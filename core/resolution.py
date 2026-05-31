@@ -109,3 +109,20 @@ async def resolve_open_positions(
             total_resolved += ledger.resolve(condition_id, winning_id)
 
     return total_resolved
+
+
+# ---------------------------------------------------------------------------
+# CLI entrypoint (invoked by launchd: uv run python -m core.resolution)
+# ---------------------------------------------------------------------------
+
+async def _main() -> None:
+    from core.config import load_config
+    from core.ledger import Ledger
+    settings = load_config()
+    ledger = Ledger("data/ledger.db")
+    n = await resolve_open_positions(ledger, fetch_resolution)
+    print(f"Resolved {n} position(s). Total realized PnL: {ledger.pnl():.2f}")
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(_main())
