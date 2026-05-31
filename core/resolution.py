@@ -12,10 +12,8 @@ from typing import Awaitable, Callable
 
 import httpx
 
-from core.clob._gamma import maybe_parse_json_field as _maybe_parse
+from core.clob._gamma import GAMMA_BASE, maybe_parse_json_field as _maybe_parse
 from core.ledger import Ledger
-
-_GAMMA_BASE = "https://gamma-api.polymarket.com"
 _WIN_THRESHOLD = 0.99
 
 
@@ -66,7 +64,7 @@ async def fetch_resolution(condition_id: str) -> str | None:
     """
     params = {"condition_ids": condition_id}
     async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.get(f"{_GAMMA_BASE}/markets", params=params)
+        response = await client.get(f"{GAMMA_BASE}/markets", params=params)
         response.raise_for_status()
         data = response.json()
 
@@ -116,12 +114,9 @@ async def resolve_open_positions(
 # ---------------------------------------------------------------------------
 
 async def _main() -> None:
-    from core.config import load_config
-    from core.ledger import Ledger
-    settings = load_config()
-    ledger = Ledger("data/ledger.db")
-    n = await resolve_open_positions(ledger, fetch_resolution)
-    print(f"Resolved {n} position(s). Total realized PnL: {ledger.pnl():.2f}")
+    with Ledger("data/ledger.db") as ledger:
+        n = await resolve_open_positions(ledger, fetch_resolution)
+        print(f"Resolved {n} position(s). Total realized PnL: {ledger.pnl():.2f}")
 
 if __name__ == "__main__":
     import asyncio

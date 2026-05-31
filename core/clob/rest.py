@@ -20,10 +20,8 @@ from typing import Any
 
 import httpx
 
-from core.clob._gamma import maybe_parse_json_field as _maybe_parse
+from core.clob._gamma import GAMMA_BASE, maybe_parse_json_field as _maybe_parse
 from core.markets import Market, Outcome
-
-_GAMMA_BASE = "https://gamma-api.polymarket.com"
 
 
 def _parse_utc(iso_str: str) -> datetime:
@@ -96,6 +94,6 @@ async def fetch_markets(limit: int = 20, active: bool = True) -> list[Market]:
     """
     params: dict[str, Any] = {"limit": limit, "active": str(active).lower()}
     async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.get(f"{_GAMMA_BASE}/markets", params=params)
+        response = await client.get(f"{GAMMA_BASE}/markets", params=params)
         response.raise_for_status()
         return [parse_market(item) for item in response.json()]

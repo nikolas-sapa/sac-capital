@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Any
 
+GAMMA_BASE = "https://gamma-api.polymarket.com"
+
 
 def maybe_parse_json_field(value: Any) -> list:
     """Return *value* as a list.

@@ -126,16 +126,16 @@ async def main(strategy_names: list[str]) -> None:
     # Ledger — ensure data/ dir exists
     data_dir = Path("data")
     data_dir.mkdir(exist_ok=True)
-    ledger = Ledger(data_dir / "ledger.db")
 
-    executor = PaperExecutor(ledger)
+    with Ledger(data_dir / "ledger.db") as ledger:
+        executor = PaperExecutor(ledger)
 
-    # Telegram alerts only if token is configured
-    alerts: TelegramAlerts | None = None
-    if settings.telegram_bot_token:
-        alerts = TelegramAlerts(settings.telegram_bot_token, settings.telegram_chat_id)
+        # Telegram alerts only if token is configured
+        alerts: TelegramAlerts | None = None
+        if settings.telegram_bot_token:
+            alerts = TelegramAlerts(settings.telegram_bot_token, settings.telegram_chat_id)
 
-    fills = await run_once(markets, strategies, executor, settings, alerts)
+        fills = await run_once(markets, strategies, executor, settings, alerts)
 
     # Summary
     print(f"\n=== Run complete: {len(fills)} fill(s) ===")
