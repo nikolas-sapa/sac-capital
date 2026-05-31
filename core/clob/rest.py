@@ -15,35 +15,15 @@ mid-price fallback — it is NOT a fabrication.
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 from typing import Any
 
 import httpx
 
+from core.clob._gamma import maybe_parse_json_field as _maybe_parse
 from core.markets import Market, Outcome
 
 _GAMMA_BASE = "https://gamma-api.polymarket.com"
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _maybe_parse(value: Any) -> list:
-    """Return *value* as a list.
-
-    The gamma API sometimes encodes list fields as JSON strings (e.g.
-    ``"[\\"Yes\\", \\"No\\"]"``).  Handle both cases defensively.
-    """
-    if isinstance(value, list):
-        return value
-    if isinstance(value, str):
-        parsed = json.loads(value)
-        if isinstance(parsed, list):
-            return parsed
-        raise ValueError(f"Expected JSON array string, got: {value!r}")
-    raise TypeError(f"Cannot coerce {type(value)} to list")
 
 
 def _parse_utc(iso_str: str) -> datetime:
@@ -115,7 +95,7 @@ async def fetch_markets(limit: int = 20, active: bool = True) -> list[Market]:
         A list of ``Market`` objects parsed from the API response.
     """
     params: dict[str, Any] = {"limit": limit, "active": str(active).lower()}
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.get(f"{_GAMMA_BASE}/markets", params=params)
         response.raise_for_status()
         return [parse_market(item) for item in response.json()]

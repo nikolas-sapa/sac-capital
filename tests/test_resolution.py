@@ -123,6 +123,17 @@ class TestParseResolution:
         }
         assert parse_resolution(item) == "clob-b"
 
+    def test_exactly_099_boundary_accepted_as_winning(self):
+        """parse_resolution treats exactly 0.99 as winning (>= threshold boundary)."""
+        from core.resolution import parse_resolution
+
+        item = {
+            "closed": True,
+            "outcomePrices": '["0.01", "0.99"]',
+            "clobTokenIds": '["clob-a", "clob-b"]',
+        }
+        assert parse_resolution(item) == "clob-b"
+
 
 # ===========================================================================
 # Tests for resolve_open_positions

@@ -8,31 +8,15 @@ resolve_open_positions(ledger, fetch_fn) — async loop over ledger open positio
 """
 from __future__ import annotations
 
-import json
-from typing import Any, Awaitable, Callable
+from typing import Awaitable, Callable
 
 import httpx
 
+from core.clob._gamma import maybe_parse_json_field as _maybe_parse
 from core.ledger import Ledger
 
 _GAMMA_BASE = "https://gamma-api.polymarket.com"
 _WIN_THRESHOLD = 0.99
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _maybe_parse(value: Any) -> list:
-    """Return *value* as a list; handles JSON-encoded string fields."""
-    if isinstance(value, list):
-        return value
-    if isinstance(value, str):
-        parsed = json.loads(value)
-        if isinstance(parsed, list):
-            return parsed
-        raise ValueError(f"Expected JSON array string, got: {value!r}")
-    raise TypeError(f"Cannot coerce {type(value)} to list")
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +65,7 @@ async def fetch_resolution(condition_id: str) -> str | None:
     is not covered by unit tests (tests inject a mock fetch_fn instead).
     """
     params = {"condition_ids": condition_id}
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.get(f"{_GAMMA_BASE}/markets", params=params)
         response.raise_for_status()
         data = response.json()
