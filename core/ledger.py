@@ -130,7 +130,7 @@ class Ledger:
         if not rows:
             return 0
 
-        updates: list[tuple[int, float, int, int]] = []
+        updates: list[tuple[int, float, int]] = []
         for r in rows:
             won = 1 if r["token_id"] == winning_token_id else 0
             pnl = (r["shares"] - r["stake"]) if won else -r["stake"]
@@ -141,6 +141,7 @@ class Ledger:
             updates,
         )
         self._con.commit()
+        self._rewrite_csv()
         return len(updates)
 
     def pnl(self) -> float:
@@ -164,6 +165,16 @@ class Ledger:
         ).fetchall()
         return [dict(r) for r in rows]
 
+    def close(self) -> None:
+        """Close the underlying sqlite connection."""
+        self._con.close()
+
+    def __enter__(self) -> "Ledger":
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.close()
+
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
@@ -178,3 +189,12 @@ class Ledger:
         with open(self._csv_path, "a", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=_CSV_HEADERS)
             writer.writerow(dict(row))
+
+    def _rewrite_csv(self) -> None:
+        """Rewrite the entire CSV from sqlite so resolved/won/pnl are current."""
+        rows = self._con.execute("SELECT * FROM fills ORDER BY id").fetchall()
+        with open(self._csv_path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=_CSV_HEADERS)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(dict(row))

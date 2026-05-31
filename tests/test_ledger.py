@@ -92,6 +92,53 @@ def test_record_creates_csv_mirror(tmp_path):
     assert market.condition_id in content
 
 
+def test_csv_mirror_updated_after_resolve(tmp_path):
+    """CSV mirror reflects resolved/won/pnl values after resolve()."""
+    import csv as _csv
+
+    db_path = tmp_path / "ledger.db"
+    csv_path = tmp_path / "ledger.csv"
+    ledger = Ledger(db_path)
+    market = _market()
+    stake = 10.0
+    shares = 17.86
+
+    ledger.record(_fill(market, token_id="tok-yes", stake=stake, shares=shares))
+    ledger.resolve(market.condition_id, "tok-yes")
+
+    with open(csv_path, newline="") as f:
+        rows = list(_csv.DictReader(f))
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["resolved"] == "1"
+    assert row["won"] == "1"
+    assert float(row["pnl"]) == pytest.approx(shares - stake)
+
+
+def test_csv_mirror_losing_position_after_resolve(tmp_path):
+    """CSV mirror shows correct pnl for a losing position after resolve()."""
+    import csv as _csv
+
+    db_path = tmp_path / "ledger.db"
+    csv_path = tmp_path / "ledger.csv"
+    ledger = Ledger(db_path)
+    market = _market()
+    stake = 10.0
+
+    ledger.record(_fill(market, token_id="tok-yes", stake=stake, shares=17.86))
+    ledger.resolve(market.condition_id, "tok-no")  # tok-no wins → tok-yes loses
+
+    with open(csv_path, newline="") as f:
+        rows = list(_csv.DictReader(f))
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["resolved"] == "1"
+    assert row["won"] == "0"
+    assert float(row["pnl"]) == pytest.approx(-stake)
+
+
 def test_persistence_across_instances(tmp_path):
     """A new Ledger opened on the same path sees previously recorded rows."""
     db_path = tmp_path / "ledger.db"
