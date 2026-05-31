@@ -33,6 +33,9 @@ _WS_URL = "wss://ws-subscriptions-clob.polymarket.com/ws/market"
 _BACKOFF_START = 1.0
 _BACKOFF_CAP = 30.0
 
+# App-level PING keepalive interval (seconds). Polymarket disconnects silent clients.
+_PING_INTERVAL = 10.0
+
 
 # ---------------------------------------------------------------------------
 # Domain type
@@ -139,6 +142,31 @@ def _parse_message(raw: str) -> OrderBook | None:
 
 
 # ---------------------------------------------------------------------------
+# Keepalive helper
+# ---------------------------------------------------------------------------
+
+
+async def _keepalive(ws: object, interval: float = _PING_INTERVAL) -> None:
+    """Send app-level ``PING`` frames on *ws* every *interval* seconds.
+
+    Exits quietly on :exc:`~websockets.exceptions.ConnectionClosed` so the
+    outer reconnect loop in :meth:`ClobWebsocket.stream` can handle recovery.
+    Designed to be run as a background :class:`asyncio.Task` scoped to a
+    single connection lifetime.
+
+    Args:
+        ws: An open websocket connection with an ``async send(text)`` method.
+        interval: Seconds between PING frames (default ``_PING_INTERVAL``).
+    """
+    try:
+        while True:
+            await ws.send("PING")  # type: ignore[union-attr]
+            await asyncio.sleep(interval)
+    except ConnectionClosed:
+        pass
+
+
+# ---------------------------------------------------------------------------
 # Websocket client
 # ---------------------------------------------------------------------------
 
@@ -177,9 +205,14 @@ class ClobWebsocket:
         # exponential backoff. We layer our own backoff on top only for the
         # subscribe/recv failure path to avoid hammering on persistent errors.
         async for websocket in connect(self._url):
+            ping_task: asyncio.Task[None] | None = None
             try:
                 await websocket.send(subscribe_payload)
                 logger.info("Subscribed to CLOB market channel for %d token(s)", len(token_ids))
+
+                # Start keepalive: sends "PING" every _PING_INTERVAL seconds.
+                # Scoped to this connection; cancelled in the finally block.
+                ping_task = asyncio.create_task(_keepalive(websocket))
 
                 async for raw in websocket:
                     # _parse_message tolerates heartbeats (PING/PONG),
@@ -210,6 +243,15 @@ class ClobWebsocket:
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, _BACKOFF_CAP)
                 continue
+            finally:
+                # Cancel the keepalive task for this connection so it doesn't
+                # leak into the next reconnect iteration.
+                if ping_task is not None:
+                    ping_task.cancel()
+                    try:
+                        await ping_task
+                    except asyncio.CancelledError:
+                        pass
 
 
 # ---------------------------------------------------------------------------

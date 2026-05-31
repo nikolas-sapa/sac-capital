@@ -6,11 +6,19 @@ No websocket connections are made; these run fully offline.
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
 
-from core.clob.client import OrderBook, _WS_URL, _apply_book_message, _parse_message
+from core.clob.client import (
+    OrderBook,
+    _PING_INTERVAL,
+    _WS_URL,
+    _apply_book_message,
+    _keepalive,
+    _parse_message,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -206,3 +214,71 @@ class TestParseMessageBatchList:
 
     def test_empty_list_returns_none(self) -> None:
         assert _parse_message("[]") is None
+
+
+# ---------------------------------------------------------------------------
+# Keepalive constant + helper unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestPingInterval:
+    def test_ping_interval_value(self) -> None:
+        """Module constant must be exactly 10.0 seconds."""
+        assert _PING_INTERVAL == 10.0
+
+
+class TestKeepalive:
+    """Unit tests for the _keepalive coroutine using a minimal fake websocket.
+
+    We test _keepalive in isolation — not the full stream() wiring — which
+    keeps the test simple and avoids mocking the websockets connect() seam.
+    """
+
+    @pytest.mark.asyncio
+    async def test_keepalive_sends_ping(self) -> None:
+        """_keepalive must call ws.send('PING') at least once."""
+        sent: list[str] = []
+
+        class _FakeWS:
+            async def send(self, text: str) -> None:
+                sent.append(text)
+
+        task = asyncio.create_task(_keepalive(_FakeWS(), interval=0.01))
+        await asyncio.sleep(0.05)  # allow 2-3 PINGs to fire
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+        assert len(sent) >= 1
+        assert all(m == "PING" for m in sent)
+
+    @pytest.mark.asyncio
+    async def test_keepalive_exits_on_connection_closed(self) -> None:
+        """_keepalive must exit quietly when ConnectionClosed is raised by send."""
+        from websockets.exceptions import ConnectionClosed
+
+        class _FakeWS:
+            async def send(self, text: str) -> None:
+                # Simulate server closing the connection on first send.
+                raise ConnectionClosed(None, None)  # type: ignore[arg-type]
+
+        # Should complete without raising.
+        await asyncio.wait_for(_keepalive(_FakeWS(), interval=0.01), timeout=1.0)
+
+    @pytest.mark.asyncio
+    async def test_keepalive_cancellable(self) -> None:
+        """_keepalive task must exit cleanly on asyncio.CancelledError."""
+
+        class _FakeWS:
+            async def send(self, text: str) -> None:
+                pass
+
+        task = asyncio.create_task(_keepalive(_FakeWS(), interval=10.0))
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass  # expected — task propagates CancelledError out of asyncio.sleep
+        # Reaching here means the task terminated without hanging.
