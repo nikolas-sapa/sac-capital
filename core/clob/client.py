@@ -200,10 +200,11 @@ if __name__ == "__main__":
 
     async def _main() -> None:
         client = ClobWebsocket()
-        deadline = asyncio.get_event_loop().time() + 10.0
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + 10.0
         async for ob in client.stream([token_id]):
             print(f"[{ob.asset_id}] best_bid={ob.best_bid:.4f}  best_ask={ob.best_ask:.4f}")
-            if asyncio.get_event_loop().time() >= deadline:
+            if loop.time() >= deadline:
                 break
         print("Done.")
 
