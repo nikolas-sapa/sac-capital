@@ -1,14 +1,16 @@
 """Unit tests for core/clob/client.py — pure-function tests only.
 
-All tests exercise _apply_book_message which is a pure parser with no I/O.
+Tests exercise _apply_book_message and _parse_message (pure parsers, no I/O).
 No websocket connections are made; these run fully offline.
 """
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
-from core.clob.client import OrderBook, _apply_book_message
+from core.clob.client import OrderBook, _WS_URL, _apply_book_message, _parse_message
 
 
 # ---------------------------------------------------------------------------
@@ -123,3 +125,84 @@ class TestApplyBookMessageEmpty:
     def test_empty_asset_id(self) -> None:
         ob = _apply_book_message(EMPTY_BOOK_MSG)
         assert ob.asset_id == "token-empty"
+
+
+# ---------------------------------------------------------------------------
+# Regression: correct websocket host
+# ---------------------------------------------------------------------------
+
+
+class TestWsUrl:
+    def test_ws_url_correct_host(self) -> None:
+        """Guard against typo in the CLOB websocket hostname."""
+        assert _WS_URL == "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+
+
+# ---------------------------------------------------------------------------
+# Tests for _parse_message
+# ---------------------------------------------------------------------------
+
+
+class TestParseMessage:
+    def test_valid_book_json_returns_orderbook(self) -> None:
+        raw = json.dumps(BOOK_MSG)
+        ob = _parse_message(raw)
+        assert ob is not None
+        assert isinstance(ob, OrderBook)
+        assert ob.best_bid == pytest.approx(0.50)
+        assert ob.best_ask == pytest.approx(0.52)
+
+    def test_pong_heartbeat_returns_none(self) -> None:
+        assert _parse_message("PONG") is None
+
+    def test_ping_heartbeat_returns_none(self) -> None:
+        assert _parse_message("PING") is None
+
+    def test_price_change_event_returns_none(self) -> None:
+        price_change = json.dumps({
+            "event_type": "price_change",
+            "asset_id": "token-abc-123",
+            "price": "0.51",
+            "side": "BUY",
+            "timestamp": "2024-01-01T00:00:00Z",
+        })
+        assert _parse_message(price_change) is None
+
+    def test_malformed_json_returns_none(self) -> None:
+        assert _parse_message("{not json") is None
+
+    def test_empty_string_returns_none(self) -> None:
+        assert _parse_message("") is None
+
+    def test_non_book_dict_returns_none(self) -> None:
+        raw = json.dumps({"event_type": "tick_size_change", "asset_id": "x"})
+        assert _parse_message(raw) is None
+
+
+class TestParseMessageBatchList:
+    """Polymarket may send a JSON array of events in a single frame."""
+
+    def test_list_with_one_book_event_returns_orderbook(self) -> None:
+        batch = json.dumps([BOOK_MSG])
+        ob = _parse_message(batch)
+        assert ob is not None
+        assert ob.asset_id == "token-abc-123"
+        assert ob.best_bid == pytest.approx(0.50)
+
+    def test_list_with_non_book_only_returns_none(self) -> None:
+        batch = json.dumps([
+            {"event_type": "price_change", "asset_id": "x", "price": "0.5"},
+        ])
+        assert _parse_message(batch) is None
+
+    def test_list_with_mixed_events_returns_first_book(self) -> None:
+        batch = json.dumps([
+            {"event_type": "price_change", "asset_id": "x"},
+            BOOK_MSG,
+        ])
+        ob = _parse_message(batch)
+        assert ob is not None
+        assert ob.asset_id == "token-abc-123"
+
+    def test_empty_list_returns_none(self) -> None:
+        assert _parse_message("[]") is None

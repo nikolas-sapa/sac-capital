@@ -27,7 +27,7 @@ from websockets.exceptions import ConnectionClosed
 
 logger = logging.getLogger(__name__)
 
-_WS_URL = "wss://ws-subscribe.clob.polymarket.com/ws/market"
+_WS_URL = "wss://ws-subscriptions-clob.polymarket.com/ws/market"
 
 # Reconnect backoff: start 1 s, double each attempt, cap at 30 s.
 _BACKOFF_START = 1.0
@@ -106,6 +106,38 @@ def _apply_book_message(msg: dict) -> OrderBook:
     )
 
 
+def _parse_message(raw: str) -> OrderBook | None:
+    """Return an OrderBook for a ``book`` event; None otherwise.
+
+    Handles:
+    - App-level heartbeats (``PING``/``PONG``) — not JSON → None.
+    - Non-``book`` events (``price_change``, ``tick_size_change``, etc.) → None.
+    - Top-level JSON **list**: Polymarket may batch events; each dict element
+      whose ``event_type == "book"`` is parsed and the FIRST OrderBook found
+      is returned (the stream loop handles the list case separately for
+      multi-book batches — see ``stream()``).
+    - Malformed JSON → None.
+
+    Pure function — no I/O, safe to test offline.
+    """
+    try:
+        msg = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+    if isinstance(msg, list):
+        # Batched event list: return the first book event found, if any.
+        for item in msg:
+            if isinstance(item, dict) and item.get("event_type") == "book":
+                return _apply_book_message(item)
+        return None
+
+    if not isinstance(msg, dict) or msg.get("event_type") != "book":
+        return None
+
+    return _apply_book_message(msg)
+
+
 # ---------------------------------------------------------------------------
 # Websocket client
 # ---------------------------------------------------------------------------
@@ -150,19 +182,26 @@ class ClobWebsocket:
                 logger.info("Subscribed to CLOB market channel for %d token(s)", len(token_ids))
 
                 async for raw in websocket:
+                    # _parse_message tolerates heartbeats (PING/PONG),
+                    # non-book events, and malformed JSON — returns None for all.
+                    # For batched list messages it returns the first book entry;
+                    # we handle the multi-book-in-one-list case below.
                     try:
-                        msg = json.loads(raw)
-                    except json.JSONDecodeError:
-                        logger.warning("Non-JSON message ignored: %.120s", raw)
+                        top = json.loads(raw)
+                    except (json.JSONDecodeError, ValueError):
+                        logger.debug("Non-JSON message ignored: %.120s", raw)
                         continue
 
-                    event_type = msg.get("event_type")
-
-                    if event_type == "book":
-                        # Reset backoff on successful message receipt.
+                    if isinstance(top, list):
+                        # Batched event list — yield every book entry.
+                        for item in top:
+                            if isinstance(item, dict) and item.get("event_type") == "book":
+                                backoff = _BACKOFF_START
+                                yield _apply_book_message(item)
+                    elif isinstance(top, dict) and top.get("event_type") == "book":
+                        # Reset backoff on successful book message.
                         backoff = _BACKOFF_START
-                        yield _apply_book_message(msg)
-
+                        yield _apply_book_message(top)
                     # price_change / tick_size_change deferred — Foundation
                     # scope uses full book snapshots only.
 
