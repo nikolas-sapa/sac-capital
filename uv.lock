@@ -585,9 +585,13 @@ dependencies = [
     { name = "pandas" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "websockets" },
+]
+
+[package.dev-dependencies]
+dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
-    { name = "websockets" },
 ]
 
 [package.metadata]
@@ -597,9 +601,13 @@ requires-dist = [
     { name = "pandas", specifier = ">=3.0.3" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pydantic-settings", specifier = ">=2.14.1" },
+    { name = "websockets", specifier = ">=16.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
-    { name = "websockets", specifier = ">=16.0" },
 ]
 
 [[package]]
