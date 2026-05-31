@@ -23,16 +23,17 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import os
 from pathlib import Path
 
 from core.alerts.telegram import TelegramAlerts
 from core.clob.rest import fetch_markets
-from core.config import load_config
+from core.config import Settings, load_config
+from core.execution.base import Executor, Fill
 from core.execution.paper import PaperExecutor
-from core.execution.base import Fill
 from core.ledger import Ledger
+from core.markets import Market
 from core.sizing.kelly import kelly_fraction
+from core.strategy import Strategy
 from strategies.dummy import DummyStrategy
 
 # ---------------------------------------------------------------------------
@@ -48,7 +49,13 @@ STRATEGIES: dict[str, type] = {
 # Core logic
 # ---------------------------------------------------------------------------
 
-async def run_once(markets, strategies, executor, settings, alerts=None) -> list[Fill]:
+async def run_once(
+    markets: list[Market],
+    strategies: list[Strategy],
+    executor: Executor,
+    settings: Settings,
+    alerts: TelegramAlerts | None = None,
+) -> list[Fill]:
     """Execute one scan-and-place pass across all strategies.
 
     For each strategy, call strategy.scan(markets). For each signal:
@@ -109,7 +116,12 @@ async def main(strategy_names: list[str]) -> None:
         strategies.append(STRATEGIES[name]())
 
     # Fetch markets (requires network; geo-blocked on this machine without VPN)
-    markets = await fetch_markets(limit=20)
+    try:
+        markets = await fetch_markets(limit=20)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to fetch markets (geo-blocked? check VPN/region): {exc}"
+        ) from exc
 
     # Ledger — ensure data/ dir exists
     data_dir = Path("data")
@@ -128,7 +140,10 @@ async def main(strategy_names: list[str]) -> None:
     # Summary
     print(f"\n=== Run complete: {len(fills)} fill(s) ===")
     for fill in fills:
-        label = fill.signal.market.outcome_by_token(fill.signal.token_id).label
+        try:
+            label = fill.signal.market.outcome_by_token(fill.signal.token_id).label
+        except KeyError:
+            label = fill.signal.token_id
         print(
             f"  [{fill.signal.market.condition_id}] {fill.signal.market.question[:60]}"
             f" | {label} | stake={fill.stake:.2f} | price={fill.avg_price:.4f}"

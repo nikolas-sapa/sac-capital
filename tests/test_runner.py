@@ -9,8 +9,8 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import pytest_asyncio
 
+from core.config import load_config
 from core.execution.paper import PaperExecutor
 from core.ledger import Ledger
 from core.markets import Market, Outcome
@@ -39,7 +39,6 @@ def _make_market(best_ask: float = 0.5) -> Market:
 
 def _make_settings(bankroll_usd=1000.0, kelly_fraction=0.5, max_position_pct=0.02):
     """Return a Settings-like object with the required attrs (no .env needed)."""
-    from core.config import load_config
     s = load_config(env_file=None)
     s = s.model_copy(update={
         "bankroll_usd": bankroll_usd,
