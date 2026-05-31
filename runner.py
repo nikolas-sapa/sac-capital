@@ -87,7 +87,7 @@ async def run_once(
             cap = settings.max_position_pct * settings.bankroll_usd
             stake = min(stake, cap)  # HARD CAP: no single position > MAX_POSITION_PCT
 
-            fill = executor.place(signal, stake)
+            fill = executor.place(signal, stake, strategy=strategy.name)
             results.append(fill)
 
             if alerts is not None:

@@ -42,7 +42,7 @@ class PaperExecutor:
         self._slippage = slippage
         self._fee_rate = fee_rate
 
-    def place(self, signal: Signal, stake: float) -> Fill:
+    def place(self, signal: Signal, stake: float, strategy: str = "") -> Fill:
         """Simulate a buy order and record it in the ledger.
 
         Execution price is worsened by slippage (crossing the spread on thin
@@ -66,5 +66,5 @@ class PaperExecutor:
             timestamp=datetime.now(timezone.utc),
             mode="paper",
         )
-        self._ledger.record(fill)
+        self._ledger.record(fill, strategy=strategy)
         return fill

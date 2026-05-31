@@ -297,3 +297,129 @@ def test_pnl_accumulates_across_markets(tmp_path):
 
     expected = (17.86 - 10.0) + (-5.0)
     assert ledger.pnl() == pytest.approx(expected)
+
+
+# ---------------------------------------------------------------------------
+# strategy attribution
+# ---------------------------------------------------------------------------
+
+def test_record_with_strategy_stored(tmp_path):
+    """record(fill, strategy=...) stores strategy; open_positions()[0]['strategy'] returns it."""
+    db_path = tmp_path / "ledger.db"
+    ledger = Ledger(db_path)
+    market = _market()
+
+    ledger.record(_fill(market), strategy="llm_probability")
+
+    positions = ledger.open_positions()
+    assert len(positions) == 1
+    assert positions[0]["strategy"] == "llm_probability"
+
+
+def test_record_default_strategy_empty_string(tmp_path):
+    """record(fill) without strategy kwarg stores '' by default."""
+    db_path = tmp_path / "ledger.db"
+    ledger = Ledger(db_path)
+    market = _market()
+
+    ledger.record(_fill(market))
+
+    positions = ledger.open_positions()
+    assert positions[0]["strategy"] == ""
+
+
+def test_csv_mirror_contains_strategy(tmp_path):
+    """CSV mirror includes strategy column after record()."""
+    import csv as _csv
+
+    db_path = tmp_path / "ledger.db"
+    csv_path = tmp_path / "ledger.csv"
+    ledger = Ledger(db_path)
+    market = _market()
+
+    ledger.record(_fill(market), strategy="llm_probability")
+
+    with open(csv_path, newline="") as f:
+        rows = list(_csv.DictReader(f))
+
+    assert len(rows) == 1
+    assert rows[0]["strategy"] == "llm_probability"
+
+
+def test_csv_mirror_strategy_after_resolve(tmp_path):
+    """CSV mirror retains strategy value after resolve() rewrite."""
+    import csv as _csv
+
+    db_path = tmp_path / "ledger.db"
+    csv_path = tmp_path / "ledger.csv"
+    ledger = Ledger(db_path)
+    market = _market()
+
+    ledger.record(_fill(market, token_id="tok-yes"), strategy="weather")
+    ledger.resolve(market.condition_id, "tok-yes")
+
+    with open(csv_path, newline="") as f:
+        rows = list(_csv.DictReader(f))
+
+    assert len(rows) == 1
+    assert rows[0]["strategy"] == "weather"
+    assert rows[0]["resolved"] == "1"
+
+
+def test_migration_old_schema(tmp_path):
+    """Opening a Ledger on an old-schema db (no strategy column) auto-migrates safely."""
+    import sqlite3 as _sqlite3
+
+    db_path = tmp_path / "old_ledger.db"
+
+    # Create old-schema db manually (no strategy column)
+    con = _sqlite3.connect(str(db_path))
+    con.execute("""
+        CREATE TABLE fills (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            condition_id TEXT    NOT NULL,
+            token_id     TEXT    NOT NULL,
+            question     TEXT    NOT NULL,
+            stake        REAL    NOT NULL,
+            shares       REAL    NOT NULL,
+            avg_price    REAL    NOT NULL,
+            fair_prob    REAL    NOT NULL,
+            confidence   REAL    NOT NULL,
+            reason       TEXT    NOT NULL,
+            mode         TEXT    NOT NULL,
+            timestamp    TEXT    NOT NULL,
+            resolved     INTEGER NOT NULL DEFAULT 0,
+            won          INTEGER,
+            pnl          REAL
+        )
+    """)
+    con.execute(
+        "INSERT INTO fills (condition_id, token_id, question, stake, shares, "
+        "avg_price, fair_prob, confidence, reason, mode, timestamp) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        ("cond-old", "tok-old", "Old question?", 5.0, 10.0, 0.5, 0.6, 0.7, "old reason", "paper", "2026-01-01T00:00:00+00:00"),
+    )
+    con.commit()
+    con.close()
+
+    # Open with Ledger — should auto-migrate
+    ledger = Ledger(db_path)
+
+    # strategy column now exists
+    cols = {row[1] for row in ledger._con.execute("PRAGMA table_info(fills)")}
+    assert "strategy" in cols
+
+    # Existing row is accessible via open_positions with strategy == ''
+    positions = ledger.open_positions()
+    assert len(positions) == 1
+    assert positions[0]["strategy"] == ""
+
+    # Can record new fills with strategy
+    market = _market("cond-new")
+    ledger.record(_fill(market), strategy="test_strategy")
+    positions = ledger.open_positions()
+    assert len(positions) == 2
+    new_pos = next(p for p in positions if p["condition_id"] == "cond-new")
+    assert new_pos["strategy"] == "test_strategy"
+
+    ledger.close()

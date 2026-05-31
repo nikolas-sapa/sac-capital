@@ -159,3 +159,18 @@ def test_place_records_in_ledger(tmp_path):
     assert pos["stake"] == pytest.approx(stake, abs=1e-9)
     assert pos["shares"] == pytest.approx(fill.shares, abs=1e-9)
     assert pos["avg_price"] == pytest.approx(fill.avg_price, abs=1e-9)
+
+
+def test_place_forwards_strategy_to_ledger(tmp_path):
+    """place(signal, stake, strategy=...) stores strategy in the ledger."""
+    from core.execution.paper import PaperExecutor
+
+    ledger = Ledger(tmp_path / "ledger.db")
+    executor = PaperExecutor(ledger, slippage=0.0, fee_rate=0.0)
+    signal = _signal()
+
+    executor.place(signal, stake=10.0, strategy="weather")
+
+    positions = ledger.open_positions()
+    assert len(positions) == 1
+    assert positions[0]["strategy"] == "weather"

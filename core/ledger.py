@@ -53,14 +53,15 @@ CREATE TABLE IF NOT EXISTS fills (
     timestamp    TEXT    NOT NULL,
     resolved     INTEGER NOT NULL DEFAULT 0,
     won          INTEGER,          -- NULL until resolved
-    pnl          REAL              -- NULL until resolved
+    pnl          REAL,             -- NULL until resolved
+    strategy     TEXT    NOT NULL DEFAULT ''
 )
 """
 
 _CSV_HEADERS = [
     "id", "condition_id", "token_id", "question",
     "stake", "shares", "avg_price", "fair_prob", "confidence",
-    "reason", "mode", "timestamp", "resolved", "won", "pnl",
+    "reason", "mode", "timestamp", "resolved", "won", "pnl", "strategy",
 ]
 
 
@@ -75,13 +76,20 @@ class Ledger:
         self._con.row_factory = sqlite3.Row
         self._con.execute(_CREATE_TABLE)
         self._con.commit()
+        # Auto-migration: add strategy column if it doesn't exist (old schema)
+        cols = {row[1] for row in self._con.execute("PRAGMA table_info(fills)")}
+        if "strategy" not in cols:
+            self._con.execute(
+                "ALTER TABLE fills ADD COLUMN strategy TEXT NOT NULL DEFAULT ''"
+            )
+            self._con.commit()
         self._ensure_csv_header()
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    def record(self, fill: Fill) -> None:
+    def record(self, fill: Fill, strategy: str = "") -> None:
         """Append a fill as a new unresolved position."""
         sig = fill.signal
         market = sig.market
@@ -97,13 +105,14 @@ class Ledger:
             sig.reason,
             fill.mode,
             fill.timestamp.isoformat(),
+            strategy,
         )
         cur = self._con.execute(
             """
             INSERT INTO fills
                 (condition_id, token_id, question, stake, shares, avg_price,
-                 fair_prob, confidence, reason, mode, timestamp)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                 fair_prob, confidence, reason, mode, timestamp, strategy)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             row,
         )
@@ -160,7 +169,7 @@ class Ledger:
         """
         rows = self._con.execute(
             "SELECT id, condition_id, token_id, question, stake, shares, "
-            "avg_price, fair_prob, confidence, reason, mode, timestamp "
+            "avg_price, fair_prob, confidence, reason, mode, timestamp, strategy "
             "FROM fills WHERE resolved = 0"
         ).fetchall()
         return [dict(r) for r in rows]
