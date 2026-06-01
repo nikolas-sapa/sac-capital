@@ -71,6 +71,12 @@ class TestEnvOverrides:
         assert s.anthropic_api_key == "sk-ant-test"
 
 
+def test_equity_defaults_present():
+    cfg = load_config(env_file=None)
+    assert cfg.equity_ledger_path.endswith(".db")
+    assert cfg.equity_risk_pct == 0.02
+
+
 class TestReturnType:
     """load_config returns a Settings instance."""
 
