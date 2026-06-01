@@ -29,6 +29,9 @@ from core.markets import Market
 from core.sizing.kelly import kelly_fraction
 from core.strategy import Strategy
 from strategies.dummy import DummyStrategy
+from strategies.llm_probability.strategy import LLMProbabilityStrategy
+from strategies.weather.strategy import WeatherStrategy
+from strategies.crypto_updown.strategy import CryptoUpDownStrategy
 
 # ---------------------------------------------------------------------------
 # Strategy registry  (name → class)
@@ -36,6 +39,9 @@ from strategies.dummy import DummyStrategy
 
 STRATEGIES: dict[str, type] = {
     "dummy": DummyStrategy,
+    "llm": LLMProbabilityStrategy,
+    "weather": WeatherStrategy,
+    "crypto_updown": CryptoUpDownStrategy,
 }
 
 
