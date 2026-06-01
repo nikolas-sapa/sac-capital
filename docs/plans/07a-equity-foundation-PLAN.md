@@ -793,8 +793,10 @@ def test_equity_defaults_present():
     from core.config import load_config
     cfg = load_config(env_file=None)
     assert cfg.equity_ledger_path.endswith(".db")
-    assert cfg.equity_risk_pct == 0.03
+    assert cfg.equity_risk_pct == 0.02
 ```
+
+> Grill Q5: fractional shares confirmed on Revolut → tight 2% default (ratchets to 1%), not the earlier 3%.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -808,7 +810,7 @@ Add to the `Settings` class in `core/config.py` (alongside the existing fields):
 ```python
     # --- equities (Plan 07) ---
     equity_ledger_path: str = "data/equity.db"
-    equity_risk_pct: float = 0.03          # per-swing-trade risk cap (ratchets later)
+    equity_risk_pct: float = 0.02          # per-swing-trade risk cap (fractional shares → tight; ratchets to 0.01)
     finnhub_api_key: str = ""
 ```
 
@@ -840,5 +842,8 @@ git commit -m "feat(equities): equity config settings"
 - [ ] Full `uv run pytest -q` is green (no Polymarket regressions).
 - [ ] No real-money / broker code exists.
 
+## NEXT after Foundation: `07-SPIKE` (grill Q4)
+Before 07b, build the throwaway **synthesis spike** — prove Claude's analysis isn't garbage on ~10 hand-picked tickers before building the machine. See `07-PLAN-INDEX.md`.
+
 ## NOT in Foundation (later milestones, gated)
-Screening (07b), analyst engine (07c), risk kernel + paper tracker (07d), backtest kill-gate (07e), self-improvement harness (07f), cross-venue orchestrator (later). See `07-equities-analyst-SPEC.md`.
+Synthesis spike (07-SPIKE), event-screening (07b), analyst engine (07c), guardian-process risk kernel + paper tracker (07d), forward-paper kill-gate (07e), self-improvement harness (07f), cross-venue orchestrator (later). See `07-equities-analyst-SPEC.md`.
