@@ -97,17 +97,23 @@ class EquityAnalyst:
     Stage 1: Haiku scores all candidates and returns top `max_candidates`.
     Stage 2: Sonnet writes entry/stop/TP for each surviving candidate.
     Candidates where the re-rating is already complete are rejected.
+
+    When `llm` is None, uses ClaudeCodeClient (Claude subscription via
+    `claude -p`) — no API key required.
     """
 
     def __init__(
         self,
-        llm: LLMClient,
-        prices: PriceProvider,
-        news: NewsProvider,
-        filings: FilingsSummaryProvider,
+        llm: LLMClient | None = None,
+        prices: PriceProvider | None = None,
+        news: NewsProvider | None = None,
+        filings: FilingsSummaryProvider | None = None,
         budget: DailyBudget | None = None,
         max_candidates: int = 5,
     ) -> None:
+        if llm is None:
+            from core.claude_client import ClaudeCodeClient
+            llm = ClaudeCodeClient()  # type: ignore[assignment]
         self._llm = llm
         self._prices = prices
         self._news = news

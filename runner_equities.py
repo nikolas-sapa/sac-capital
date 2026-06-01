@@ -17,7 +17,8 @@ from pathlib import Path
 
 from core.assets.instrument import CapTier, Instrument
 from core.config import load_config
-from equities.analysis.analyst import EquityAnalyst, AnthropicLLMClient
+from core.claude_client import ClaudeCodeClient
+from equities.analysis.analyst import EquityAnalyst
 from equities.analysis.budget import DailyBudget
 from equities.data.calendar import YFinanceCalendar
 from equities.data.filings import SECEdgarFilings
@@ -155,19 +156,16 @@ async def run_once(
     for c in core_candidates:
         print(f"  [{c.instrument.ticker}] score={c.score:.3f}: {c.evidence}")
 
-    if no_analyse or not settings.anthropic_api_key:
-        if not settings.anthropic_api_key:
-            print("\n[!] ANTHROPIC_API_KEY not set — skipping analyst stage.")
+    if no_analyse:
         print("Screen-only mode complete.")
         equity_ledger.close()
         fp_tracker.close()
         return
 
-    # --- Analyst stage ---
-    llm_client = AnthropicLLMClient(settings.anthropic_api_key)
-    budget = DailyBudget(daily_limit_usd=1.0)
+    # --- Analyst stage (uses Claude subscription via `claude -p`) ---
+    budget = DailyBudget(daily_limit_usd=999.0)  # subscription: not per-token billed
     analyst = EquityAnalyst(
-        llm=llm_client,
+        llm=ClaudeCodeClient(),
         prices=prices,
         news=news,
         filings=filings_summary,
