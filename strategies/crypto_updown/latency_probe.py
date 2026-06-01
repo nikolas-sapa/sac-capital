@@ -4,8 +4,23 @@ Task 2 — LATENCY GATE (manual).
 Measures the delay between a significant BTC spot move on Binance and the
 corresponding Polymarket CLOB book reprice on an active BTC Up/Down market.
 
-USAGE:
-  uv run python strategies/crypto_updown/latency_probe.py --market <condition_id> --duration 3600
+USAGE (three ways to supply the market):
+
+  # Auto-discover live BTC Up/Down markets (requires VPN routing terminal traffic):
+  uv run python strategies/crypto_updown/latency_probe.py --discover
+
+  # Extract condition_id from a Polymarket market URL you copied from the browser:
+  uv run python strategies/crypto_updown/latency_probe.py --url "https://polymarket.com/event/btc-..."
+
+  # Pass the condition_id directly (fastest):
+  uv run python strategies/crypto_updown/latency_probe.py --market 0xabc...123 --duration 3600
+
+HOW TO GET THE CONDITION ID WITHOUT VPN IN THE TERMINAL:
+  1. Open polymarket.com in your VPN browser
+  2. Find any "Will BTC be higher/lower at ..." market
+  3. Open browser DevTools → Network tab → reload → find a request to gamma-api.polymarket.com
+  4. Copy the conditionId value from the JSON response
+  OR: the URL slug can be resolved via --url flag below.
 
 INTERPRETATION:
   median_reprice_lag_ms < 500   → directional repricing MAY be viable; run Tasks 4-5
@@ -140,13 +155,101 @@ async def run_probe(condition_id: str, duration_s: int, symbol: str = "BTCUSDT")
     print("\nDocument these numbers in docs/plans/04-crypto-updown-bot.md before continuing.")
 
 
+def _discover_markets() -> list[tuple[str, str]]:
+    """Try to fetch live BTC Up/Down markets from the Gamma API."""
+    try:
+        resp = httpx.get(
+            f"{_GAMMA_URL}/markets?active=true&closed=false&limit=200",
+            headers={"Accept": "application/json"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        markets = resp.json()
+        if not isinstance(markets, list):
+            markets = markets.get("markets", [])
+        found = []
+        for m in markets:
+            q = m.get("question", "").lower()
+            cid = m.get("conditionId", "")
+            if cid and any(w in q for w in ["btc", "bitcoin"]) and any(
+                w in q for w in ["higher", "lower", "up", "down"]
+            ):
+                found.append((cid, m.get("question", "")))
+        return found
+    except Exception as e:
+        print(f"[!] Could not reach Gamma API: {e}")
+        return []
+
+
+def _cid_from_url(url: str) -> str | None:
+    """Extract conditionId from a Polymarket event URL slug via the API."""
+    import re
+    slug_match = re.search(r"polymarket\.com/event/([^/?#]+)", url)
+    if not slug_match:
+        print("[!] Could not parse slug from URL:", url)
+        return None
+    slug = slug_match.group(1)
+    print(f"Resolving slug: {slug}")
+    try:
+        resp = httpx.get(
+            f"{_GAMMA_URL}/events?slug={slug}",
+            headers={"Accept": "application/json"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        events = data if isinstance(data, list) else [data]
+        for event in events:
+            markets = event.get("markets", [])
+            for m in markets:
+                q = m.get("question", "").lower()
+                if any(w in q for w in ["btc", "bitcoin", "higher", "lower"]):
+                    cid = m.get("conditionId", "")
+                    if cid:
+                        return cid
+            # fallback: first market in the event
+            if markets and markets[0].get("conditionId"):
+                return markets[0]["conditionId"]
+    except Exception as e:
+        print(f"[!] Could not resolve URL: {e}")
+    return None
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--market", required=True, help="Polymarket condition_id for a BTC Up/Down market")
+    parser = argparse.ArgumentParser(description="Polymarket/Binance latency probe")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--market", help="Polymarket condition_id for a BTC Up/Down market")
+    group.add_argument("--discover", action="store_true", help="Auto-discover live BTC Up/Down markets via Gamma API")
+    group.add_argument("--url", help="Polymarket event URL (e.g. https://polymarket.com/event/btc-...)")
     parser.add_argument("--duration", type=int, default=3600, help="probe duration in seconds")
     parser.add_argument("--symbol", default="BTCUSDT", help="Binance symbol")
     args = parser.parse_args()
-    asyncio.run(run_probe(args.market, args.duration, args.symbol))
+
+    condition_id = args.market
+
+    if args.discover:
+        print("Discovering live BTC Up/Down markets...")
+        markets = _discover_markets()
+        if not markets:
+            print("[!] No markets found. Make sure your VPN is routing terminal traffic.")
+            print("    Alternatively use: --url <polymarket_url>  or  --market <condition_id>")
+            return
+        print(f"\nFound {len(markets)} BTC Up/Down market(s):")
+        for i, (cid, q) in enumerate(markets[:5]):
+            print(f"  [{i}] {cid[:20]}... | {q[:70]}")
+        condition_id = markets[0][0]
+        print(f"\nUsing: {condition_id}")
+
+    elif args.url:
+        condition_id = _cid_from_url(args.url)
+        if not condition_id:
+            print("[!] Could not extract condition_id from URL. Try --market directly.")
+            return
+
+    if not condition_id:
+        parser.error("Provide one of: --market <id>, --discover, or --url <polymarket_url>")
+
+    asyncio.run(run_probe(condition_id, args.duration, args.symbol))
 
 
 if __name__ == "__main__":

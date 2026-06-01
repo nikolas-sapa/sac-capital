@@ -17,3 +17,12 @@ dependencies = [
 
 [dependency-groups]
 dev = ["pytest>=9.0.3", "pytest-asyncio>=1.4.0"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
+
+[project.scripts]
+latency-probe = "strategies.crypto_updown.latency_probe:main"
+runner = "runner:main"
+runner-equities = "runner_equities:main"
