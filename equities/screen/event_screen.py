@@ -1,0 +1,190 @@
+"""07b — Event-based screener for the swing sleeve.
+
+Screens for *upcoming or recent events* that may cause a re-rating, NOT for
+stocks that have already moved. Claude is the analyst; this is the cheap funnel.
+
+Events detected (in urgency order):
+1. EARNINGS_APPROACHING — next earnings date within `earnings_window_days`
+2. EARNINGS_SURPRISE_DRIFT — 8-K item 2.02 filed within `filing_window_days`
+   (post-earnings-announcement drift window)
+3. MATERIAL_FILING — fresh 8-K with material items (1.01 / 5.02 / 8.01 / 7.01)
+   within `filing_window_days`
+
+Only SMALL and MID cap instruments are eligible (configurable via `cap_tiers`).
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import date
+from enum import Enum
+from typing import Protocol
+
+from core.assets.instrument import CapTier, Instrument
+
+
+class EventType(Enum):
+    EARNINGS_APPROACHING = "earnings_approaching"
+    EARNINGS_SURPRISE_DRIFT = "earnings_surprise_drift"
+    MATERIAL_FILING = "material_filing"
+
+
+@dataclass(frozen=True)
+class CandidateEvent:
+    instrument: Instrument
+    event_type: EventType
+    evidence: str
+    urgency: float              # 0.0–1.0; higher = review sooner
+    days_to_event: int | None = None
+
+
+# ---------------------------------------------------------------------------
+# Injectable provider protocols (real implementations live in equities/data/)
+# ---------------------------------------------------------------------------
+
+class EarningsDateProvider(Protocol):
+    def next_date(self, ticker: str) -> date | None: ...
+
+
+class FilingsProvider(Protocol):
+    def recent_8k_items(self, ticker: str, days: int) -> list[tuple[date, list[str]]]:
+        """Return list of (filed_date, item_codes) for recent 8-Ks."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# Adapters that wrap the richer data clients
+# ---------------------------------------------------------------------------
+
+class CalendarAdapter:
+    """Wraps YFinanceCalendar to satisfy EarningsDateProvider."""
+
+    def __init__(self, calendar: object) -> None:
+        self._cal = calendar
+
+    def next_date(self, ticker: str) -> date | None:
+        snap = self._cal.fetch(ticker)  # type: ignore[attr-defined]
+        return snap.next_earnings_date
+
+
+class FilingsAdapter:
+    """Wraps SECEdgarFilings to satisfy FilingsProvider."""
+
+    def __init__(self, client: object) -> None:
+        self._client = client
+
+    def recent_8k_items(self, ticker: str, days: int) -> list[tuple[date, list[str]]]:
+        filings = self._client.recent(ticker, days=days)  # type: ignore[attr-defined]
+        return [
+            (f.filed_date, f.items)
+            for f in filings
+            if f.form_type == "8-K"
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Material item codes that warrant flagging (non-earnings)
+# ---------------------------------------------------------------------------
+
+_MATERIAL_ITEMS = frozenset({"1.01", "5.02", "8.01", "7.01", "1.02", "2.01"})
+
+
+class EventScreen:
+    """Scan a universe of Instruments for upcoming catalyst events.
+
+    Args:
+        earnings:              Provider of next-earnings dates.
+        filings:               Provider of recent 8-K item codes.
+        earnings_window_days:  Flag if earnings ≤ N days away (default 14).
+        filing_window_days:    Look back N days for fresh filings (default 10).
+        cap_tiers:             Eligible cap tiers (default SMALL + MID).
+    """
+
+    def __init__(
+        self,
+        earnings: EarningsDateProvider,
+        filings: FilingsProvider,
+        earnings_window_days: int = 14,
+        filing_window_days: int = 10,
+        cap_tiers: set[CapTier] | None = None,
+    ) -> None:
+        self._earnings = earnings
+        self._filings = filings
+        self._earn_window = earnings_window_days
+        self._file_window = filing_window_days
+        self._cap_tiers = cap_tiers if cap_tiers is not None else {CapTier.SMALL, CapTier.MID}
+
+    def scan(self, universe: list[Instrument]) -> list[CandidateEvent]:
+        """Return CandidateEvents for all instruments that match an event filter.
+
+        Results are sorted by urgency descending.
+        """
+        today = date.today()
+        candidates: list[CandidateEvent] = []
+
+        for inst in universe:
+            if inst.cap_tier not in self._cap_tiers:
+                continue
+
+            candidates.extend(self._check_earnings(inst, today))
+            candidates.extend(self._check_filings(inst, today))
+
+        candidates.sort(key=lambda c: c.urgency, reverse=True)
+        return candidates
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _check_earnings(
+        self, inst: Instrument, today: date
+    ) -> list[CandidateEvent]:
+        next_date = self._earnings.next_date(inst.ticker)
+        if next_date is None:
+            return []
+        days_to = (next_date - today).days
+        if not (0 <= days_to <= self._earn_window):
+            return []
+        urgency = 1.0 - days_to / self._earn_window if self._earn_window > 0 else 1.0
+        return [
+            CandidateEvent(
+                instrument=inst,
+                event_type=EventType.EARNINGS_APPROACHING,
+                evidence=f"Earnings in {days_to}d ({next_date.isoformat()})",
+                urgency=round(urgency, 4),
+                days_to_event=days_to,
+            )
+        ]
+
+    def _check_filings(
+        self, inst: Instrument, today: date
+    ) -> list[CandidateEvent]:
+        events: list[CandidateEvent] = []
+        filings = self._filings.recent_8k_items(inst.ticker, self._file_window)
+
+        for filed_date, items in filings:
+            days_ago = (today - filed_date).days
+            if days_ago < 0 or days_ago > self._file_window:
+                continue
+            base_urgency = max(0.0, 1.0 - days_ago / self._file_window)
+
+            if "2.02" in items:
+                events.append(
+                    CandidateEvent(
+                        instrument=inst,
+                        event_type=EventType.EARNINGS_SURPRISE_DRIFT,
+                        evidence=f"8-K item 2.02 (earnings) filed {days_ago}d ago ({filed_date})",
+                        urgency=round(base_urgency, 4),
+                    )
+                )
+            if _MATERIAL_ITEMS.intersection(items):
+                matched = sorted(_MATERIAL_ITEMS.intersection(items))
+                events.append(
+                    CandidateEvent(
+                        instrument=inst,
+                        event_type=EventType.MATERIAL_FILING,
+                        evidence=f"8-K items [{', '.join(matched)}] filed {days_ago}d ago",
+                        urgency=round(base_urgency * 0.8, 4),  # slightly lower than earnings
+                    )
+                )
+
+        return events
