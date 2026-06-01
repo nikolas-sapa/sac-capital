@@ -1,0 +1,13 @@
+from __future__ import annotations
+
+from typing import Any, Protocol, runtime_checkable
+
+
+@runtime_checkable
+class Fund(Protocol):
+    name: str
+
+    def positions(self) -> list[dict[str, Any]]: ...
+    def pnl(self) -> float: ...
+    def exposure(self) -> float: ...
+    def set_allocation(self, usd: float) -> None: ...
