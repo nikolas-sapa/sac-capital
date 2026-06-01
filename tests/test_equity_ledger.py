@@ -27,6 +27,28 @@ def test_open_position_appears_in_open_positions(tmp_path):
     led.close()
 
 
+def test_mark_updates_unrealized(tmp_path):
+    led = EquityLedger(tmp_path / "eq.db")
+    led.open_position(_rec(), shares=5.0, fill_price=10.0,
+                      opened_at=datetime(2026, 1, 2), mode="paper")
+    led.mark("ACME", price=12.0)
+    pos = led.open_positions()[0]
+    assert pos["mark_price"] == 12.0
+    assert pos["unrealized_pnl"] == 10.0   # (12-10)*5
+    led.close()
+
+
+def test_close_sets_realized_and_removes_from_open(tmp_path):
+    led = EquityLedger(tmp_path / "eq.db")
+    pid = led.open_position(_rec(), shares=5.0, fill_price=10.0,
+                            opened_at=datetime(2026, 1, 2), mode="paper")
+    led.close_position(pid, exit_price=13.0, exit_reason="target",
+                       closed_at=datetime(2026, 1, 5))
+    assert led.open_positions() == []
+    assert led.realized_pnl() == 15.0      # (13-10)*5
+    led.close()
+
+
 def test_csv_mirror_written(tmp_path):
     led = EquityLedger(tmp_path / "eq.db")
     led.open_position(_rec(), shares=5.0, fill_price=10.0,
