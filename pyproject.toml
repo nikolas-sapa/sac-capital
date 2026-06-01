@@ -5,6 +5,7 @@ description = "Polymarket multi-strategy paper-trading bot"
 requires-python = ">=3.12"
 dependencies = [
     "aiogram>=3.28.2",
+    "anthropic>=0.105.2",
     "httpx>=0.28.1",
     "pandas>=3.0.3",
     "pydantic>=2.13.4",
