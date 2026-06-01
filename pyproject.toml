@@ -10,6 +10,7 @@ dependencies = [
     "pandas>=3.0.3",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.1",
+    "scikit-learn>=1.8.0",
     "websockets>=16.0",
     "yfinance>=1.4.1",
 ]

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.polymarketbot.nightly</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/env</string>
+        <string>uv</string>
+        <string>run</string>
+        <string>python</string>
+        <string>/Users/nikolassapalidis/polymarket-bot/scripts/run_nightly.py</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>2</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/nikolassapalidis/polymarket-bot/logs/nightly.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/nikolassapalidis/polymarket-bot/logs/nightly.err</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/nikolassapalidis/polymarket-bot</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
