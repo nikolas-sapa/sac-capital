@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     kelly_fraction: float = 0.5
     max_position_pct: float = 0.02
 
+    # equities (Plan 07)
+    equity_ledger_path: str = "data/equity.db"
+    equity_risk_pct: float = 0.02  # per-swing-trade cap; ratchets to 0.01 after grilling
+    finnhub_api_key: str = ""
+
 
 def load_config(env_file: str | None = ".env") -> Settings:
     """Return a Settings instance, optionally reading from *env_file*."""
