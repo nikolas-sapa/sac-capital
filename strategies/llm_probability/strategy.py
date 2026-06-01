@@ -52,7 +52,7 @@ class LLMProbabilityStrategy:
 
             try:
                 est = self._client.estimate_probability(prompt)
-            except (RuntimeError, ValueError):
+            except Exception:
                 continue
 
             edge = est.probability - yes.best_ask

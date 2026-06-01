@@ -79,27 +79,38 @@ class LLMClient:
             return _parse_estimate(raw2)
 
     def prefilter(self, markets: list[Market], max_candidates: int = 10) -> list[Market]:
-        """Haiku pass: score markets cheaply and return the top candidates."""
+        """Haiku pass: score all candidates in ONE call and return the top candidates."""
         candidates = candidate_markets(markets)[:max_candidates]
         if not candidates:
             return []
 
-        scored: list[tuple[float, Market]] = []
-        for m in candidates:
-            if not self._budget.allow(_HAIKU_COST_EST):
-                break
-            prompt = (
-                f"Rate this prediction market 1-10 for how much LLM analysis could add edge. "
-                f"Question: {m.question}. "
-                f"Return ONLY a JSON object: {{\"score\": <int 1-10>}}"
-            )
-            raw = self._backend.complete(prompt, model="haiku")
-            self._budget.record(_HAIKU_COST_EST)
-            try:
-                score = float(json.loads(raw).get("score", 5))
-            except (json.JSONDecodeError, TypeError, ValueError):
-                score = 5.0
-            scored.append((score, m))
+        if not self._budget.allow(_HAIKU_COST_EST):
+            return candidates
 
-        scored.sort(key=lambda x: x[0], reverse=True)
+        # Batch all markets into a single prompt to avoid N subprocess calls
+        lines = "\n".join(
+            f'{i+1}. {m.question}' for i, m in enumerate(candidates)
+        )
+        prompt = (
+            f"Rate each prediction market 1-10 for how much LLM analysis could add edge.\n"
+            f"Markets:\n{lines}\n\n"
+            f'Return ONLY a JSON array: [{{"index": 1, "score": <int>}}, ...]'
+        )
+        self._budget.record(_HAIKU_COST_EST)
+
+        try:
+            raw = self._backend.complete(prompt, model="haiku")
+            raw = raw.strip()
+            if raw.startswith("```"):
+                raw = raw.split("```")[1].lstrip("json").strip()
+            ratings = json.loads(raw)
+            scores: dict[int, float] = {r["index"]: float(r.get("score", 5)) for r in ratings}
+        except Exception:
+            return candidates[:max_candidates]  # fallback: return as-is
+
+        scored = sorted(
+            enumerate(candidates, start=1),
+            key=lambda x: scores.get(x[0], 5.0),
+            reverse=True,
+        )
         return [m for _, m in scored]

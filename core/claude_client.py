@@ -42,7 +42,7 @@ class ClaudeCodeClient:
         "sonnet":                    "claude-sonnet-4-6",
     }
 
-    def __init__(self, timeout: int = 60) -> None:
+    def __init__(self, timeout: int = 180) -> None:
         self._timeout = timeout
 
     def complete(self, system: str, user: str, model: str) -> LLMResponse:
@@ -51,15 +51,23 @@ class ClaudeCodeClient:
         full_prompt = f"{system}\n\n---\n\n{user}"
 
         result = subprocess.run(
-            ["claude", "-p", "--model", mapped, full_prompt],
+            [
+                "claude", "-p", "--model", mapped,
+                "--setting-sources=",   # don't load global settings → no MCP servers
+                "--strict-mcp-config",  # only use explicitly configured MCP (none)
+                "--permission-mode", "default",
+                full_prompt,
+            ],
             capture_output=True,
             text=True,
             timeout=self._timeout,
+            stdin=subprocess.DEVNULL,
         )
 
         if result.returncode != 0:
             stderr = result.stderr.strip()
             raise RuntimeError(f"claude -p failed (exit {result.returncode}): {stderr}")
+
 
         text = result.stdout.strip()
         # Rough token estimate (4 chars ≈ 1 token)
@@ -75,7 +83,7 @@ class ClaudeCodeBackend:
     complete_batch(prompts, *, model) -> list[str]
     """
 
-    def __init__(self, timeout: int = 60) -> None:
+    def __init__(self, timeout: int = 180) -> None:
         self._client = ClaudeCodeClient(timeout=timeout)
 
     def complete(self, prompt: str, *, model: str = "sonnet") -> str:
