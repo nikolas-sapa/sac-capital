@@ -42,6 +42,7 @@ import httpx
 from strategies.crypto_updown.spot import parse_trade
 
 _CLOB_WS = "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+_CLOB_REST = "https://clob.polymarket.com"
 _GAMMA_URL = "https://gamma-api.polymarket.com"
 _SPOT_THRESHOLD_PCT = 0.002   # 0.2% move in 10s considered "significant"
 _WINDOW_S = 10                # rolling window to detect a significant move
@@ -58,9 +59,25 @@ async def _spot_feed(symbol: str, queue: asyncio.Queue) -> None:
                 continue
 
 
-async def _clob_feed(condition_id: str, queue: asyncio.Queue) -> None:
+def _resolve_token_ids(condition_id: str) -> list[str]:
+    """Resolve YES/NO token IDs from a condition ID via the CLOB REST API."""
+    try:
+        resp = httpx.get(f"{_CLOB_REST}/markets/{condition_id}", timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        tokens = data.get("tokens", [])
+        return [t["token_id"] for t in tokens if t.get("token_id")]
+    except Exception as e:
+        print(f"[!] Could not resolve token IDs: {e} — falling back to condition_id")
+        return [condition_id]
+
+
+async def _clob_feed(condition_id: str, queue: asyncio.Queue, token_ids: list[str] | None = None) -> None:
+    if token_ids is None:
+        token_ids = await asyncio.get_event_loop().run_in_executor(None, _resolve_token_ids, condition_id)
+    print(f"  Subscribing to {len(token_ids)} token(s)")
     async with websockets.connect(_CLOB_WS) as ws:
-        await ws.send(json.dumps({"assets_ids": [condition_id], "type": "market"}))
+        await ws.send(json.dumps({"assets_ids": token_ids, "type": "market"}))
         async for raw in ws:
             try:
                 msg = json.loads(raw)
@@ -75,7 +92,7 @@ async def _clob_feed(condition_id: str, queue: asyncio.Queue) -> None:
                 continue
 
 
-async def run_probe(condition_id: str, duration_s: int, symbol: str = "BTCUSDT") -> None:
+async def run_probe(condition_id: str, duration_s: int, symbol: str = "BTCUSDT", token_ids: list[str] | None = None) -> None:
     queue: asyncio.Queue = asyncio.Queue()
     spot_prices: list[tuple[float, float]] = []   # (price, mono_ts)
     clob_events: list[float] = []                 # mono_ts of each clob update
@@ -120,7 +137,7 @@ async def run_probe(condition_id: str, duration_s: int, symbol: str = "BTCUSDT")
 
     tasks = [
         asyncio.create_task(_spot_feed(symbol, queue)),
-        asyncio.create_task(_clob_feed(condition_id, queue)),
+        asyncio.create_task(_clob_feed(condition_id, queue, token_ids=token_ids)),
         asyncio.create_task(_collector()),
     ]
 
@@ -221,6 +238,7 @@ def main() -> None:
     group.add_argument("--market", help="Polymarket condition_id for a BTC Up/Down market")
     group.add_argument("--discover", action="store_true", help="Auto-discover live BTC Up/Down markets via Gamma API")
     group.add_argument("--url", help="Polymarket event URL (e.g. https://polymarket.com/event/btc-...)")
+    parser.add_argument("--tokens", help="Comma-separated token IDs (skips CLOB REST lookup)")
     parser.add_argument("--duration", type=int, default=3600, help="probe duration in seconds")
     parser.add_argument("--symbol", default="BTCUSDT", help="Binance symbol")
     args = parser.parse_args()
@@ -249,7 +267,8 @@ def main() -> None:
     if not condition_id:
         parser.error("Provide one of: --market <id>, --discover, or --url <polymarket_url>")
 
-    asyncio.run(run_probe(condition_id, args.duration, args.symbol))
+    token_ids = [t.strip() for t in args.tokens.split(",")] if args.tokens else None
+    asyncio.run(run_probe(condition_id, args.duration, args.symbol, token_ids=token_ids))
 
 
 if __name__ == "__main__":
