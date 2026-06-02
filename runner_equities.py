@@ -40,6 +40,7 @@ from equities.screen.quality_screen import QualityScreen
 # ---------------------------------------------------------------------------
 
 DEFAULT_SWING_UNIVERSE: list[Instrument] = [
+    # Original mid-cap catalyst plays
     Instrument("ARWR",  "Arrowhead Pharmaceuticals", "NASDAQ", CapTier.MID),
     Instrument("PRCT",  "PROCEPT BioRobotics",       "NASDAQ", CapTier.MID),
     Instrument("PGNY",  "Progyny",                    "NASDAQ", CapTier.MID),
@@ -47,14 +48,44 @@ DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     Instrument("FIGS",  "FIGS",                       "NYSE",   CapTier.MID),
     Instrument("XPEL",  "XPEL",                       "NASDAQ", CapTier.SMALL),
     Instrument("KLIC",  "Kulicke and Soffa",          "NASDAQ", CapTier.MID),
+    # High-growth / trendy — analyst fires on earnings/filings catalysts
+    Instrument("PLTR",  "Palantir",                   "NASDAQ", CapTier.MID),
+    Instrument("HOOD",  "Robinhood",                  "NASDAQ", CapTier.MID),
+    Instrument("COIN",  "Coinbase",                   "NASDAQ", CapTier.MID),
+    Instrument("RKLB",  "Rocket Lab",                 "NASDAQ", CapTier.SMALL),
+    Instrument("SOFI",  "SoFi Technologies",          "NASDAQ", CapTier.MID),
+    Instrument("APP",   "AppLovin",                   "NASDAQ", CapTier.MID),
+    Instrument("AXON",  "Axon Enterprise",            "NASDAQ", CapTier.MID),
+    Instrument("CRWD",  "CrowdStrike",                "NASDAQ", CapTier.LARGE),
+    Instrument("NET",   "Cloudflare",                 "NYSE",   CapTier.MID),
+    Instrument("DDOG",  "Datadog",                    "NASDAQ", CapTier.MID),
+    Instrument("SNOW",  "Snowflake",                  "NYSE",   CapTier.MID),
+    Instrument("IONQ",  "IonQ",                       "NYSE",   CapTier.SMALL),
+    Instrument("MSTR",  "MicroStrategy",              "NASDAQ", CapTier.MID),
+    Instrument("SQ",    "Block",                      "NYSE",   CapTier.MID),
+    Instrument("AFRM",  "Affirm",                     "NASDAQ", CapTier.MID),
+    Instrument("NU",    "Nu Holdings",                "NYSE",   CapTier.MID),
+    Instrument("TSLA",  "Tesla",                      "NASDAQ", CapTier.LARGE),
+    Instrument("ARM",   "Arm Holdings",               "NASDAQ", CapTier.LARGE),
+    Instrument("CVNA",  "Carvana",                    "NYSE",   CapTier.MID),
+    Instrument("RBRK",  "Rubrik",                     "NYSE",   CapTier.MID),
+    Instrument("SOUN",  "SoundHound AI",              "NASDAQ", CapTier.SMALL),
 ]
 
 DEFAULT_CORE_UNIVERSE: list[Instrument] = [
+    # Quality large-caps — scored on fundamentals (margins, PE, growth)
     Instrument("MSFT",  "Microsoft",       "NASDAQ", CapTier.LARGE),
     Instrument("AAPL",  "Apple",           "NASDAQ", CapTier.LARGE),
     Instrument("GOOGL", "Alphabet",        "NASDAQ", CapTier.LARGE),
     Instrument("META",  "Meta Platforms",  "NASDAQ", CapTier.LARGE),
+    Instrument("NVDA",  "NVIDIA",          "NASDAQ", CapTier.LARGE),
+    Instrument("AMZN",  "Amazon",          "NASDAQ", CapTier.LARGE),
     Instrument("V",     "Visa",            "NYSE",   CapTier.LARGE),
+    Instrument("MA",    "Mastercard",      "NYSE",   CapTier.LARGE),
+    Instrument("JPM",   "JPMorgan Chase",  "NYSE",   CapTier.LARGE),
+    Instrument("UNH",   "UnitedHealth",    "NYSE",   CapTier.LARGE),
+    Instrument("LLY",   "Eli Lilly",       "NYSE",   CapTier.LARGE),
+    Instrument("TSM",   "TSMC",            "NYSE",   CapTier.LARGE),
 ]
 
 

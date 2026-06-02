@@ -45,7 +45,7 @@ class QualityScreen:
         self,
         fundamentals: FundamentalsProvider,
         min_gross_margins: float = 0.35,
-        max_trailing_pe: float = 30.0,
+        max_trailing_pe: float = 45.0,
         min_cap_m: float = 5_000.0,
         min_revenue_growth: float = -0.05,
     ) -> None:

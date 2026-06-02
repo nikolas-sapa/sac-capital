@@ -189,7 +189,7 @@ async def main(strategy_names: list[str], mode: str = "simple") -> None:
 
     # Fetch markets (requires network; geo-blocked on this machine without VPN)
     try:
-        markets = await fetch_markets(limit=20)
+        markets = await fetch_markets(limit=500)
     except Exception as exc:
         raise RuntimeError(
             f"Failed to fetch markets (geo-blocked? check VPN/region): {exc}"

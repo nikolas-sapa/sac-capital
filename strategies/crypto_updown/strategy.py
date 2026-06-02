@@ -6,7 +6,10 @@ from core.markets import Market
 from core.strategy import Signal
 from strategies.crypto_updown.arbitrage import find_arb
 
-_UPDOWN_PATTERN = re.compile(r"\b(higher|lower|up|down)\b", re.IGNORECASE)
+_UPDOWN_PATTERN = re.compile(
+    r"\b(higher|lower|up|down|above|below|between)\b|price of bitcoin|btc price|\$[\d,]+",
+    re.IGNORECASE,
+)
 _CRYPTO_PATTERN = re.compile(r"\b(BTC|ETH|bitcoin|ethereum)\b", re.IGNORECASE)
 
 _DEFAULT_FEE = 0.01  # 1% per leg (conservative; Polymarket fee is 0-2%)

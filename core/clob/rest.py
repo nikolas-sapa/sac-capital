@@ -82,18 +82,31 @@ def parse_market(item: dict) -> Market:
 # Async fetcher
 # ---------------------------------------------------------------------------
 
-async def fetch_markets(limit: int = 20, active: bool = True) -> list[Market]:
-    """Fetch market metadata from the gamma REST API.
+async def fetch_markets(limit: int = 500, active: bool = True) -> list[Market]:
+    """Fetch market metadata from the gamma REST API, paginating up to `limit`.
 
-    Args:
-        limit: Maximum number of markets to return.
-        active: When True, request only active (unresolved) markets.
-
-    Returns:
-        A list of ``Market`` objects parsed from the API response.
+    Sorts by liquidity descending so the most tradeable markets come first.
+    The Gamma API caps each page at 100 — we paginate automatically.
     """
-    params: dict[str, Any] = {"limit": limit, "active": str(active).lower()}
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.get(f"{GAMMA_BASE}/markets", params=params)
-        response.raise_for_status()
-        return [parse_market(item) for item in response.json()]
+    params: dict[str, Any] = {
+        "limit": 100,
+        "active": str(active).lower(),
+        "closed": "false",
+        "order": "liquidity",
+        "ascending": "false",
+    }
+    collected: list[Market] = []
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        offset = 0
+        while len(collected) < limit:
+            params["offset"] = offset
+            response = await client.get(f"{GAMMA_BASE}/markets", params=params)
+            response.raise_for_status()
+            batch = response.json()
+            if not batch:
+                break
+            collected.extend(parse_market(item) for item in batch)
+            if len(batch) < 100:
+                break
+            offset += 100
+    return collected[:limit]
