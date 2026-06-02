@@ -17,7 +17,10 @@ class ModelForecasts:
     icon_max: float
     gfs_max: float
     ecmwf_max: float
-    spread: float   # max - min across the three models
+    icon_min: float
+    gfs_min: float
+    ecmwf_min: float
+    spread: float   # max - min across max forecasts
     agree: bool     # spread <= 3.0 °F or °C
 
 
@@ -35,16 +38,32 @@ def build_url(station: StationInfo, target_date: date) -> str:
 
 
 def parse_forecast(data: dict[str, Any]) -> ModelForecasts:
-    """Extract daily max for each model from the API response."""
+    """Extract tomorrow's daily max and min for each model from the API response.
+
+    forecast_days=2 returns 48 hourly values: [0..23] = today, [24..47] = tomorrow.
+    We always slice tomorrow's hours (index 24 onward) because in_window() ensures
+    the market resolves in 18-30h — i.e., it always resolves tomorrow.
+    """
     hourly = data["hourly"]
-    icon_max  = max(v for v in hourly["temperature_2m_icon_seamless"]  if v is not None)
-    gfs_max   = max(v for v in hourly["temperature_2m_gfs_seamless"]   if v is not None)
-    ecmwf_max = max(v for v in hourly["temperature_2m_ecmwf_ifs025"]   if v is not None)
+
+    def _tomorrow(key: str) -> list[float]:
+        vals = hourly[key]
+        tomorrow = [v for v in vals[24:] if v is not None]
+        # Fallback to all hours if tomorrow slice is empty (shouldn't happen)
+        return tomorrow if tomorrow else [v for v in vals if v is not None]
+
+    icon_vals  = _tomorrow("temperature_2m_icon_seamless")
+    gfs_vals   = _tomorrow("temperature_2m_gfs_seamless")
+    ecmwf_vals = _tomorrow("temperature_2m_ecmwf_ifs025")
+
+    icon_max,  icon_min  = max(icon_vals),  min(icon_vals)
+    gfs_max,   gfs_min   = max(gfs_vals),   min(gfs_vals)
+    ecmwf_max, ecmwf_min = max(ecmwf_vals), min(ecmwf_vals)
+
     spread = max(icon_max, gfs_max, ecmwf_max) - min(icon_max, gfs_max, ecmwf_max)
     return ModelForecasts(
-        icon_max=icon_max,
-        gfs_max=gfs_max,
-        ecmwf_max=ecmwf_max,
+        icon_max=icon_max,   gfs_max=gfs_max,   ecmwf_max=ecmwf_max,
+        icon_min=icon_min,   gfs_min=gfs_min,   ecmwf_min=ecmwf_min,
         spread=round(spread, 2),
         agree=spread <= 3.0,
     )

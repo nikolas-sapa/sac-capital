@@ -117,6 +117,27 @@ class EquityLedger:
         ).fetchone()[0]
         return float(result)
 
+    def portfolio_stats(self) -> dict[str, Any]:
+        closed = self._con.execute(
+            "SELECT realized_pnl FROM positions WHERE status = 'closed'"
+        ).fetchall()
+        open_rows = self._con.execute(
+            "SELECT ticker, entry_price, mark_price, unrealized_pnl "
+            "FROM positions WHERE status = 'open'"
+        ).fetchall()
+        total = len(closed)
+        wins = sum(1 for r in closed if r["realized_pnl"] > 0)
+        return {
+            "open_count": len(open_rows),
+            "closed_count": total,
+            "wins": wins,
+            "losses": total - wins,
+            "win_rate": wins / total if total > 0 else 0.0,
+            "realized_pnl": sum(r["realized_pnl"] for r in closed),
+            "unrealized_pnl": sum((r["unrealized_pnl"] or 0.0) for r in open_rows),
+            "open_positions": [dict(r) for r in open_rows],
+        }
+
     def close(self) -> None:
         self._con.close()
 

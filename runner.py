@@ -207,6 +207,9 @@ async def main(strategy_names: list[str], mode: str = "simple") -> None:
         if settings.telegram_bot_token:
             alerts = TelegramAlerts(settings.telegram_bot_token, settings.telegram_chat_id)
 
+        if alerts is not None:
+            await alerts.send(alerts.format_polymarket_scan(len(markets), [s.name for s in strategies]))
+
         if mode == "orchestrated":
             fills = await run_orchestrated(markets, strategies, executor, settings, ledger, alerts)
         else:

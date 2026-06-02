@@ -15,6 +15,7 @@ import asyncio
 import sys
 from pathlib import Path
 
+from core.alerts.telegram import TelegramAlerts
 from core.assets.instrument import CapTier, Instrument
 from core.config import load_config
 from core.claude_client import ClaudeCodeClient
@@ -154,15 +155,32 @@ async def run_once(
 
     paper = EquityPaperTracker(equity_ledger, prices)
 
+    alerts: TelegramAlerts | None = None
+    if settings.telegram_bot_token:
+        alerts = TelegramAlerts(settings.telegram_bot_token, settings.telegram_chat_id)
+
     # --- Mark-to-market and fire exits ---
+    pre_mark = {pos["id"]: pos for pos in equity_ledger.open_positions()}
     exits = paper.mark_and_check_exits()
     if exits:
         print(f"\n=== {len(exits)} exit(s) fired ===")
         for ex in exits:
             print(f"  [{ex.position_id}] {ex.reason} @ {ex.exit_price:.2f}")
+            if alerts is not None and ex.position_id in pre_mark:
+                pos = pre_mark[ex.position_id]
+                stats = equity_ledger.portfolio_stats()
+                await alerts.send(alerts.format_equity_exit(
+                    ex,
+                    ticker=pos["ticker"],
+                    entry_price=pos["entry_price"],
+                    shares=pos["shares"],
+                    portfolio_stats=stats,
+                ))
 
     if mark_only:
         print("Mark-only mode complete.")
+        if alerts is not None:
+            await alerts.send(alerts.format_equity_portfolio(equity_ledger.portfolio_stats()))
         equity_ledger.close()
         fp_tracker.close()
         return
@@ -193,6 +211,11 @@ async def run_once(
         equity_ledger.close()
         fp_tracker.close()
         return
+
+    # --- Scan summary alert ---
+    if alerts is not None:
+        analyst_count = min(len(swing_candidates), 5)
+        await alerts.send(alerts.format_equity_scan(swing_candidates, core_candidates, analyst_count))
 
     # --- Analyst stage (uses Claude subscription via `claude -p`) ---
     budget = DailyBudget(daily_limit_usd=999.0)  # subscription: not per-token billed
@@ -231,6 +254,12 @@ async def run_once(
             f"shares={sized.shares:.4f} entry={rec.entry:.2f} "
             f"stop={rec.stop_loss:.2f} tp={rec.take_profit:.2f}"
         )
+        if alerts is not None:
+            await alerts.send(alerts.format_equity_open(rec, fill))
+
+    # --- Portfolio summary ---
+    if alerts is not None:
+        await alerts.send(alerts.format_equity_portfolio(equity_ledger.portfolio_stats()))
 
     print(f"\nBudget used today: ${budget.spent_today():.4f}")
     equity_ledger.close()

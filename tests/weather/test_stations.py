@@ -42,4 +42,25 @@ def test_nyc_is_laguardia():
 
 
 def test_station_count():
-    assert len(STATIONS) >= 11
+    assert len(STATIONS) >= 45
+
+
+def test_nyc_alias_exists_and_matches_laguardia():
+    assert "NYC" in STATIONS
+    assert STATIONS["NYC"].station == "KLGA"
+    assert STATIONS["NYC"].unit == "F"
+
+
+def test_new_us_cities_use_fahrenheit():
+    for city in ("NYC", "Houston", "Seattle", "San Francisco", "Los Angeles", "Austin", "Denver"):
+        assert STATIONS[city].unit == "F", f"{city} should be Fahrenheit"
+
+
+def test_new_asia_cities_use_celsius():
+    for city in ("Beijing", "Shanghai", "Seoul", "Busan", "Taipei", "Manila", "Kuala Lumpur"):
+        assert STATIONS[city].unit == "C", f"{city} should be Celsius"
+
+
+def test_new_europe_cities_use_celsius():
+    for city in ("Munich", "Milan", "Amsterdam", "Warsaw", "Helsinki", "Madrid", "Moscow"):
+        assert STATIONS[city].unit == "C", f"{city} should be Celsius"

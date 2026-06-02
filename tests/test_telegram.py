@@ -146,6 +146,208 @@ async def test_send_calls_send_message_once():
     mock_bot.send_message.assert_awaited_once_with("123456", "hello telegram")
 
 
+# ---------------------------------------------------------------------------
+# format_fill — edge field added
+# ---------------------------------------------------------------------------
+
+def test_format_fill_contains_edge():
+    alerts = TelegramAlerts(token="fake-token", chat_id="123456")
+    fill = _make_fill()
+    msg = alerts.format_fill(fill)
+    assert "Edge:" in msg
+
+
+# ---------------------------------------------------------------------------
+# format_polymarket_scan tests
+# ---------------------------------------------------------------------------
+
+def test_format_polymarket_scan_contains_market_count():
+    alerts = TelegramAlerts(token="t", chat_id="1")
+    msg = alerts.format_polymarket_scan(500, ["weather", "crypto_updown"])
+    assert "500" in msg
+    assert "POLYMARKET SCAN" in msg
+
+
+def test_format_polymarket_scan_contains_strategies():
+    alerts = TelegramAlerts(token="t", chat_id="1")
+    msg = alerts.format_polymarket_scan(100, ["weather", "dummy"])
+    assert "weather" in msg
+    assert "dummy" in msg
+
+
+# ---------------------------------------------------------------------------
+# format_equity_scan tests
+# ---------------------------------------------------------------------------
+
+class _FakeInstrument:
+    def __init__(self, ticker: str, name: str = "Co"):
+        self.ticker = ticker
+        self.name = name
+
+
+class _FakeEventType:
+    def __init__(self, value: str):
+        self.value = value
+
+
+class _FakeSwingCandidate:
+    def __init__(self, ticker: str, event: str, evidence: str, urgency: float = 0.8, days: int | None = 5):
+        self.instrument = _FakeInstrument(ticker)
+        self.event_type = _FakeEventType(event)
+        self.evidence = evidence
+        self.urgency = urgency
+        self.days_to_event = days
+
+
+class _FakeCoreCandidate:
+    def __init__(self, ticker: str, score: float = 0.85, evidence: str = "good"):
+        self.instrument = _FakeInstrument(ticker)
+        self.score = score
+        self.evidence = evidence
+
+
+def test_format_equity_scan_contains_tickers():
+    alerts = TelegramAlerts(token="t", chat_id="1")
+    swing = [_FakeSwingCandidate("RBRK", "earnings_approaching", "earnings Jun 4")]
+    core = [_FakeCoreCandidate("NVDA")]
+    msg = alerts.format_equity_scan(swing, core, analyst_count=1)
+    assert "RBRK" in msg
+    assert "NVDA" in msg
+
+
+def test_format_equity_scan_header():
+    alerts = TelegramAlerts(token="t", chat_id="1")
+    msg = alerts.format_equity_scan([], [], analyst_count=0)
+    assert "EQUITY SCAN" in msg
+    assert "0 swing / 0 core" in msg
+
+
+def test_format_equity_scan_days_to_event():
+    alerts = TelegramAlerts(token="t", chat_id="1")
+    swing = [_FakeSwingCandidate("RBRK", "earnings_approaching", "earnings Jun 4", days=2)]
+    msg = alerts.format_equity_scan(swing, [], analyst_count=1)
+    assert "in 2d" in msg
+
+
+# ---------------------------------------------------------------------------
+# format_equity_open tests
+# ---------------------------------------------------------------------------
+
+class _FakeRec:
+    def __init__(self):
+        self.instrument = _FakeInstrument("RBRK", "Rubrik")
+        self.entry = 84.50
+        self.stop_loss = 75.50
+        self.take_profit = 98.00
+        self.confidence = 0.78
+        self.catalyst = "earnings Jun 4"
+        self.thesis = "Strong ARR growth into earnings catalyst"
+
+
+class _FakeFill:
+    def __init__(self, shares: float = 2.3664):
+        self.shares = shares
+
+
+def test_format_equity_open_contains_ticker():
+    alerts = TelegramAlerts(token="t", chat_id="1")
+    msg = alerts.format_equity_open(_FakeRec(), _FakeFill())
+    assert "RBRK" in msg
+    assert "PAPER OPEN" in msg
+
+
+def test_format_equity_open_contains_prices():
+    alerts = TelegramAlerts(token="t", chat_id="1")
+    msg = alerts.format_equity_open(_FakeRec(), _FakeFill())
+    assert "84.50" in msg
+    assert "75.50" in msg
+    assert "98.00" in msg
+
+
+def test_format_equity_open_contains_rr():
+    alerts = TelegramAlerts(token="t", chat_id="1")
+    msg = alerts.format_equity_open(_FakeRec(), _FakeFill())
+    assert "R/R:" in msg
+
+
+def test_format_equity_open_contains_thesis():
+    alerts = TelegramAlerts(token="t", chat_id="1")
+    msg = alerts.format_equity_open(_FakeRec(), _FakeFill())
+    assert "Strong ARR" in msg
+
+
+# ---------------------------------------------------------------------------
+# format_equity_exit tests
+# ---------------------------------------------------------------------------
+
+class _FakeExitSignal:
+    def __init__(self, position_id: int = 1, reason: str = "target_hit", exit_price: float = 98.20):
+        self.position_id = position_id
+        self.reason = reason
+        self.exit_price = exit_price
+
+
+def _portfolio_stats_fixture() -> dict:
+    return {
+        "open_count": 0, "closed_count": 1, "wins": 1, "losses": 0,
+        "win_rate": 1.0, "realized_pnl": 32.14, "unrealized_pnl": 0.0,
+        "open_positions": [],
+    }
+
+
+def test_format_equity_exit_win():
+    alerts = TelegramAlerts(token="t", chat_id="1")
+    msg = alerts.format_equity_exit(
+        _FakeExitSignal(reason="target_hit", exit_price=98.20),
+        ticker="RBRK", entry_price=84.50, shares=2.3664,
+        portfolio_stats=_portfolio_stats_fixture(),
+    )
+    assert "PAPER EXIT" in msg
+    assert "RBRK" in msg
+    assert "WIN" in msg
+    assert "TARGET HIT" in msg
+
+
+def test_format_equity_exit_loss():
+    alerts = TelegramAlerts(token="t", chat_id="1")
+    stats = _portfolio_stats_fixture()
+    stats.update(wins=0, losses=1, win_rate=0.0, realized_pnl=-20.0)
+    msg = alerts.format_equity_exit(
+        _FakeExitSignal(reason="stop_hit", exit_price=75.50),
+        ticker="RBRK", entry_price=84.50, shares=2.3664,
+        portfolio_stats=stats,
+    )
+    assert "LOSS" in msg
+    assert "STOP HIT" in msg
+
+
+# ---------------------------------------------------------------------------
+# format_equity_portfolio tests
+# ---------------------------------------------------------------------------
+
+def test_format_equity_portfolio_header():
+    alerts = TelegramAlerts(token="t", chat_id="1")
+    msg = alerts.format_equity_portfolio(_portfolio_stats_fixture())
+    assert "PORTFOLIO" in msg
+
+
+def test_format_equity_portfolio_shows_trade_count():
+    alerts = TelegramAlerts(token="t", chat_id="1")
+    stats = {
+        "open_count": 0, "closed_count": 3, "wins": 2, "losses": 1,
+        "win_rate": 0.667, "realized_pnl": 50.0, "unrealized_pnl": 0.0,
+        "open_positions": [],
+    }
+    msg = alerts.format_equity_portfolio(stats)
+    assert "3" in msg
+    assert "2W" in msg
+    assert "1L" in msg
+
+
+# ---------------------------------------------------------------------------
+# send tests (mock aiogram — no network)
+# ---------------------------------------------------------------------------
+
 @pytest.mark.asyncio
 async def test_send_uses_stored_chat_id():
     """send() uses the chat_id provided at construction."""
