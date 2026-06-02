@@ -100,7 +100,8 @@ class _PriceAdapter:
     def latest_close(self, ticker: str) -> float | None:
         try:
             series = self._feed.history(ticker, period="5d")
-            return series.latest if series.bars else None
+            bar = series.latest
+            return bar.close if bar is not None else None
         except Exception:
             return None
 
