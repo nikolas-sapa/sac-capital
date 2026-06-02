@@ -1,7 +1,12 @@
-"""Telegram command poller — run every 2 minutes via launchd.
+"""Telegram command bot — long-poll loop.
 
-Checks for new messages, routes /commands, replies, advances offset.
-Only responds to the configured TELEGRAM_CHAT_ID (security gate).
+Run as a persistent process via launchd KeepAlive.
+- Waits up to 25s for a message (Telegram long-poll)
+- Processes any /commands and replies
+- Exits; launchd immediately restarts for the next cycle
+- Response latency: < 1 second after user sends a command
+
+Only responds to TELEGRAM_CHAT_ID (security gate).
 """
 from __future__ import annotations
 
@@ -21,12 +26,13 @@ def _get_updates(token: str, offset: int) -> list[dict]:
     try:
         r = httpx.get(
             f"{_TG_BASE}{token}/getUpdates",
-            params={"offset": offset, "timeout": 5, "limit": 20},
-            timeout=10,
+            params={"offset": offset, "timeout": 25, "limit": 20},
+            timeout=35,  # slightly longer than Telegram's timeout
         )
         r.raise_for_status()
         return r.json().get("result", [])
-    except Exception:
+    except Exception as exc:
+        print(f"getUpdates error: {exc}", flush=True)
         return []
 
 
@@ -37,6 +43,26 @@ def _send(token: str, chat_id: str, text: str) -> None:
             json={"chat_id": chat_id, "text": text},
             timeout=10,
         )
+    except Exception as exc:
+        print(f"sendMessage error: {exc}", flush=True)
+
+
+def _register_commands(token: str) -> None:
+    """Register bot command menu shown when user types '/' in Telegram."""
+    commands = [
+        {"command": "help",      "description": "List all commands"},
+        {"command": "stats",     "description": "Equity portfolio summary"},
+        {"command": "positions", "description": "Open equity positions with PnL"},
+        {"command": "markets",   "description": "Open Polymarket positions"},
+        {"command": "pnl",       "description": "Combined P&L report"},
+        {"command": "kill",      "description": "Kill gate progress to live trading"},
+    ]
+    try:
+        httpx.post(
+            f"{_TG_BASE}{token}/setMyCommands",
+            json={"commands": commands},
+            timeout=10,
+        )
     except Exception:
         pass
 
@@ -44,30 +70,35 @@ def _send(token: str, chat_id: str, text: str) -> None:
 def main() -> None:
     settings = load_config()
     if not settings.telegram_bot_token:
-        print("No TELEGRAM_BOT_TOKEN configured — exiting.")
+        print("No TELEGRAM_BOT_TOKEN — exiting.", flush=True)
         sys.exit(0)
 
-    offset = int(_OFFSET_FILE.read_text().strip()) if _OFFSET_FILE.exists() else 0
-    handler = CommandHandler()
     token = settings.telegram_bot_token
     allowed_chat = settings.telegram_chat_id
 
+    # Register command menu once per process start (cheap, idempotent)
+    _register_commands(token)
+
+    offset = int(_OFFSET_FILE.read_text().strip()) if _OFFSET_FILE.exists() else 0
+    handler = CommandHandler()
+
     updates = _get_updates(token, offset)
+
     for update in updates:
         offset = update["update_id"] + 1
-        msg = update.get("message") or update.get("channel_post", {})
+        msg = update.get("message") or update.get("channel_post") or {}
         if not msg:
             continue
 
         chat_id = str(msg.get("chat", {}).get("id", ""))
         text = (msg.get("text") or "").strip()
 
-        # Security: ignore messages not from the configured chat
         if chat_id != allowed_chat:
             continue
         if not text.startswith("/"):
             continue
 
+        print(f"cmd: {text!r} from {chat_id}", flush=True)
         response = handler.dispatch(text)
         _send(token, chat_id, response)
 

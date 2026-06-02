@@ -14,9 +14,11 @@
     <key>WorkingDirectory</key>
     <string>/Users/nikolassapalidis/polymarket-bot</string>
 
-    <!-- Poll every 120 seconds for incoming Telegram commands -->
-    <key>StartInterval</key>
-    <integer>120</integer>
+    <!-- Long-poll mode: the script blocks for ~25s waiting for a message,
+         then exits. KeepAlive restarts it immediately for the next cycle.
+         Response latency to any /command is under 1 second. -->
+    <key>KeepAlive</key>
+    <true/>
 
     <key>RunAtLoad</key>
     <true/>
