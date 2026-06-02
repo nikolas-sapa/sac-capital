@@ -71,6 +71,39 @@ DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     Instrument("CVNA",  "Carvana",                    "NYSE",   CapTier.MID),
     Instrument("RBRK",  "Rubrik",                     "NYSE",   CapTier.MID),
     Instrument("SOUN",  "SoundHound AI",              "NASDAQ", CapTier.SMALL),
+    # AI chips & semiconductor infrastructure
+    Instrument("AMD",   "Advanced Micro Devices",     "NASDAQ", CapTier.LARGE),
+    Instrument("MU",    "Micron Technology",          "NASDAQ", CapTier.LARGE),
+    Instrument("MRVL",  "Marvell Technology",         "NASDAQ", CapTier.MID),
+    Instrument("ALAB",  "Astera Labs",                "NASDAQ", CapTier.SMALL),
+    Instrument("NBIS",  "Nebius Group",               "NASDAQ", CapTier.SMALL),
+    Instrument("QCOM",  "Qualcomm",                   "NASDAQ", CapTier.LARGE),
+    Instrument("ONTO",  "Onto Innovation",            "NYSE",   CapTier.MID),
+    # Cybersecurity
+    Instrument("ZS",    "Zscaler",                    "NASDAQ", CapTier.MID),
+    Instrument("S",     "SentinelOne",                "NYSE",   CapTier.MID),
+    Instrument("PANW",  "Palo Alto Networks",         "NASDAQ", CapTier.LARGE),
+    Instrument("OKTA",  "Okta",                       "NASDAQ", CapTier.MID),
+    Instrument("FTNT",  "Fortinet",                   "NASDAQ", CapTier.LARGE),
+    # Cloud / AI SaaS
+    Instrument("NOW",   "ServiceNow",                 "NYSE",   CapTier.LARGE),
+    Instrument("CRM",   "Salesforce",                 "NYSE",   CapTier.LARGE),
+    Instrument("MNDY",  "Monday.com",                 "NASDAQ", CapTier.MID),
+    Instrument("GTLB",  "GitLab",                     "NASDAQ", CapTier.MID),
+    Instrument("HUBS",  "HubSpot",                    "NYSE",   CapTier.MID),
+    Instrument("BILL",  "Bill.com",                   "NYSE",   CapTier.MID),
+    # E-commerce / consumer tech
+    Instrument("SHOP",  "Shopify",                    "NYSE",   CapTier.LARGE),
+    Instrument("MELI",  "MercadoLibre",               "NASDAQ", CapTier.LARGE),
+    Instrument("TOST",  "Toast",                      "NYSE",   CapTier.MID),
+    Instrument("GLBE",  "Global-E Online",            "NASDAQ", CapTier.SMALL),
+    Instrument("UBER",  "Uber",                       "NYSE",   CapTier.LARGE),
+    # Emerging / speculative tech
+    Instrument("RBLX",  "Roblox",                     "NYSE",   CapTier.MID),
+    Instrument("RXRX",  "Recursion Pharmaceuticals",  "NASDAQ", CapTier.SMALL),
+    Instrument("HIMS",  "Hims & Hers",                "NYSE",   CapTier.SMALL),
+    Instrument("AI",    "C3.ai",                      "NYSE",   CapTier.SMALL),
+    Instrument("BBAI",  "BigBear.ai",                 "NYSE",   CapTier.SMALL),
 ]
 
 DEFAULT_CORE_UNIVERSE: list[Instrument] = [
@@ -87,6 +120,9 @@ DEFAULT_CORE_UNIVERSE: list[Instrument] = [
     Instrument("UNH",   "UnitedHealth",    "NYSE",   CapTier.LARGE),
     Instrument("LLY",   "Eli Lilly",       "NYSE",   CapTier.LARGE),
     Instrument("TSM",   "TSMC",            "NYSE",   CapTier.LARGE),
+    Instrument("AVGO",  "Broadcom",        "NASDAQ", CapTier.LARGE),
+    Instrument("ASML",  "ASML Holding",    "NASDAQ", CapTier.LARGE),
+    Instrument("ORCL",  "Oracle",          "NYSE",   CapTier.LARGE),
 ]
 
 
