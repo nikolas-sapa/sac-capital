@@ -55,6 +55,7 @@ DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     Instrument("MU",    "Micron Technology",          "NASDAQ", CapTier.LARGE),
     Instrument("MRVL",  "Marvell Technology",         "NASDAQ", CapTier.MID),
     Instrument("ALAB",  "Astera Labs",                "NASDAQ", CapTier.SMALL),
+    Instrument("NBIS",  "Nebius Group",               "NASDAQ", CapTier.SMALL),
     Instrument("QCOM",  "Qualcomm",                   "NASDAQ", CapTier.LARGE),
     Instrument("SMCI",  "Super Micro Computer",       "NASDAQ", CapTier.MID),
     # Optical / connectivity (NVIDIA supply chain)
@@ -93,6 +94,7 @@ DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     Instrument("ARM",   "Arm Holdings",               "NASDAQ", CapTier.LARGE),
     Instrument("CVNA",  "Carvana",                    "NYSE",   CapTier.MID),
     Instrument("RBRK",  "Rubrik",                     "NYSE",   CapTier.MID),
+    Instrument("SOUN",  "SoundHound AI",              "NASDAQ", CapTier.SMALL),
     Instrument("XPEL",  "XPEL",                       "NASDAQ", CapTier.SMALL),
     # Cybersecurity
     Instrument("ZS",    "Zscaler",                    "NASDAQ", CapTier.MID),
@@ -124,10 +126,18 @@ DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     Instrument("LUNR",  "Intuitive Machines",         "NASDAQ", CapTier.SMALL),
     # Healthcare AI / consumer growth
     Instrument("TEM",   "Tempus AI",                  "NASDAQ", CapTier.MID),
+    Instrument("GEHC",  "GE HealthCare",              "NASDAQ", CapTier.LARGE),
+    Instrument("DOCS",  "Doximity",                   "NYSE",   CapTier.MID),
     Instrument("HIMS",  "Hims & Hers",                "NYSE",   CapTier.SMALL),
     Instrument("DUOL",  "Duolingo",                   "NASDAQ", CapTier.MID),
     Instrument("ONON",  "On Holding",                 "NYSE",   CapTier.MID),
     Instrument("DKNG",  "DraftKings",                 "NASDAQ", CapTier.MID),
+    # Market laggards / re-rating plays
+    Instrument("ADBE",  "Adobe",                      "NASDAQ", CapTier.LARGE),
+    Instrument("VST",   "Vistra Energy",              "NYSE",   CapTier.LARGE),
+    Instrument("TDC",   "Teradata",                   "NYSE",   CapTier.MID),
+    Instrument("PGY",   "Pagaya Technologies",        "NASDAQ", CapTier.SMALL),
+    Instrument("JBL",   "Jabil",                      "NYSE",   CapTier.LARGE),
     # Edge AI / robotics
     Instrument("AMBA",  "Ambarella",                  "NASDAQ", CapTier.SMALL),
     Instrument("PRCT",  "PROCEPT BioRobotics",        "NASDAQ", CapTier.MID),
