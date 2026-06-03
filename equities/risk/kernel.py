@@ -106,7 +106,18 @@ class RiskKernel:
         if today_realized_loss < -(self.daily_loss_limit_pct * self.capital):
             return SizedRecommendation(recommendation, 0.0, False, "daily_loss_limit_hit")
 
-        # --- Concurrent position cap ---
+        sleeve = getattr(recommendation, "sleeve", None)
+        is_core = sleeve is not None and str(sleeve.value) == "core"
+
+        # --- CORE DCA: fixed fractional sizing (no stop required) ---
+        if is_core:
+            if recommendation.entry is None or recommendation.entry <= 0:
+                return SizedRecommendation(recommendation, 0.0, False, "missing_entry")
+            alloc_usd = self.capital * recommendation.size_pct
+            shares = alloc_usd / recommendation.entry
+            return SizedRecommendation(recommendation, round(shares, 6), True)
+
+        # --- Concurrent position cap (swing only) ---
         swing_open = [p for p in open_positions if p.get("sleeve") == "swing"]
         if len(swing_open) >= self.max_positions:
             return SizedRecommendation(recommendation, 0.0, False, f"max_positions={self.max_positions}_reached")
@@ -121,7 +132,7 @@ class RiskKernel:
         if ticker_exposure / self.capital > self.max_name_pct:
             return SizedRecommendation(recommendation, 0.0, False, f"name_concentration_cap_{self.max_name_pct:.0%}_exceeded")
 
-        # --- Gap-aware sizing ---
+        # --- Gap-aware sizing (swing) ---
         if recommendation.stop_loss is None or recommendation.entry is None:
             return SizedRecommendation(recommendation, 0.0, False, "missing_stop_or_entry")
 

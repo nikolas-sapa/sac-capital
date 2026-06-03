@@ -78,10 +78,20 @@ class TelegramAlerts:
         return "\n".join(lines)
 
     def format_equity_open(self, rec: Any, fill: Any) -> str:
+        thesis = rec.thesis[:160] + "..." if len(rec.thesis) > 160 else rec.thesis
+        sleeve = getattr(rec, "sleeve", None)
+        is_core = sleeve is not None and str(sleeve.value) == "core"
+        if is_core:
+            return (
+                f"🔵 DCA OPEN — {rec.instrument.ticker} · {rec.instrument.name}\n"
+                f"Entry ${rec.entry:.2f}  📊 No stop (long-term DCA)\n"
+                f"Shares {fill.shares:.4f}  Confidence {rec.confidence:.0%}\n"
+                f"📍 {rec.catalyst}\n"
+                f"💡 {thesis}"
+            )
         risk_pct = abs(rec.entry - rec.stop_loss) / rec.entry * 100
         reward_pct = abs(rec.take_profit - rec.entry) / rec.entry * 100
         rr = reward_pct / risk_pct if risk_pct > 0 else 0.0
-        thesis = rec.thesis[:160] + "..." if len(rec.thesis) > 160 else rec.thesis
         return (
             f"🟢 PAPER OPEN — {rec.instrument.ticker} · {rec.instrument.name}\n"
             f"Entry ${rec.entry:.2f}  🛑 Stop ${rec.stop_loss:.2f}  🎯 Target ${rec.take_profit:.2f}\n"
