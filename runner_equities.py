@@ -43,15 +43,38 @@ from equities.screen.quality_screen import QualityScreen
 # ---------------------------------------------------------------------------
 
 DEFAULT_SWING_UNIVERSE: list[Instrument] = [
-    # Original mid-cap catalyst plays
-    Instrument("ARWR",  "Arrowhead Pharmaceuticals", "NASDAQ", CapTier.MID),
-    Instrument("PRCT",  "PROCEPT BioRobotics",       "NASDAQ", CapTier.MID),
-    Instrument("PGNY",  "Progyny",                    "NASDAQ", CapTier.MID),
-    Instrument("SMCI",  "Super Micro Computer",       "NASDAQ", CapTier.MID),
-    Instrument("FIGS",  "FIGS",                       "NYSE",   CapTier.MID),
-    Instrument("XPEL",  "XPEL",                       "NASDAQ", CapTier.SMALL),
+    # Semiconductor equipment & packaging
     Instrument("KLIC",  "Kulicke and Soffa",          "NASDAQ", CapTier.MID),
-    # High-growth / trendy — analyst fires on earnings/filings catalysts
+    Instrument("ONTO",  "Onto Innovation",            "NYSE",   CapTier.MID),
+    Instrument("LRCX",  "Lam Research",               "NASDAQ", CapTier.LARGE),
+    Instrument("KLAC",  "KLA Corporation",            "NASDAQ", CapTier.LARGE),
+    Instrument("ENTG",  "Entegris",                   "NASDAQ", CapTier.MID),
+    Instrument("AMKR",  "Amkor Technology",           "NASDAQ", CapTier.MID),
+    # AI chips & semiconductor infrastructure
+    Instrument("AMD",   "Advanced Micro Devices",     "NASDAQ", CapTier.LARGE),
+    Instrument("MU",    "Micron Technology",          "NASDAQ", CapTier.LARGE),
+    Instrument("MRVL",  "Marvell Technology",         "NASDAQ", CapTier.MID),
+    Instrument("ALAB",  "Astera Labs",                "NASDAQ", CapTier.SMALL),
+    Instrument("QCOM",  "Qualcomm",                   "NASDAQ", CapTier.LARGE),
+    Instrument("SMCI",  "Super Micro Computer",       "NASDAQ", CapTier.MID),
+    # Optical / connectivity (NVIDIA supply chain)
+    Instrument("COHR",  "Coherent Corp",              "NYSE",   CapTier.MID),
+    Instrument("LITE",  "Lumentum Holdings",          "NASDAQ", CapTier.MID),
+    Instrument("AAOI",  "Applied Optoelectronics",    "NASDAQ", CapTier.SMALL),
+    Instrument("FN",    "Fabrinet",                   "NYSE",   CapTier.MID),
+    Instrument("APH",   "Amphenol",                   "NYSE",   CapTier.LARGE),
+    Instrument("AXTI",  "AXT Inc",                    "NASDAQ", CapTier.SMALL),
+    Instrument("VIAV",  "VIAVI Solutions",            "NASDAQ", CapTier.MID),
+    # AI server ODM / construction
+    Instrument("CLS",   "Celestica",                  "NYSE",   CapTier.MID),
+    Instrument("FIX",   "Comfort Systems USA",        "NYSE",   CapTier.MID),
+    # Power grid & nuclear
+    Instrument("CEG",   "Constellation Energy",       "NASDAQ", CapTier.LARGE),
+    Instrument("GEV",   "GE Vernova",                 "NYSE",   CapTier.LARGE),
+    Instrument("ETN",   "Eaton Corporation",          "NYSE",   CapTier.LARGE),
+    Instrument("PWR",   "Quanta Services",            "NYSE",   CapTier.LARGE),
+    Instrument("VRT",   "Vertiv Holdings",            "NYSE",   CapTier.MID),
+    # High-growth / catalyst plays
     Instrument("PLTR",  "Palantir",                   "NASDAQ", CapTier.MID),
     Instrument("HOOD",  "Robinhood",                  "NASDAQ", CapTier.MID),
     Instrument("COIN",  "Coinbase",                   "NASDAQ", CapTier.MID),
@@ -63,8 +86,6 @@ DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     Instrument("NET",   "Cloudflare",                 "NYSE",   CapTier.MID),
     Instrument("DDOG",  "Datadog",                    "NASDAQ", CapTier.MID),
     Instrument("SNOW",  "Snowflake",                  "NYSE",   CapTier.MID),
-    Instrument("IONQ",  "IonQ",                       "NYSE",   CapTier.SMALL),
-    Instrument("MSTR",  "MicroStrategy",              "NASDAQ", CapTier.MID),
     Instrument("SQ",    "Block",                      "NYSE",   CapTier.MID),
     Instrument("AFRM",  "Affirm",                     "NASDAQ", CapTier.MID),
     Instrument("NU",    "Nu Holdings",                "NYSE",   CapTier.MID),
@@ -72,40 +93,47 @@ DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     Instrument("ARM",   "Arm Holdings",               "NASDAQ", CapTier.LARGE),
     Instrument("CVNA",  "Carvana",                    "NYSE",   CapTier.MID),
     Instrument("RBRK",  "Rubrik",                     "NYSE",   CapTier.MID),
-    Instrument("SOUN",  "SoundHound AI",              "NASDAQ", CapTier.SMALL),
-    # AI chips & semiconductor infrastructure
-    Instrument("AMD",   "Advanced Micro Devices",     "NASDAQ", CapTier.LARGE),
-    Instrument("MU",    "Micron Technology",          "NASDAQ", CapTier.LARGE),
-    Instrument("MRVL",  "Marvell Technology",         "NASDAQ", CapTier.MID),
-    Instrument("ALAB",  "Astera Labs",                "NASDAQ", CapTier.SMALL),
-    Instrument("NBIS",  "Nebius Group",               "NASDAQ", CapTier.SMALL),
-    Instrument("QCOM",  "Qualcomm",                   "NASDAQ", CapTier.LARGE),
-    Instrument("ONTO",  "Onto Innovation",            "NYSE",   CapTier.MID),
+    Instrument("XPEL",  "XPEL",                       "NASDAQ", CapTier.SMALL),
     # Cybersecurity
     Instrument("ZS",    "Zscaler",                    "NASDAQ", CapTier.MID),
     Instrument("S",     "SentinelOne",                "NYSE",   CapTier.MID),
     Instrument("PANW",  "Palo Alto Networks",         "NASDAQ", CapTier.LARGE),
-    Instrument("OKTA",  "Okta",                       "NASDAQ", CapTier.MID),
     Instrument("FTNT",  "Fortinet",                   "NASDAQ", CapTier.LARGE),
+    Instrument("CYBR",  "CyberArk Software",          "NASDAQ", CapTier.MID),
     # Cloud / AI SaaS
     Instrument("NOW",   "ServiceNow",                 "NYSE",   CapTier.LARGE),
     Instrument("CRM",   "Salesforce",                 "NYSE",   CapTier.LARGE),
     Instrument("MNDY",  "Monday.com",                 "NASDAQ", CapTier.MID),
-    Instrument("GTLB",  "GitLab",                     "NASDAQ", CapTier.MID),
     Instrument("HUBS",  "HubSpot",                    "NYSE",   CapTier.MID),
-    Instrument("BILL",  "Bill.com",                   "NYSE",   CapTier.MID),
+    Instrument("MDB",   "MongoDB",                    "NASDAQ", CapTier.MID),
+    Instrument("TTD",   "The Trade Desk",             "NASDAQ", CapTier.MID),
+    Instrument("CFLT",  "Confluent",                  "NASDAQ", CapTier.MID),
+    Instrument("VEEV",  "Veeva Systems",              "NYSE",   CapTier.LARGE),
     # E-commerce / consumer tech
     Instrument("SHOP",  "Shopify",                    "NYSE",   CapTier.LARGE),
     Instrument("MELI",  "MercadoLibre",               "NASDAQ", CapTier.LARGE),
     Instrument("TOST",  "Toast",                      "NYSE",   CapTier.MID),
     Instrument("GLBE",  "Global-E Online",            "NASDAQ", CapTier.SMALL),
     Instrument("UBER",  "Uber",                       "NYSE",   CapTier.LARGE),
-    # Emerging / speculative tech
-    Instrument("RBLX",  "Roblox",                     "NYSE",   CapTier.MID),
-    Instrument("RXRX",  "Recursion Pharmaceuticals",  "NASDAQ", CapTier.SMALL),
+    Instrument("PYPL",  "PayPal",                     "NASDAQ", CapTier.LARGE),
+    Instrument("FOUR",  "Shift4 Payments",            "NYSE",   CapTier.MID),
+    # Defense / space
+    Instrument("KTOS",  "Kratos Defense",             "NASDAQ", CapTier.MID),
+    Instrument("AVAV",  "AeroVironment",              "NASDAQ", CapTier.MID),
+    Instrument("ASTS",  "AST SpaceMobile",            "NASDAQ", CapTier.SMALL),
+    Instrument("LUNR",  "Intuitive Machines",         "NASDAQ", CapTier.SMALL),
+    # Healthcare AI / consumer growth
+    Instrument("TEM",   "Tempus AI",                  "NASDAQ", CapTier.MID),
     Instrument("HIMS",  "Hims & Hers",                "NYSE",   CapTier.SMALL),
+    Instrument("DUOL",  "Duolingo",                   "NASDAQ", CapTier.MID),
+    Instrument("ONON",  "On Holding",                 "NYSE",   CapTier.MID),
+    Instrument("DKNG",  "DraftKings",                 "NASDAQ", CapTier.MID),
+    # Edge AI / robotics
+    Instrument("AMBA",  "Ambarella",                  "NASDAQ", CapTier.SMALL),
+    Instrument("PRCT",  "PROCEPT BioRobotics",        "NASDAQ", CapTier.MID),
+    # Inference / new IPOs
+    Instrument("CRBR",  "Cerebras Systems",           "NASDAQ", CapTier.MID),
     Instrument("AI",    "C3.ai",                      "NYSE",   CapTier.SMALL),
-    Instrument("BBAI",  "BigBear.ai",                 "NYSE",   CapTier.SMALL),
 ]
 
 DEFAULT_CORE_UNIVERSE: list[Instrument] = [
@@ -125,6 +153,7 @@ DEFAULT_CORE_UNIVERSE: list[Instrument] = [
     Instrument("AVGO",  "Broadcom",        "NASDAQ", CapTier.LARGE),
     Instrument("ASML",  "ASML Holding",    "NASDAQ", CapTier.LARGE),
     Instrument("ORCL",  "Oracle",          "NYSE",   CapTier.LARGE),
+    Instrument("COST",  "Costco",          "NASDAQ", CapTier.LARGE),
 ]
 
 
