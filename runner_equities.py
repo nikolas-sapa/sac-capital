@@ -5,7 +5,7 @@ Usage:
     uv run python runner_equities.py --no-analyse       # screen only (no Claude API)
     uv run python runner_equities.py --mark-only        # mark-to-market + exit check
 
-Requires ANTHROPIC_API_KEY in .env for the analyse phase.
+Uses Claude Code subscription (claude -p) — no ANTHROPIC_API_KEY required.
 All trades are paper-only; LIVE mode does not exist yet.
 """
 from __future__ import annotations
@@ -21,6 +21,8 @@ from core.config import load_config
 from core.claude_client import ClaudeCodeClient
 from equities.analysis.analyst import EquityAnalyst
 from equities.analysis.budget import DailyBudget
+from equities.analysis.core_analyst import CoreDCAAnalyst
+from equities.data.news import YFinanceNewsProvider
 from equities.data.calendar import YFinanceCalendar
 from equities.data.filings import SECEdgarFilings
 from equities.data.fundamentals import YFinanceFundamentals
@@ -143,16 +145,6 @@ class _PriceAdapter:
             return None
 
 
-class _NewsAdapter:
-    def headlines(self, ticker: str, limit: int = 8) -> list[str]:
-        try:
-            import yfinance as yf
-            news = yf.Ticker(ticker).news or []
-            return [n.get("content", {}).get("title") or n.get("title", "") for n in news[:limit]]
-        except Exception:
-            return []
-
-
 class _FilingsSummaryAdapter:
     def __init__(self, client: SECEdgarFilings) -> None:
         self._client = client
@@ -185,7 +177,7 @@ async def run_once(
 
     price_feed = YFinancePriceFeed()
     prices = _PriceAdapter(price_feed)
-    news = _NewsAdapter()
+    news = YFinanceNewsProvider()
     filings_client = SECEdgarFilings()
     filings_summary = _FilingsSummaryAdapter(filings_client)
 
@@ -264,17 +256,30 @@ async def run_once(
         max_candidates=5,
     )
 
-    recommendations = analyst.analyse(swing_candidates)
+    swing_recommendations = analyst.analyse(swing_candidates)
+
+    # --- Core DCA analyst (risk-officer check before accumulating) ---
+    core_analyst = CoreDCAAnalyst(
+        llm=ClaudeCodeClient(),
+        prices=prices,
+        news=news,
+        budget=budget,
+        max_candidates=4,
+    )
+    core_recommendations = core_analyst.analyse(core_candidates)
+
+    all_recommendations = swing_recommendations + core_recommendations
 
     # --- Risk kernel + paper open ---
     kernel = RiskKernel(capital=settings.bankroll_usd)
     open_positions = equity_ledger.open_positions()
 
-    print(f"\n=== Analyst recommendations: {len(recommendations)} ===")
-    for rec in recommendations:
+    print(f"\n=== Swing recommendations: {len(swing_recommendations)} ===")
+    print(f"=== Core DCA recommendations: {len(core_recommendations)} ===")
+    for rec in all_recommendations:
         sized = kernel.approve(rec, open_positions)
         if not sized.approved:
-            print(f"  REJECTED [{rec.instrument.ticker}]: {sized.rejection_reason}")
+            print(f"  REJECTED [{rec.instrument.ticker}] ({rec.sleeve.value}): {sized.rejection_reason}")
             continue
 
         fill = paper.open_position(rec, sized.shares, rec.entry, strategy="equity_analyst")
@@ -285,11 +290,17 @@ async def run_once(
             shares=sized.shares,
             strategy="equity_analyst",
         )
-        print(
-            f"  PAPER OPEN [{rec.instrument.ticker}] "
-            f"shares={sized.shares:.4f} entry={rec.entry:.2f} "
-            f"stop={rec.stop_loss:.2f} tp={rec.take_profit:.2f}"
-        )
+        if rec.sleeve.value == "core":
+            print(
+                f"  DCA OPEN [{rec.instrument.ticker}] "
+                f"shares={sized.shares:.4f} entry={rec.entry:.2f} (no stop)"
+            )
+        else:
+            print(
+                f"  PAPER OPEN [{rec.instrument.ticker}] "
+                f"shares={sized.shares:.4f} entry={rec.entry:.2f} "
+                f"stop={rec.stop_loss:.2f} tp={rec.take_profit:.2f}"
+            )
         if alerts is not None:
             await alerts.send(alerts.format_equity_open(rec, fill))
 

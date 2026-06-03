@@ -46,9 +46,9 @@ def test_analyst_includes_no_news_fallback():
     assert "(none)" in prompt
 
 
-def test_analyst_limits_news_to_8():
+def test_analyst_limits_news_to_15():
     event = _event("X")
     headlines = [f"headline {i}" for i in range(20)]
     prompt = build_analyst_prompt(event, 50.0, news=headlines, filings=[])
-    assert "headline 7" in prompt
-    assert "headline 8" not in prompt
+    assert "headline 14" in prompt
+    assert "headline 15" not in prompt

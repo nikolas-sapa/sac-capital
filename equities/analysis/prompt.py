@@ -1,7 +1,8 @@
-"""Prompt builders for the two-stage equity analyst pipeline."""
+"""Prompt builders for the equity analyst pipeline (swing + core DCA + challenger)."""
 from __future__ import annotations
 
 from equities.screen.event_screen import CandidateEvent
+from equities.screen.quality_screen import QualityCandidate
 
 # ---------------------------------------------------------------------------
 # Stage 1 — Haiku prefilter
@@ -87,7 +88,7 @@ def build_analyst_prompt(
     filings: list[str],
 ) -> str:
     """Build the Sonnet deep-analyst user message."""
-    news_block = "\n".join(f"- {h}" for h in news[:8]) or "  (none)"
+    news_block = "\n".join(f"- {h}" for h in news[:15]) or "  (none)"
     filings_block = "\n".join(f"- {f}" for f in filings[:6]) or "  (none)"
     return _ANALYST_USER.format(
         ticker=candidate.instrument.ticker,
@@ -97,4 +98,110 @@ def build_analyst_prompt(
         cap_tier=candidate.instrument.cap_tier.value,
         news_block=news_block,
         filings_block=filings_block,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Stage 3 — Sonnet challenger (argue against the bull thesis)
+# ---------------------------------------------------------------------------
+
+_CHALLENGER_SYSTEM = """You are a bearish equity analyst stress-testing a proposed trade.
+Your job: find the strongest specific objections to this thesis.
+No generic risks ("market could fall", "competition exists"). Only concrete, ticker-specific reasons this trade fails.
+
+Return ONLY valid JSON. No markdown, no preamble."""
+
+_CHALLENGER_USER = """Challenge this proposed swing trade.
+
+## Proposed Trade
+Ticker: {ticker}
+Entry: ${entry:.2f} | Stop: ${stop:.2f} | Target: ${target:.2f}
+Catalyst: {catalyst}
+Bull thesis: {thesis}
+
+## Recent news
+{news_block}
+
+Output:
+{{
+  "verdict": "reject" | "weaken" | "pass",
+  "objections": ["specific objection 1", "specific objection 2"],
+  "confidence_adjustment": <float between -0.3 and 0.0>,
+  "summary": "one sentence verdict"
+}}
+
+Verdict rules:
+- "reject": thesis is fundamentally flawed or catalyst is already fully priced in
+- "weaken": 1-2 real concerns reduce the edge but do not eliminate it
+- "pass": no material objections — bull case stands"""
+
+
+def build_challenger_prompt(
+    ticker: str,
+    entry: float,
+    stop: float,
+    target: float,
+    catalyst: str,
+    thesis: str,
+    news: list[str],
+) -> str:
+    news_block = "\n".join(f"- {h}" for h in news[:10]) or "  (none)"
+    return _CHALLENGER_USER.format(
+        ticker=ticker,
+        entry=entry,
+        stop=stop,
+        target=target,
+        catalyst=catalyst,
+        thesis=thesis,
+        news_block=news_block,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Core DCA analyst — risk-officer check before accumulating
+# ---------------------------------------------------------------------------
+
+_CORE_DCA_SYSTEM = """You are a risk officer reviewing DCA accumulation candidates for a long-term systematic portfolio.
+The quality screener already confirmed strong fundamentals. Your only job: flag specific near-term reasons to WAIT.
+
+You do NOT need a catalyst to approve a DCA. Approve unless there is a concrete, near-term risk.
+
+Return ONLY valid JSON. No markdown, no preamble."""
+
+_CORE_DCA_USER = """Review this DCA accumulation candidate.
+
+## Company
+Ticker: {ticker}
+Quality score: {score:.3f}/1.0
+Fundamentals: {evidence}
+Current price: ${current_price:.2f}
+
+## Recent news (last 15 headlines)
+{news_block}
+
+Output:
+{{
+  "action": "dca" | "wait",
+  "risk_flags": ["specific risk 1", "specific risk 2"],
+  "dca_pct": <float, 0.005 to 0.015>,
+  "thesis": "one sentence: why accumulate now or why to wait"
+}}
+
+Wait only if there is: earnings warning, SEC investigation, major lawsuit, product recall,
+CFO/CEO departure + no replacement, or sector-wide regulatory crisis.
+Everything else → "dca"."""
+
+
+def build_core_dca_prompt(
+    candidate: QualityCandidate,
+    current_price: float,
+    news: list[str],
+) -> str:
+    news_block = "\n".join(f"- {h}" for h in news[:15]) or "  (none)"
+    return _CORE_DCA_USER.format(
+        ticker=candidate.instrument.ticker,
+        score=candidate.score,
+        evidence=candidate.evidence,
+        current_price=current_price,
+        news_block=news_block,
     )
