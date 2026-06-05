@@ -54,6 +54,7 @@ class RiskKernel:
         risk_pct: float = 0.02,
         max_positions: int = 4,
         max_name_pct: float = 0.25,
+        max_sector_pct: float = 0.35,
         daily_loss_limit_pct: float = 0.05,
         drawdown_limit_pct: float = 0.15,
         gap_pct: float = _DEFAULT_GAP_PCT,
@@ -62,6 +63,7 @@ class RiskKernel:
         self.risk_pct = risk_pct
         self.max_positions = max_positions
         self.max_name_pct = max_name_pct
+        self.max_sector_pct = max_sector_pct
         self.daily_loss_limit_pct = daily_loss_limit_pct
         self.drawdown_limit_pct = drawdown_limit_pct
         self.gap_pct = gap_pct
@@ -81,6 +83,7 @@ class RiskKernel:
         open_positions: list[dict[str, Any]],
         today_realized_loss: float = 0.0,
         current_equity: float | None = None,
+        sector_lookup: dict[str, str] | None = None,
     ) -> SizedRecommendation:
         """Approve or reject a Recommendation; return sized result.
 
@@ -131,6 +134,21 @@ class RiskKernel:
         )
         if ticker_exposure / self.capital > self.max_name_pct:
             return SizedRecommendation(recommendation, 0.0, False, f"name_concentration_cap_{self.max_name_pct:.0%}_exceeded")
+
+        # --- Sector concentration cap ---
+        if sector_lookup is not None:
+            new_sector = sector_lookup.get(ticker, "")
+            if new_sector:
+                sector_exposure = sum(
+                    p.get("shares", 0) * p.get("entry_price", 0)
+                    for p in swing_open
+                    if p.get("sector", "") == new_sector
+                )
+                if sector_exposure / self.capital >= self.max_sector_pct:
+                    return SizedRecommendation(
+                        recommendation, 0.0, False,
+                        f"sector_concentration_{new_sector}_at_{self.max_sector_pct:.0%}_limit",
+                    )
 
         # --- Gap-aware sizing (swing) ---
         if recommendation.stop_loss is None or recommendation.entry is None:

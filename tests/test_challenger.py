@@ -66,13 +66,11 @@ def test_challenger_pass_keeps_recommendation():
         "confidence_adjustment": 0.0,
         "summary": "no issues",
     })
-    analyst = _make_analyst([])
-    result = analyst._challenge.__func__(analyst, _rec(0.7))
-    # Direct challenger call via stub
-    analyst._llm = _StubLLM([verdict])
-    result = analyst._challenge(_rec(0.7))
+    analyst = _make_analyst([verdict])
+    result, objections = analyst._challenge(_rec(0.7))
     assert result is not None
     assert result.confidence == pytest.approx(0.7)
+    assert objections == []
 
 
 def test_challenger_reject_drops_recommendation():
@@ -83,8 +81,9 @@ def test_challenger_reject_drops_recommendation():
         "summary": "re-rating complete",
     })
     analyst = _make_analyst([verdict])
-    result = analyst._challenge(_rec(0.7))
+    result, objections = analyst._challenge(_rec(0.7))
     assert result is None
+    assert len(objections) == 1
 
 
 def test_challenger_weaken_reduces_confidence():
@@ -95,9 +94,10 @@ def test_challenger_weaken_reduces_confidence():
         "summary": "proceed with lower size",
     })
     analyst = _make_analyst([verdict])
-    result = analyst._challenge(_rec(0.7))
+    result, objections = analyst._challenge(_rec(0.7))
     assert result is not None
     assert result.confidence == pytest.approx(0.55, abs=0.01)
+    assert len(objections) == 1
 
 
 def test_challenger_weaken_floors_confidence_at_0_1():
@@ -108,7 +108,7 @@ def test_challenger_weaken_floors_confidence_at_0_1():
         "summary": "barely pass",
     })
     analyst = _make_analyst([verdict])
-    result = analyst._challenge(_rec(0.2))
+    result, _ = analyst._challenge(_rec(0.2))
     assert result is not None
     assert result.confidence >= 0.1
 
@@ -117,12 +117,14 @@ def test_challenger_skipped_on_budget_exhausted():
     analyst = _make_analyst([])
     analyst._budget = DailyBudget(daily_limit_usd=0.0)
     rec = _rec(0.7)
-    result = analyst._challenge(rec)
+    result, objections = analyst._challenge(rec)
     assert result is rec  # returned unchanged
+    assert objections == []
 
 
 def test_challenger_parse_error_keeps_recommendation():
     analyst = _make_analyst(["NOT VALID JSON )))"])
-    result = analyst._challenge(_rec(0.7))
+    result, objections = analyst._challenge(_rec(0.7))
     assert result is not None
     assert result.confidence == pytest.approx(0.7)
+    assert objections == []

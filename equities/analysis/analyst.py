@@ -17,12 +17,15 @@ from core.assets.instrument import Instrument
 from equities.analysis.budget import DailyBudget
 from equities.analysis.prompt import (
     _ANALYST_SYSTEM,
+    _AUDITOR_SYSTEM,
     _CHALLENGER_SYSTEM,
     _PREFILTER_SYSTEM,
     build_analyst_prompt,
+    build_auditor_prompt,
     build_challenger_prompt,
     build_prefilter_prompt,
 )
+from equities.data.fundamentals import FundamentalsProvider
 from equities.screen.event_screen import CandidateEvent
 from equities.strategy import Recommendation, Sleeve
 
@@ -93,6 +96,7 @@ _SONNET = "claude-sonnet-4-6"
 _HAIKU_COST_PER_CANDIDATE = 0.0005
 _SONNET_COST_PER_CANDIDATE = 0.01
 _CHALLENGER_COST = 0.008
+_AUDITOR_COST = 0.006
 
 
 class EquityAnalyst:
@@ -115,6 +119,7 @@ class EquityAnalyst:
         prices: PriceProvider | None = None,
         news: NewsProvider | None = None,
         filings: FilingsSummaryProvider | None = None,
+        fundamentals: FundamentalsProvider | None = None,
         budget: DailyBudget | None = None,
         max_candidates: int = 5,
     ) -> None:
@@ -125,10 +130,17 @@ class EquityAnalyst:
         self._prices = prices
         self._news = news
         self._filings = filings
+        self._fundamentals = fundamentals
         self._budget = budget or DailyBudget(daily_limit_usd=1.0)
         self._max_candidates = max_candidates
 
-    def analyse(self, candidates: list[CandidateEvent]) -> list[Recommendation]:
+    def analyse(
+        self,
+        candidates: list[CandidateEvent],
+        regime: str = "neutral",
+        vix: float | None = None,
+        yield_curve: float | None = None,
+    ) -> list[Recommendation]:
         """Run the three-stage pipeline. Returns Recommendations."""
         if not candidates:
             return []
@@ -139,12 +151,36 @@ class EquityAnalyst:
         for candidate in survivors:
             if not self._budget.allow(_SONNET_COST_PER_CANDIDATE + _CHALLENGER_COST):
                 break
-            rec = self._analyse_one(candidate)
+            rec = self._analyse_one(candidate, regime=regime, vix=vix, yield_curve=yield_curve)
             if rec is None:
                 continue
-            final = self._challenge(rec)
-            if final is not None:
-                results.append(final)
+            challenged, objections = self._challenge(rec)
+            if challenged is None:
+                continue
+            audited = self._audit(challenged, objections)
+            if audited is None:
+                continue
+            _action, size_pct = _compute_build_action(
+                analyst_confidence=audited.confidence,
+                consistency_penalty=0.0,  # already applied by auditor
+                regime=regime,
+            )
+            if size_pct == 0.0:
+                continue  # WAIT — skip
+            final = Recommendation(
+                instrument=audited.instrument,
+                sleeve=audited.sleeve,
+                side=audited.side,
+                entry=audited.entry,
+                stop_loss=audited.stop_loss,
+                take_profit=audited.take_profit,
+                size_pct=size_pct,
+                confidence=audited.confidence,
+                catalyst=audited.catalyst,
+                thesis=audited.thesis,
+                horizon=audited.horizon,
+            )
+            results.append(final)
 
         return results
 
@@ -164,13 +200,39 @@ class EquityAnalyst:
         except Exception:
             return candidates[: self._max_candidates]
 
-    def _analyse_one(self, candidate: CandidateEvent) -> Recommendation | None:
+    def _analyse_one(
+        self,
+        candidate: CandidateEvent,
+        regime: str = "neutral",
+        vix: float | None = None,
+        yield_curve: float | None = None,
+    ) -> Recommendation | None:
         ticker = candidate.instrument.ticker
         price = self._prices.latest_close(ticker) or 0.0
         headlines = self._news.headlines(ticker, limit=15)
         filings = self._filings.summary(ticker, days=90)
 
-        user_msg = build_analyst_prompt(candidate, price, headlines, filings)
+        sector = ""
+        analyst_count = 0
+        if self._fundamentals:
+            try:
+                snap = self._fundamentals.fetch(ticker)
+                sector = snap.sector
+                analyst_count = snap.analyst_count
+            except Exception:
+                pass
+
+        user_msg = build_analyst_prompt(
+            candidate=candidate,
+            current_price=price,
+            news=headlines,
+            filings=filings,
+            sector=sector,
+            analyst_count=analyst_count,
+            macro_regime=regime,
+            vix=vix,
+            yield_curve=yield_curve,
+        )
         try:
             resp = self._llm.complete(_ANALYST_SYSTEM, user_msg, _SONNET)
             self._budget.record(resp.cost_usd("sonnet"))
@@ -198,10 +260,12 @@ class EquityAnalyst:
         except (KeyError, TypeError, ValueError):
             return None
 
-    def _challenge(self, rec: Recommendation) -> Recommendation | None:
-        """Run the challenger pass. Returns adjusted/None recommendation."""
+    def _challenge(
+        self, rec: Recommendation
+    ) -> tuple[Recommendation | None, list[str]]:
+        """Run the challenger pass. Returns (adjusted_rec_or_None, objections)."""
         if not self._budget.allow(_CHALLENGER_COST):
-            return rec  # budget exhausted — skip challenger, keep rec
+            return rec, []
 
         ticker = rec.instrument.ticker
         headlines = self._news.headlines(ticker, limit=10) if self._news else []
@@ -220,17 +284,18 @@ class EquityAnalyst:
             self._budget.record(resp.cost_usd("sonnet"))
             data = json.loads(_strip_fences(resp.content))
         except Exception:
-            return rec  # on parse failure keep original
+            return rec, []
 
+        objections: list[str] = data.get("objections", [])
         verdict = data.get("verdict", "pass")
 
         if verdict == "reject":
-            return None
+            return None, objections
 
         if verdict == "weaken":
             adj = float(data.get("confidence_adjustment", -0.1))
             new_confidence = max(0.1, rec.confidence + adj)
-            return Recommendation(
+            weakened = Recommendation(
                 instrument=rec.instrument,
                 sleeve=rec.sleeve,
                 side=rec.side,
@@ -243,8 +308,86 @@ class EquityAnalyst:
                 thesis=rec.thesis,
                 horizon=rec.horizon,
             )
+            return weakened, objections
 
-        return rec  # verdict == "pass"
+        return rec, objections
+
+    def _audit(
+        self,
+        rec: Recommendation,
+        objections: list[str],
+    ) -> Recommendation | None:
+        """Run auditor pass. Applies consistency_penalty; returns None on fatal flaw."""
+        if not self._budget.allow(_AUDITOR_COST):
+            return rec
+
+        user_msg = build_auditor_prompt(
+            thesis=rec.thesis,
+            objections=objections,
+            catalyst=rec.catalyst,
+        )
+        try:
+            resp = self._llm.complete(_AUDITOR_SYSTEM, user_msg, _SONNET)
+            self._budget.record(resp.cost_usd("sonnet"))
+            data = json.loads(_strip_fences(resp.content))
+        except Exception:
+            return rec
+
+        if data.get("verdict") == "reject":
+            return None
+
+        consistency_penalty = float(data.get("consistency_penalty", 0.0))
+        new_confidence = round(max(0.05, rec.confidence - consistency_penalty), 3)
+
+        return Recommendation(
+            instrument=rec.instrument,
+            sleeve=rec.sleeve,
+            side=rec.side,
+            entry=rec.entry,
+            stop_loss=rec.stop_loss,
+            take_profit=rec.take_profit,
+            size_pct=rec.size_pct,
+            confidence=new_confidence,
+            catalyst=rec.catalyst,
+            thesis=rec.thesis,
+            horizon=rec.horizon,
+        )
+
+
+def _compute_build_action(
+    analyst_confidence: float,
+    consistency_penalty: float,
+    regime: str = "neutral",
+) -> tuple[str, float]:
+    """Map composite score to build action and size_pct.
+
+    composite = analyst_confidence - consistency_penalty, clamped [0, 1].
+    Base thresholds:
+      AGGRESSIVE_BUILD >= 0.75 -> 4%
+      GRADUAL_BUILD    >= 0.60 -> 2%
+      NIBBLE           >= 0.45 -> 1%
+      WAIT             <  0.45 -> 0% (skip)
+
+    Regime adjustments (Task 15):
+      risk_off: thresholds tighten by +0.10
+      risk_on:  thresholds loosen by -0.05
+    """
+    composite = max(0.0, min(1.0, analyst_confidence - consistency_penalty))
+    offset = 0.0
+    if regime == "risk_off":
+        offset = 0.10
+    elif regime == "risk_on":
+        offset = -0.05
+    t_aggressive = 0.75 + offset
+    t_gradual = 0.60 + offset
+    t_nibble = 0.45 + offset
+    if composite >= t_aggressive:
+        return "AGGRESSIVE_BUILD", 0.04
+    if composite >= t_gradual:
+        return "GRADUAL_BUILD", 0.02
+    if composite >= t_nibble:
+        return "NIBBLE", 0.01
+    return "WAIT", 0.0
 
 
 def _strip_fences(text: str) -> str:

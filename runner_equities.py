@@ -23,6 +23,10 @@ from equities.analysis.analyst import EquityAnalyst
 from equities.analysis.budget import DailyBudget
 from equities.analysis.core_analyst import CoreDCAAnalyst
 from equities.data.news import YFinanceNewsProvider
+from equities.data.news_composite import CompositeNewsProvider
+from equities.data.news_tiingo import TiingoNewsProvider
+from equities.data.macro_regime import MacroRegimeGate
+from equities.data.vix import VIXRegimeGate
 from equities.data.calendar import YFinanceCalendar
 from equities.data.filings import SECEdgarFilings
 from equities.data.fundamentals import YFinanceFundamentals
@@ -31,6 +35,9 @@ from equities.killgate.tracker import ForwardPaperTracker
 from equities.ledger_equity import EquityLedger
 from equities.paper import EquityPaperTracker
 from equities.risk.kernel import RiskKernel
+from equities.killgate.thesis_health import ThesisHealthChecker
+from equities.screen.inflection_screen import InflectionScanner
+from equities.screen.thematic_monitor import ThematicMonitor
 from equities.screen.event_screen import (
     CalendarAdapter,
     EventScreen,
@@ -216,7 +223,10 @@ async def run_once(
 
     price_feed = YFinancePriceFeed()
     prices = _PriceAdapter(price_feed)
-    news = YFinanceNewsProvider()
+    news = CompositeNewsProvider([
+        YFinanceNewsProvider(),
+        TiingoNewsProvider(),   # no-op if TIINGO_API_KEY absent
+    ])
     filings_client = SECEdgarFilings()
     filings_summary = _FilingsSummaryAdapter(filings_client)
 
@@ -252,6 +262,27 @@ async def run_once(
         fp_tracker.close()
         return
 
+    # --- Macro regime classification ---
+    regime_gate = MacroRegimeGate()
+    regime_snap = regime_gate.classify()
+    _vix_str = f"{regime_snap.vix:.1f}" if regime_snap.vix is not None else "n/a"
+    _yc_str = f"{regime_snap.yield_curve:.2f}" if regime_snap.yield_curve is not None else "n/a"
+    print(f"\n=== Macro Regime: {regime_snap.regime.upper()} | VIX={_vix_str} | Yield curve={_yc_str} ===")
+
+    # --- Thesis health check (nightly) ---
+    open_swing = [p for p in equity_ledger.open_positions() if p.get("sleeve") == "swing"]
+    if open_swing and not mark_only:
+        health_checker = ThesisHealthChecker()
+        for health in health_checker.check_all(open_swing, news):
+            print(f"  [HEALTH] {health.ticker}: {health.status} -> {health.action} | {health.reason}")
+            if health.action == "exit" and alerts is not None:
+                await alerts.send(f"Thesis exit signal: {health.ticker} — {health.reason}")
+
+    # --- Thematic concentration check ---
+    thematic_monitor = ThematicMonitor(max_theme_pct=0.35, capital=settings.bankroll_usd)
+    for alert in thematic_monitor.check(equity_ledger.open_positions()):
+        print(f"  [THEMATIC] {alert}")
+
     # --- Swing screen ---
     calendar = YFinanceCalendar()
     event_screen = EventScreen(
@@ -273,8 +304,28 @@ async def run_once(
     for c in core_candidates:
         print(f"  [{c.instrument.ticker}] score={c.score:.3f}: {c.evidence}")
 
+    # --- Inflection screen ---
+    inflection_screen = InflectionScanner(fundamentals_provider)
+    inflection_candidates = inflection_screen.scan(swing_universe)
+    print(f"\n=== Inflection candidates: {len(inflection_candidates)} ===")
+    for c in inflection_candidates:
+        print(f"  [{c.ticker}] ~{c.quarters_to_profit}q to profit | {c.evidence}")
+
     if no_analyse:
         print("Screen-only mode complete.")
+        equity_ledger.close()
+        fp_tracker.close()
+        return
+
+    # --- VIX regime gate ---
+    vix_gate = VIXRegimeGate(threshold=30.0)
+    entries_allowed, current_vix = vix_gate.allow_new_entries()
+    if current_vix is not None:
+        print(f"\nVIX: {current_vix:.1f} | entries_allowed={entries_allowed}")
+    if not entries_allowed:
+        print(f"VIX={current_vix:.1f} > 30 — blocking new entries. Running mark-to-market only.")
+        if alerts is not None:
+            await alerts.send(f"VIX={current_vix:.1f} — new entries blocked today.")
         equity_ledger.close()
         fp_tracker.close()
         return
@@ -291,11 +342,17 @@ async def run_once(
         prices=prices,
         news=news,
         filings=filings_summary,
+        fundamentals=fundamentals_provider,
         budget=budget,
         max_candidates=5,
     )
 
-    swing_recommendations = analyst.analyse(swing_candidates)
+    swing_recommendations = analyst.analyse(
+        swing_candidates,
+        regime=regime_snap.regime,
+        vix=regime_snap.vix,
+        yield_curve=regime_snap.yield_curve,
+    )
 
     # --- Core DCA analyst (risk-officer check before accumulating) ---
     core_analyst = CoreDCAAnalyst(

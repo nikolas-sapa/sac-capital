@@ -19,20 +19,27 @@ Score criteria:
 Return ONLY valid JSON: {"rankings": [{"ticker": "TICKER", "score": 7, "reason": "one sentence"}]}
 No markdown fences, no commentary outside the JSON object."""
 
-_PREFILTER_USER = """Score each of these equity catalysts:
+_PREFILTER_USER = """Score each of these equity catalysts. Under-followed stocks (< 5 sell-side analysts) deserve a coverage bonus of +1 to your score — the market is less informed.
 
 {candidates_block}
 
 Return JSON rankings."""
 
 
-def build_prefilter_prompt(candidates: list[CandidateEvent]) -> str:
+def build_prefilter_prompt(
+    candidates: list[CandidateEvent],
+    analyst_counts: dict[str, int] | None = None,
+) -> str:
     """Build the Haiku prefilter user message."""
     lines = []
     for c in candidates:
+        coverage = ""
+        if analyst_counts:
+            n = analyst_counts.get(c.instrument.ticker, 0)
+            coverage = f" | analysts={n}"
         lines.append(
             f"- {c.instrument.ticker} ({c.instrument.cap_tier.value} cap): "
-            f"{c.event_type.value} | {c.evidence}"
+            f"{c.event_type.value} | {c.evidence}{coverage}"
         )
     return _PREFILTER_USER.format(candidates_block="\n".join(lines))
 
@@ -54,6 +61,8 @@ _ANALYST_USER = """Analyze this equity catalyst.
 
 ## Candidate
 Ticker: {ticker}
+Sector: {sector}
+Analyst coverage: {analyst_count} sell-side analysts (< 5 = under-followed = higher opportunity)
 Event: {event_type} — {evidence}
 Current price: ${current_price:.2f}
 Cap tier: {cap_tier}
@@ -64,6 +73,9 @@ Cap tier: {cap_tier}
 ## Recent SEC filings (last 90 days)
 {filings_block}
 
+## Macro context
+Regime: {macro_regime} | VIX: {vix_str} | Yield curve (10y-3m): {yield_curve_str}
+
 ## Task
 If this setup is already priced in OR has no clear thesis, output:
 {{"action": "reject", "reason": "one sentence"}}
@@ -72,12 +84,12 @@ Otherwise output:
 {{
   "action": "buy",
   "entry": <limit price as float>,
-  "stop_loss": <stop price — where thesis is broken>,
-  "take_profit": <target — where re-rating completes>,
+  "stop_loss": <stop price where thesis is broken>,
+  "take_profit": <target where re-rating completes>,
   "confidence": <0.0-1.0>,
   "horizon": "<e.g. 1-2 weeks>",
   "catalyst": "<one sentence: what specific event drives this>",
-  "thesis": "<2-3 sentences: what the market is missing, why the re-rating is incomplete>"
+  "thesis": "<2-3 sentences: what the market is missing>"
 }}"""
 
 
@@ -86,18 +98,30 @@ def build_analyst_prompt(
     current_price: float,
     news: list[str],
     filings: list[str],
+    sector: str = "",
+    analyst_count: int = 0,
+    macro_regime: str = "neutral",
+    vix: float | None = None,
+    yield_curve: float | None = None,
 ) -> str:
     """Build the Sonnet deep-analyst user message."""
-    news_block = "\n".join(f"- {h}" for h in news[:15]) or "  (none)"
-    filings_block = "\n".join(f"- {f}" for f in filings[:6]) or "  (none)"
+    news_block = "\n".join(f"- {h}" for h in news[:8]) or "  (none)"
+    filings_block = "\n".join(f"- {f}" for f in filings[:5]) or "  (none)"
+    vix_str = f"{vix:.1f}" if vix is not None else "n/a"
+    yield_curve_str = f"{yield_curve:.2f}" if yield_curve is not None else "n/a"
     return _ANALYST_USER.format(
         ticker=candidate.instrument.ticker,
+        sector=sector or "Unknown",
+        analyst_count=analyst_count,
         event_type=candidate.event_type.value,
         evidence=candidate.evidence,
         current_price=current_price,
         cap_tier=candidate.instrument.cap_tier.value,
         news_block=news_block,
         filings_block=filings_block,
+        macro_regime=macro_regime,
+        vix_str=vix_str,
+        yield_curve_str=yield_curve_str,
     )
 
 
@@ -134,6 +158,57 @@ Verdict rules:
 - "reject": thesis is fundamentally flawed or catalyst is already fully priced in
 - "weaken": 1-2 real concerns reduce the edge but do not eliminate it
 - "pass": no material objections — bull case stands"""
+
+
+# ---------------------------------------------------------------------------
+# Stage 4 — Sonnet auditor (debate quality evaluator)
+# ---------------------------------------------------------------------------
+
+_AUDITOR_SYSTEM = """You are a debate auditor evaluating the quality of reasoning in a bull/bear equity analysis.
+Do NOT decide who is right. Assess whether each side argued rigorously.
+
+Penalize: circular logic, unbacked assertions, generic risks ("market could fall"), recency bias, no concrete data.
+Reward: specific data points (revenue numbers, margin trends, dates), clear falsifiability, concrete timeframes.
+
+Return ONLY valid JSON. No markdown, no preamble."""
+
+_AUDITOR_USER = """Audit this bull/bear analysis.
+
+## Catalyst
+{catalyst}
+
+## Bull thesis
+{thesis}
+
+## Bear objections
+{objections_block}
+
+Output:
+{{
+  "bull_rigor": <0.0-1.0>,
+  "bear_rigor": <0.0-1.0>,
+  "consistency_penalty": <0.0-0.25, how much to penalize final confidence for weak reasoning>,
+  "fatal_flaw": <null or "one sentence describing a logical fatal flaw if found">,
+  "verdict": "proceed" | "downgrade" | "reject"
+}}
+
+Verdict rules:
+- "proceed": both sides argued with specifics, no fatal flaw detected
+- "downgrade": one side was vague OR a genuine unaddressed concern exists
+- "reject": fatal logical flaw in the bull thesis, or both sides were entirely generic"""
+
+
+def build_auditor_prompt(
+    thesis: str,
+    objections: list[str],
+    catalyst: str,
+) -> str:
+    objections_block = "\n".join(f"- {o}" for o in objections) or "  (none)"
+    return _AUDITOR_USER.format(
+        catalyst=catalyst,
+        thesis=thesis,
+        objections_block=objections_block,
+    )
 
 
 def build_challenger_prompt(
