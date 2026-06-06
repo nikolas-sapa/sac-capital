@@ -12,17 +12,17 @@ _DEFAULT_RESOLUTION_TEXT = "Resolves according to Polymarket resolution source."
 
 
 def _default_client() -> LLMClient:
-    """Build a ClaudeCodeBackend-backed LLMClient (uses Claude subscription)."""
+    """Build the default LLM-backed client."""
     from core.claude_client import ClaudeCodeBackend
     return LLMClient(backend=ClaudeCodeBackend(), budget=DailyBudget(limit_usd=999.0))
 
 
 class LLMProbabilityStrategy:
-    """Scan thin/illiquid Polymarket markets; emit Signals where Claude's
+    """Scan thin/illiquid Polymarket markets; emit Signals where the LLM's
     estimated edge clears both the min_edge and min_conf thresholds.
 
-    When called with no arguments, uses ClaudeCodeBackend (your Claude
-    subscription via `claude -p`) — no API key required.
+    When called with no arguments, uses OpenAI if OPENAI_API_KEY is set;
+    otherwise it falls back to the Claude CLI.
     """
 
     name = "llm_probability"

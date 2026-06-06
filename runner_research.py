@@ -45,6 +45,15 @@ def main() -> None:
         print(f"\n{trunk}:")
         for leaf, b, d in lag.score_all_leaves(trunk)[:5]:
             print(f"  {leaf}  bottleneck={b:.2f}  lag={d:+.1f}pp")
+            all_candidates.append({
+                "ticker": leaf,
+                "trunk": trunk,
+                "level": "static",
+                "discovery_lag_pct": d,
+                "bottleneck_score": b,
+                "opportunity_score": round((max(d, 0.0) / 100) * b, 4),
+                "thesis": f"Static supply-chain lag behind {trunk}",
+            })
 
     all_candidates.sort(key=lambda x: x["opportunity_score"], reverse=True)
     out = Path("data/research_candidates.json")

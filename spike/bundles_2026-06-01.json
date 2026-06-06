@@ -1,0 +1,427 @@
+[
+  {
+    "ticker": "SMCI",
+    "hint": "AI server infrastructure, extreme earnings volatility, SEC filing issues",
+    "info": {
+      "name": "Super Micro Computer, Inc.",
+      "sector": "Technology",
+      "industry": "Computer Hardware",
+      "market_cap_m": 28306.0,
+      "employees": 6238,
+      "trailing_pe": 24.771051,
+      "forward_pe": 14.6163225,
+      "ps_ratio": 0.8399284,
+      "revenue_growth": 1.227,
+      "gross_margins": 0.08394,
+      "analyst_count": 16
+    },
+    "prices": {
+      "latest_close": 47.06,
+      "1mo_chg_pct": 71.8,
+      "3mo_chg_pct": 45.8,
+      "52w_high": 48.34,
+      "52w_low": 19.48,
+      "pct_from_52w_high": -2.6,
+      "avg_vol_20d": 45594660
+    },
+    "earnings": [],
+    "news": [
+      "SMCI Stock Gets Target Boost As Mizuho Cites Agentic AI Demand \u2014 Jensen Huang Says 'One Prompt Can Launch A 1000-Step Journey'",
+      "Here's How Much a $1000 Investment in Super Micro Computer Made 10 Years Ago Would Be Worth Today",
+      "3 Growth Stocks Insiders Are Betting On",
+      "Is Super Micro Computer (SMCI) Among the Most Undervalued AI Stocks to Buy According to Hedge Funds?",
+      "AVGO vs. SMCI: Analysts See Upside in One AI Stock, but 24% Downside in the Other",
+      "Why Super Micro Computer Stock Skyrocketed This Week",
+      "\u2018Something New For a Change,\u2019 Says Investor About Super Micro Computer Stock",
+      "Officials Detain Three Individuals in Taiwan Chip Smuggling Case"
+    ],
+    "sec_filings": [
+      "8-K (2026-05-18) \u2014 Items: 5.02,9.01",
+      "10-Q (2026-05-11)",
+      "8-K (2026-05-05) \u2014 Items: 2.02,9.01",
+      "8-K (2026-04-20) \u2014 Items: 5.02,5.07,9.01",
+      "8-K (2026-03-20) \u2014 Items: 5.02,9.01"
+    ]
+  },
+  {
+    "ticker": "XPEL",
+    "hint": "auto aftermarket protection film, thin analyst coverage, expansion story",
+    "info": {
+      "name": "XPEL, Inc.",
+      "sector": "Consumer Cyclical",
+      "industry": "Auto Parts",
+      "market_cap_m": 1227.0,
+      "employees": 1337,
+      "trailing_pe": 23.3089,
+      "forward_pe": 18.396694,
+      "ps_ratio": 2.5053957,
+      "revenue_growth": 0.131,
+      "gross_margins": 0.42543,
+      "analyst_count": 3
+    },
+    "prices": {
+      "latest_close": 44.52,
+      "1mo_chg_pct": -6.5,
+      "3mo_chg_pct": -1.2,
+      "52w_high": 55.91,
+      "52w_low": 36.99,
+      "pct_from_52w_high": -20.4,
+      "avg_vol_20d": 291248
+    },
+    "earnings": [],
+    "news": [
+      "A Look At XPEL (XPEL) Valuation After First Quarter Earnings Beat Expectations",
+      "XPEL Q1 Earnings Call Highlights",
+      "XPEL, Inc. Q1 2026 Earnings Call Summary",
+      "XPEL, Inc. (XPEL) Q1 Earnings and Revenues Beat Estimates",
+      "Nutex Health And 2 Other Undiscovered Gems In The US Market",
+      "Assessing XPEL (XPEL) Valuation After New Stellantis Jeep Gladiator Collaboration",
+      "US Market's Top 3 Undiscovered Gems With Strong Potential",
+      "Is\u00a0XPEL, Inc. (XPEL)\u00a0A Good Stock\u00a0To\u00a0Buy Now?"
+    ],
+    "sec_filings": [
+      "8-K (2026-05-20) \u2014 Items: 1.01,2.01,2.03,7.01,9.01",
+      "10-Q (2026-05-08)",
+      "8-K (2026-05-06) \u2014 Items: 2.02,9.01",
+      "8-K (2026-04-29) \u2014 Items: 5.02"
+    ]
+  },
+  {
+    "ticker": "PGNY",
+    "hint": "fertility benefits SaaS, employer-headwinds debate, under-covered",
+    "info": {
+      "name": "Progyny, Inc.",
+      "sector": "Healthcare",
+      "industry": "Healthcare Plans",
+      "market_cap_m": 2050.0,
+      "employees": 835,
+      "trailing_pe": 33.987015,
+      "forward_pe": 11.860843,
+      "ps_ratio": 1.585272,
+      "revenue_growth": 0.014,
+      "gross_margins": 0.24109,
+      "analyst_count": 11
+    },
+    "prices": {
+      "latest_close": 26.17,
+      "1mo_chg_pct": 40.9,
+      "3mo_chg_pct": 17.6,
+      "52w_high": 28.75,
+      "52w_low": 16.1,
+      "pct_from_52w_high": -9.0,
+      "avg_vol_20d": 1743897
+    },
+    "earnings": [],
+    "news": [
+      "A Progyny (PGNY) Insider Sold 5,500 Shares for $137,000",
+      "Progyny (PGNY) Is Up 7.0% After Analyst Upgrade Backed By Six Earnings Beats And 2026 Outlook",
+      "3 Stocks Under $50 with Warning Signs",
+      "Progyny (PGNY) Stock Is Up, What You Need To Know",
+      "StubHub, Jazz Pharmaceuticals upgraded: Wall Street's top analyst calls",
+      "Progyny and Standex International have been highlighted as Zacks Bull and Bear of the Day",
+      "Bull of the Day: Progyny (PGNY)",
+      "Progyny\u2019s Q1 Earnings Call: Our Top 5 Analyst Questions"
+    ],
+    "sec_filings": [
+      "8-K (2026-05-27) \u2014 Items: 5.03,5.07",
+      "8-K (2026-05-26) \u2014 Items: 8.01",
+      "10-Q (2026-05-08)",
+      "8-K (2026-05-07) \u2014 Items: 2.02,7.01",
+      "8-K (2026-03-13) \u2014 Items: 8.01"
+    ]
+  },
+  {
+    "ticker": "FIGS",
+    "hint": "medical apparel DTC, recovery thesis vs. competition narrative",
+    "info": {
+      "name": "FIGS, Inc.",
+      "sector": "Consumer Cyclical",
+      "industry": "Apparel Manufacturing",
+      "market_cap_m": 1985.0,
+      "employees": 330,
+      "trailing_pe": 54.0,
+      "forward_pe": 36.983997,
+      "ps_ratio": 2.9793189,
+      "revenue_growth": 0.28,
+      "gross_margins": 0.66608,
+      "analyst_count": 8
+    },
+    "prices": {
+      "latest_close": 11.88,
+      "1mo_chg_pct": -20.6,
+      "3mo_chg_pct": -4.7,
+      "52w_high": 17.48,
+      "52w_low": 9.7,
+      "pct_from_52w_high": -32.0,
+      "avg_vol_20d": 3983724
+    },
+    "earnings": [],
+    "news": [
+      "Brunswick, Figs, Marriott Vacations, WeightWatchers, and PVH Shares Are Soaring, What You Need To Know",
+      "FIGS Q1 Strength Tests Market Sentiment As Growth Outlook Rises",
+      "FIGS Q1 Deep Dive: Strong Revenue Growth Overshadowed by Market Concerns on Sustainability",
+      "The 5 Most Interesting Analyst Questions From Figs\u2019s Q1 Earnings Call",
+      "Here is Why FIGS, Inc. (FIGS) is Among the 8 Best Small Cap US Stocks to Buy",
+      "Why Figs (FIGS) Shares Are Sliding Today",
+      "FIGS Q1 Earnings Call Highlights",
+      "How The FIGS (FIGS) Investment Story Is Shifting After Recent Earnings And Analyst Revisions"
+    ],
+    "sec_filings": [
+      "10-Q (2026-05-07)",
+      "8-K (2026-05-07) \u2014 Items: 2.02,7.01,9.01"
+    ]
+  },
+  {
+    "ticker": "PRCT",
+    "hint": "medtech urology robotics, early commercial ramp, complex clinical story",
+    "info": {
+      "name": "PROCEPT BioRobotics Corporation",
+      "sector": "Healthcare",
+      "industry": "Medical Devices",
+      "market_cap_m": 1617.0,
+      "employees": 888,
+      "trailing_pe": null,
+      "forward_pe": -32.806004,
+      "ps_ratio": 5.0215645,
+      "revenue_growth": 0.202,
+      "gross_margins": 0.63974,
+      "analyst_count": 9
+    },
+    "prices": {
+      "latest_close": 28.41,
+      "1mo_chg_pct": 18.2,
+      "3mo_chg_pct": 20.2,
+      "52w_high": 38.11,
+      "52w_low": 19.35,
+      "pct_from_52w_high": -25.5,
+      "avg_vol_20d": 1469456
+    },
+    "earnings": [],
+    "news": [
+      "PROCEPT BioRobotics (PRCT) Is Down 9.2% After Aquablation WATER IV Milestones - What's Changed",
+      "Here\u2019s What the Street Thinks About PROCEPT BioRobotics Corporation (PRCT)",
+      "This Healthcare Investor Added $43 Million to a Genomics Leader Growing Volume 34%",
+      "5 Robotics Stocks to Watch as Physical AI Builds Momentum",
+      "Q1 Results Say a Lot About Procept Biorobotics Corp (PRCT) Stock Outlook",
+      "How The PROCEPT BioRobotics (PRCT) Investment Story Is Shifting After Q4 Miss And Guidance Reset",
+      "PROCEPT BioRobotics (PRCT)\u2019s Growth Narrative Improves Following Aquablation Upgrade and HYDROS Launch",
+      "Procept (PRCT) Q1 2026 Earnings Transcript"
+    ],
+    "sec_filings": [
+      "10-Q (2026-04-30)",
+      "8-K (2026-04-29) \u2014 Items: 2.02,9.01",
+      "8-K (2026-03-06) \u2014 Items: 5.02,9.01"
+    ]
+  },
+  {
+    "ticker": "BOOT",
+    "hint": "specialty retail western wear, same-store sales + margin story",
+    "info": {
+      "name": "Boot Barn Holdings, Inc.",
+      "sector": "Consumer Cyclical",
+      "industry": "Apparel Retail",
+      "market_cap_m": 5028.0,
+      "employees": 3800,
+      "trailing_pe": 22.512228,
+      "forward_pe": 16.751356,
+      "ps_ratio": 2.2309613,
+      "revenue_growth": 0.187,
+      "gross_margins": 0.38084,
+      "analyst_count": 14
+    },
+    "prices": {
+      "latest_close": 165.69,
+      "1mo_chg_pct": -3.4,
+      "3mo_chg_pct": -16.0,
+      "52w_high": 210.25,
+      "52w_low": 133.18,
+      "pct_from_52w_high": -21.2,
+      "avg_vol_20d": 857278
+    },
+    "earnings": [],
+    "news": [
+      "A Look At Boot Barn Holdings\u2019s (BOOT) Valuation As Mixed Returns Contrast With Undervaluation Narrative",
+      "3 Market-Beating Stocks to Keep an Eye On",
+      "Boot Barn Trades at Premium Valuation: Overvalued or Apt for Entry?",
+      "1 of Wall Street\u2019s Favorite Stocks with Competitive Advantages and 2 We Avoid",
+      "BOOT's Exclusive Brands Are Fueling Merchandise Margin Growth",
+      "How The Boot Barn (BOOT) Narrative Is Shifting After Q4 Results And Valuation Reset",
+      "5 Insightful Analyst Questions From Boot Barn\u2019s Q1 Earnings Call",
+      "BOOT Q1 Deep Dive: New Store Openings, Exclusive Brands, and Margin Focus Shape 2026 Outlook"
+    ],
+    "sec_filings": [
+      "10-K (2026-05-14)",
+      "8-K (2026-05-14) \u2014 Items: 2.02,7.01,9.01"
+    ]
+  },
+  {
+    "ticker": "KLIC",
+    "hint": "semiconductor equipment, earnings sensitivity, capacity cycle position",
+    "info": {
+      "name": "Kulicke and Soffa Industries, Inc.",
+      "sector": "Technology",
+      "industry": "Semiconductor Equipment & Materials",
+      "market_cap_m": 5454.0,
+      "employees": 2551,
+      "trailing_pe": 101.18932,
+      "forward_pe": 24.600689,
+      "ps_ratio": 7.100069,
+      "revenue_growth": 0.498,
+      "gross_margins": 0.53565,
+      "analyst_count": 3
+    },
+    "prices": {
+      "latest_close": 104.22,
+      "1mo_chg_pct": 21.9,
+      "3mo_chg_pct": 47.8,
+      "52w_high": 109.88,
+      "52w_low": 44.09,
+      "pct_from_52w_high": -5.1,
+      "avg_vol_20d": 992610
+    },
+    "earnings": [],
+    "news": [
+      "3 Small-Cap Stocks We\u2019re Skeptical Of",
+      "Ultra Clean Surges 322% in a Year: Should You Bet on the Stock?",
+      "Entegris and Kulicke and Soffa Shares Plummet, What You Need To Know",
+      "Teradyne, Kulicke and Soffa, Impinj, Microchip Technology, and IPG Photonics Shares Plummet, What You Need To Know",
+      "Kulicke & Soffa Rides on Multiple Growth Drivers: Should You Invest?",
+      "Did Stronger Guidance and AI-Focused Capex Just Shift Kulicke and Soffa Industries' (KLIC) Investment Narrative?",
+      "Kulicke and Soffa\u2019s Q1 Earnings Call: Our Top 5 Analyst Questions",
+      "Earnings Estimates Moving Higher for Kulicke and Soffa (KLIC): Time to Buy?"
+    ],
+    "sec_filings": [
+      "10-Q (2026-05-07)",
+      "8-K (2026-05-06) \u2014 Items: 2.02,9.01",
+      "8-K (2026-03-05) \u2014 Items: 5.07"
+    ]
+  },
+  {
+    "ticker": "CURV",
+    "hint": "plus-size fashion retail, turnaround or terminal decline?",
+    "info": {
+      "name": "Torrid Holdings Inc.",
+      "sector": "Consumer Cyclical",
+      "industry": "Apparel Retail",
+      "market_cap_m": 153.0,
+      "employees": 1530,
+      "trailing_pe": null,
+      "forward_pe": 41.99618,
+      "ps_ratio": 0.15321355,
+      "revenue_growth": -0.143,
+      "gross_margins": 0.34792998,
+      "analyst_count": 4
+    },
+    "prices": {
+      "latest_close": 1.54,
+      "1mo_chg_pct": -10.5,
+      "3mo_chg_pct": 46.7,
+      "52w_high": 2.32,
+      "52w_low": 0.94,
+      "pct_from_52w_high": -33.6,
+      "avg_vol_20d": 347007
+    },
+    "earnings": [],
+    "news": [
+      "Stocks making big moves this week: Viasat, Agilent, Verra Mobility, Torrid, and Zscaler",
+      "Abercrombie & Fitch (ANF) Beats Q1 Earnings Estimates",
+      "Victoria's Secret, American Eagle, and Torrid Shares Skyrocket, What You Need To Know",
+      "3 Small-Cap Stocks Walking a Fine Line",
+      "2 Cash-Burning Stocks to Consider Right Now and 1 We Turn Down",
+      "3 Russell 2000 Stocks That Concern Us",
+      "Torrid, Victoria's Secret, Boot Barn, America's Car-Mart, and Shoe Carnival Stocks Trade Down, What You Need To Know",
+      "Dollar General, Torrid, and Camping World Shares Plummet, What You Need To Know"
+    ],
+    "sec_filings": [
+      "8-K (2026-04-03) \u2014 Items: 5.02,9.01",
+      "10-K (2026-03-31)",
+      "8-K (2026-03-19) \u2014 Items: 2.02,9.01"
+    ]
+  },
+  {
+    "ticker": "ARWR",
+    "hint": "RNA interference biotech, pipeline catalyst timing, thin sell-side",
+    "info": {
+      "name": "Arrowhead Pharmaceuticals, Inc.",
+      "sector": "Healthcare",
+      "industry": "Biotechnology",
+      "market_cap_m": 10475.0,
+      "employees": 711,
+      "trailing_pe": null,
+      "forward_pe": -17.133648,
+      "ps_ratio": 16.84032,
+      "revenue_growth": -0.864,
+      "gross_margins": 1.0,
+      "analyst_count": 12
+    },
+    "prices": {
+      "latest_close": 74.36,
+      "1mo_chg_pct": 1.2,
+      "3mo_chg_pct": 17.3,
+      "52w_high": 82.26,
+      "52w_low": 52.23,
+      "pct_from_52w_high": -9.6,
+      "avg_vol_20d": 1647267
+    },
+    "earnings": [],
+    "news": [
+      "Arrowhead Data On Plozasiran Expands Cardiometabolic Opportunity And Investor Focus",
+      "Bernstein Lifts PT on Arrowhead Pharmaceuticals (ARWR) Following Biotech\u2019s Solid Start to 2026",
+      "Arrowhead Pharmaceuticals Eyes Q3 SHASTA Data as REDEMPLO Approvals Build Momentum",
+      "Arrowhead Pharmaceuticals Eyes $4B REDEMPLO Opportunity as RNAi Pipeline Readouts Near",
+      "Assessing Arrowhead Pharmaceuticals (ARWR) Valuation After Its Recent Share Price Momentum",
+      "Arrowhead (ARWR) Q2 2026 Earnings Transcript",
+      "Arrowhead Pharmaceuticals Q2 Earnings Call Highlights",
+      "Arrowhead and Madrigal sign global licence for MASH RNAi therapy"
+    ],
+    "sec_filings": [
+      "10-Q (2026-05-07)",
+      "8-K (2026-05-07) \u2014 Items: 2.02,9.01",
+      "8-K (2026-03-20) \u2014 Items: 5.07,9.01"
+    ]
+  },
+  {
+    "ticker": "IPAR",
+    "hint": "fragrance/beauty IP licensor, steady compounder, under-followed",
+    "info": {
+      "name": "Interparfums, Inc.",
+      "sector": "Consumer Defensive",
+      "industry": "Household & Personal Products",
+      "market_cap_m": 2925.0,
+      "employees": 662,
+      "trailing_pe": 17.330172,
+      "forward_pe": 16.42626,
+      "ps_ratio": 1.9570209,
+      "revenue_growth": 0.018,
+      "gross_margins": 0.59213,
+      "analyst_count": 5
+    },
+    "prices": {
+      "latest_close": 91.33,
+      "1mo_chg_pct": 0.1,
+      "3mo_chg_pct": -11.6,
+      "52w_high": 104.08,
+      "52w_low": 78.06,
+      "pct_from_52w_high": -12.3,
+      "avg_vol_20d": 234124
+    },
+    "earnings": [],
+    "news": [
+      "3 Cash-Producing Stocks We Keep Off Our Radar",
+      "Q1 Earnings Outperformers: Inter Parfums (NASDAQ:IPAR) And The Rest Of The Personal Care Stocks",
+      "Interparfums And 2 Other Prominent Dividend Stocks To Consider",
+      "The 5 Most Interesting Analyst Questions From Inter Parfums\u2019s Q1 Earnings Call",
+      "Tyson Foods, Inter Parfums, and Est\u00e9e Lauder Shares Plummet, What You Need To Know",
+      "How Interparfums' Reaffirmed 2026 Guidance and Dividend Commitment Will Impact Interparfums (IPAR) Investors",
+      "Interparfums Q1 Earnings Call Highlights",
+      "Interparfums (IPAR) Q1 2026 Earnings Transcript"
+    ],
+    "sec_filings": [
+      "8-K (2026-05-13) \u2014 Items: 4.01,9.01",
+      "8-K (2026-05-05) \u2014 Items: 2.02,7.01,8.01,9.01",
+      "10-Q (2026-05-05)",
+      "8-K (2026-04-21) \u2014 Items: 2.02,7.01,9.01",
+      "10-K (2026-03-10)"
+    ]
+  }
+]

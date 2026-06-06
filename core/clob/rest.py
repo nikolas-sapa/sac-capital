@@ -105,7 +105,11 @@ async def fetch_markets(limit: int = 500, active: bool = True) -> list[Market]:
             batch = response.json()
             if not batch:
                 break
-            collected.extend(parse_market(item) for item in batch)
+            for item in batch:
+                try:
+                    collected.append(parse_market(item))
+                except (KeyError, TypeError, ValueError):
+                    continue
             if len(batch) < 100:
                 break
             offset += 100

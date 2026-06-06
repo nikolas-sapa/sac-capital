@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from core.clob.rest import parse_market
+from core.clob.rest import fetch_markets, parse_market
 
 FIXTURE = Path(__file__).parent / "fixtures" / "gamma_market.json"
 
@@ -67,3 +67,33 @@ def test_parse_market_outcomes_prices(raw_market):
     assert yes.best_ask == pytest.approx(0.53)
     assert no.best_bid == pytest.approx(0.47)
     assert no.best_ask == pytest.approx(0.47)
+
+
+@pytest.mark.asyncio
+async def test_fetch_markets_skips_items_missing_end_date(monkeypatch, raw_market):
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            bad = dict(raw_market)
+            bad.pop("endDate", None)
+            return [bad, raw_market]
+
+    class FakeClient:
+        def __init__(self, timeout):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def get(self, url, params):
+            return FakeResponse()
+
+    monkeypatch.setattr("core.clob.rest.httpx.AsyncClient", FakeClient)
+    markets = await fetch_markets(limit=2)
+    assert len(markets) == 1
+    assert markets[0].condition_id == raw_market["conditionId"]
