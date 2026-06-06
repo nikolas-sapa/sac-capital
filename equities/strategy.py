@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from core.assets.instrument import Instrument
 
@@ -25,6 +25,7 @@ class Recommendation:
     catalyst: str
     thesis: str
     horizon: str
+    memo: dict[str, Any] | None = None
 
 
 @runtime_checkable

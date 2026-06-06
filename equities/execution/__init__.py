@@ -1,0 +1,1 @@
+"""Equities execution adapters."""

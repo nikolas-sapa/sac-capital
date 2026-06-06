@@ -11,6 +11,7 @@ Only responds to TELEGRAM_CHAT_ID (security gate).
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 
 import httpx
@@ -31,8 +32,11 @@ def _get_updates(token: str, offset: int) -> list[dict]:
         )
         r.raise_for_status()
         return r.json().get("result", [])
+    except httpx.TimeoutException:
+        return []
     except Exception as exc:
         print(f"getUpdates error: {exc}", flush=True)
+        time.sleep(30)
         return []
 
 
@@ -53,6 +57,9 @@ def _register_commands(token: str) -> None:
         {"command": "help",      "description": "List all commands"},
         {"command": "stats",     "description": "Equity portfolio summary"},
         {"command": "positions", "description": "Open equity positions with PnL"},
+        {"command": "alpaca",    "description": "Alpaca paper config status"},
+        {"command": "orders",    "description": "Broker order status from local ledger"},
+        {"command": "risk",      "description": "Risk limits and local exposure"},
         {"command": "markets",   "description": "Open Polymarket positions"},
         {"command": "pnl",       "description": "Combined P&L report"},
         {"command": "kill",      "description": "Kill gate progress to live trading"},

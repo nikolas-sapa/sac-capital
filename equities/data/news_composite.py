@@ -11,8 +11,9 @@ class NewsProvider(Protocol):
 class CompositeNewsProvider:
     """Aggregate headlines from multiple providers, deduplicating by exact match."""
 
-    def __init__(self, providers: list[NewsProvider]) -> None:
+    def __init__(self, providers: list[NewsProvider], failure_callback=None) -> None:
         self._providers = providers
+        self._failure_callback = failure_callback
 
     def headlines(self, ticker: str, limit: int = 15) -> list[str]:
         seen: set[str] = set()
@@ -20,7 +21,11 @@ class CompositeNewsProvider:
         for provider in self._providers:
             try:
                 items = provider.headlines(ticker, limit=limit)
-            except Exception:
+            except Exception as exc:
+                source = provider.__class__.__name__
+                print(f"  [PROVIDER] source={source} ticker={ticker} error={exc}")
+                if self._failure_callback is not None:
+                    self._failure_callback()
                 items = []
             for item in items:
                 normalized = item.strip()

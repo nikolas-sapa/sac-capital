@@ -73,6 +73,8 @@ class EquityPaperTracker:
         fired: list[ExitSignal] = []
 
         for pos in positions:
+            if pos.get("status") == "submitted":
+                continue
             ticker = pos["ticker"]
             price = self._prices.latest_close(ticker)
             if price is None:

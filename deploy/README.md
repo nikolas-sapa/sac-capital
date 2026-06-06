@@ -1,11 +1,14 @@
 # launchd Scheduling — macOS Paper-Trading Phase
 
-Two launchd agents drive the paper-trading loop locally.
+Several launchd agents drive the paper-trading loop locally.
 
 | Agent | Plist | Cadence |
 |---|---|---|
-| Scanner | `com.polymarketbot.runner.plist` | Every 5 min (`StartInterval 300`) |
+| Polymarket scanner | `com.polymarketbot.runner.plist` | Every 5 min (`StartInterval 300`) |
 | Resolution poller | `com.polymarketbot.resolve.plist` | Nightly at 02:00 (`StartCalendarInterval`) |
+| Equity mark/exits | `com.polymarketbot.equities.mark.plist` | Every 60 min (`StartInterval 3600`) |
+| Equity scan/analysis | `com.polymarketbot.equities.scan.plist` | Daily 17:15 local time (`StartCalendarInterval`) |
+| Nightly harness | `com.polymarketbot.nightly.plist` | Nightly at 02:30 (`StartCalendarInterval`) |
 
 Both invoke the venv Python binary directly (no bare `uv`/`python` in PATH) and set `WorkingDirectory` so relative paths like `data/ledger.db` and `.env` resolve correctly.
 
@@ -27,10 +30,16 @@ Both invoke the venv Python binary directly (no bare `uv`/`python` in PATH) and 
 # Copy plists into the user LaunchAgents directory
 cp deploy/com.polymarketbot.runner.plist  ~/Library/LaunchAgents/
 cp deploy/com.polymarketbot.resolve.plist ~/Library/LaunchAgents/
+cp deploy/com.polymarketbot.equities.mark.plist ~/Library/LaunchAgents/
+cp deploy/com.polymarketbot.equities.scan.plist ~/Library/LaunchAgents/
+cp deploy/com.polymarketbot.nightly.plist ~/Library/LaunchAgents/
 
 # Load and enable both agents
 launchctl load -w ~/Library/LaunchAgents/com.polymarketbot.runner.plist
 launchctl load -w ~/Library/LaunchAgents/com.polymarketbot.resolve.plist
+launchctl load -w ~/Library/LaunchAgents/com.polymarketbot.equities.mark.plist
+launchctl load -w ~/Library/LaunchAgents/com.polymarketbot.equities.scan.plist
+launchctl load -w ~/Library/LaunchAgents/com.polymarketbot.nightly.plist
 ```
 
 Alternatively, symlink instead of copy (changes to the repo take effect on next reload):
@@ -38,6 +47,9 @@ Alternatively, symlink instead of copy (changes to the repo take effect on next 
 ```sh
 ln -sf "$(pwd)/deploy/com.polymarketbot.runner.plist"  ~/Library/LaunchAgents/
 ln -sf "$(pwd)/deploy/com.polymarketbot.resolve.plist" ~/Library/LaunchAgents/
+ln -sf "$(pwd)/deploy/com.polymarketbot.equities.mark.plist" ~/Library/LaunchAgents/
+ln -sf "$(pwd)/deploy/com.polymarketbot.equities.scan.plist" ~/Library/LaunchAgents/
+ln -sf "$(pwd)/deploy/com.polymarketbot.nightly.plist" ~/Library/LaunchAgents/
 ```
 
 ---
@@ -51,6 +63,9 @@ launchctl list | grep polymarketbot
 # Unload (disable + stop)
 launchctl unload -w ~/Library/LaunchAgents/com.polymarketbot.runner.plist
 launchctl unload -w ~/Library/LaunchAgents/com.polymarketbot.resolve.plist
+launchctl unload -w ~/Library/LaunchAgents/com.polymarketbot.equities.mark.plist
+launchctl unload -w ~/Library/LaunchAgents/com.polymarketbot.equities.scan.plist
+launchctl unload -w ~/Library/LaunchAgents/com.polymarketbot.nightly.plist
 
 # Reload after editing a plist
 launchctl unload ~/Library/LaunchAgents/com.polymarketbot.runner.plist
@@ -59,6 +74,9 @@ launchctl load -w ~/Library/LaunchAgents/com.polymarketbot.runner.plist
 # Tail logs
 tail -f /Users/nikolassapalidis/polymarket-bot/data/runner.log
 tail -f /Users/nikolassapalidis/polymarket-bot/data/runner.err.log
+tail -f /Users/nikolassapalidis/polymarket-bot/data/equities_mark.log
+tail -f /Users/nikolassapalidis/polymarket-bot/data/equities_scan.log
+tail -f /Users/nikolassapalidis/polymarket-bot/data/nightly.log
 tail -f /Users/nikolassapalidis/polymarket-bot/data/resolve.log
 tail -f /Users/nikolassapalidis/polymarket-bot/data/resolve.err.log
 ```

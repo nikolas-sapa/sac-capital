@@ -58,22 +58,36 @@ class FilingsProvider(Protocol):
 class CalendarAdapter:
     """Wraps YFinanceCalendar to satisfy EarningsDateProvider."""
 
-    def __init__(self, calendar: object) -> None:
+    def __init__(self, calendar: object, failure_callback=None) -> None:
         self._cal = calendar
+        self._failure_callback = failure_callback
 
     def next_date(self, ticker: str) -> date | None:
-        snap = self._cal.fetch(ticker)  # type: ignore[attr-defined]
-        return snap.next_earnings_date
+        try:
+            snap = self._cal.fetch(ticker)  # type: ignore[attr-defined]
+            return snap.next_earnings_date
+        except Exception as exc:
+            print(f"  [PROVIDER] source=yfinance_calendar ticker={ticker} error={exc}")
+            if self._failure_callback is not None:
+                self._failure_callback()
+            return None
 
 
 class FilingsAdapter:
     """Wraps SECEdgarFilings to satisfy FilingsProvider."""
 
-    def __init__(self, client: object) -> None:
+    def __init__(self, client: object, failure_callback=None) -> None:
         self._client = client
+        self._failure_callback = failure_callback
 
     def recent_8k_items(self, ticker: str, days: int) -> list[tuple[date, list[str]]]:
-        filings = self._client.recent(ticker, days=days)  # type: ignore[attr-defined]
+        try:
+            filings = self._client.recent(ticker, days=days)  # type: ignore[attr-defined]
+        except Exception as exc:
+            print(f"  [PROVIDER] source=sec_filings ticker={ticker} error={exc}")
+            if self._failure_callback is not None:
+                self._failure_callback()
+            return []
         return [
             (f.filed_date, f.items)
             for f in filings

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from equities.data.fundamentals import FundamentalsSnapshot
+from equities.data.fundamentals import YFinanceFundamentals
 
 
 def test_snapshot_has_enriched_fields():
@@ -41,3 +42,19 @@ def test_enriched_fields_default_safely():
     assert snap.eps_trend == []
     assert snap.short_interest_pct is None
     assert snap.peg_ratio is None
+
+
+def test_yfinance_fundamentals_failure_returns_empty_snapshot(monkeypatch):
+    class FakeTicker:
+        def __init__(self, symbol):
+            pass
+
+        @property
+        def info(self):
+            raise RuntimeError("provider failed")
+
+    monkeypatch.setattr("yfinance.Ticker", FakeTicker)
+    snap = YFinanceFundamentals().fetch("STALE")
+    assert snap.ticker == "STALE"
+    assert snap.gross_margins is None
+    assert snap.analyst_count == 0

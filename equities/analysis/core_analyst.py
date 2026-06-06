@@ -5,11 +5,12 @@ and no stop/take_profit. Approves unless there is a specific near-term risk.
 """
 from __future__ import annotations
 
-import json
+import math
 
-from equities.analysis.analyst import LLMClient, LLMResponse, _strip_fences
+from equities.analysis.analyst import LLMClient, LLMResponse, LLMFailureBudgetExceeded
 from equities.analysis.budget import DailyBudget
 from equities.analysis.prompt import _CORE_DCA_SYSTEM, build_core_dca_prompt
+from equities.analysis.schema import parse_core_dca_decision
 from equities.screen.quality_screen import QualityCandidate
 from equities.strategy import Recommendation, Sleeve
 
@@ -25,7 +26,8 @@ class CoreDCAAnalyst:
       - Ask Sonnet: any specific reason to wait?
       - "wait" → skip; "dca" → open a small position
 
-    When `llm` is None, uses ClaudeCodeClient (Claude subscription).
+    When `llm` is None, uses OpenAI if OPENAI_API_KEY is set, otherwise Claude
+    CLI fallback.
     """
 
     def __init__(
@@ -58,21 +60,29 @@ class CoreDCAAnalyst:
 
     def _analyse_one(self, candidate: QualityCandidate) -> Recommendation | None:
         ticker = candidate.instrument.ticker
-        price = self._prices.latest_close(ticker) or 0.0 if self._prices else 0.0
+        if not self._prices:
+            print(f"  REJECTED [{ticker}] core_market_data_missing: no_price_provider")
+            return None
+        price = self._prices.latest_close(ticker)
+        if price is None or not math.isfinite(price) or price <= 0:
+            print(f"  REJECTED [{ticker}] core_market_data_invalid: latest_close={price!r}")
+            return None
         headlines = self._news.headlines(ticker, limit=15) if self._news else []
 
         user_msg = build_core_dca_prompt(candidate, price, headlines)
         try:
             resp = self._llm.complete(_CORE_DCA_SYSTEM, user_msg, _SONNET)
             self._budget.record(resp.cost_usd("sonnet"))
-            data = json.loads(_strip_fences(resp.content))
+            data = parse_core_dca_decision(resp.content)
+        except LLMFailureBudgetExceeded:
+            raise
         except Exception:
             return None
 
-        if data.get("action") != "dca":
+        if data.action != "dca":
             return None
 
-        dca_pct = float(data.get("dca_pct", 0.01))
+        dca_pct = float(data.dca_pct or 0.01)
         dca_pct = max(0.005, min(0.015, dca_pct))  # clamp to safe range
 
         return Recommendation(
@@ -85,6 +95,6 @@ class CoreDCAAnalyst:
             size_pct=dca_pct,
             confidence=candidate.score,
             catalyst="DCA accumulation — quality screen pass",
-            thesis=str(data.get("thesis", "")),
+            thesis=data.thesis,
             horizon="long-term",
         )

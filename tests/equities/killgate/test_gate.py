@@ -64,3 +64,24 @@ def test_strategy_filter(tmp_path):
     result = gate.evaluate(tracker, strategy="equity_analyst")
     assert result.passed is True
     assert result.n_trades == 6
+
+
+def test_record_exit_for_open_trade_matches_oldest_trade(tmp_path):
+    tracker = ForwardPaperTracker(tmp_path / "fp.db")
+    first = tracker.record_entry("RBRK", "swing", 100.0, 1.0, strategy="equity_analyst")
+    second = tracker.record_entry("RBRK", "swing", 110.0, 1.0, strategy="equity_analyst")
+
+    closed = tracker.record_exit_for_open_trade(
+        "RBRK",
+        90.0,
+        sleeve="swing",
+        strategy="equity_analyst",
+        is_gap_stop=True,
+    )
+
+    assert closed is True
+    closed_trades = tracker.closed_trades("equity_analyst")
+    assert [t.id for t in closed_trades] == [first]
+    assert closed_trades[0].exit_price == pytest.approx(90.0)
+    assert closed_trades[0].is_gap_stop is True
+    assert [t.id for t in tracker.open_trades()] == [second]

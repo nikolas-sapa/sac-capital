@@ -41,7 +41,19 @@ class YFinanceFundamentals:
         import yfinance as yf
 
         t = yf.Ticker(ticker)
-        info = t.info
+        try:
+            info = t.info
+        except Exception:
+            return FundamentalsSnapshot(
+                ticker=ticker,
+                market_cap_m=None,
+                trailing_pe=None,
+                forward_pe=None,
+                gross_margins=None,
+                revenue_growth=None,
+                sector="",
+                analyst_count=0,
+            )
         cap_raw = info.get("marketCap")
         fcf_raw = info.get("freeCashflow")
 

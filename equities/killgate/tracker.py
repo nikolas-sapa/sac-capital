@@ -102,6 +102,37 @@ class ForwardPaperTracker:
         )
         self._con.commit()
 
+    def record_exit_for_open_trade(
+        self,
+        ticker: str,
+        exit_price: float,
+        *,
+        sleeve: str | None = None,
+        strategy: str | None = None,
+        is_gap_stop: bool = False,
+    ) -> bool:
+        """Close the oldest matching open forward-paper trade.
+
+        The equity ledger owns position ids, while this tracker owns its own ids.
+        Runner exits therefore reconcile by ticker/sleeve/strategy.
+        """
+        clauses = ["ticker=?", "status='open'"]
+        params: list[Any] = [ticker]
+        if sleeve is not None:
+            clauses.append("sleeve=?")
+            params.append(sleeve)
+        if strategy is not None:
+            clauses.append("strategy=?")
+            params.append(strategy)
+        row = self._con.execute(
+            f"SELECT id FROM forward_paper WHERE {' AND '.join(clauses)} ORDER BY id LIMIT 1",
+            params,
+        ).fetchone()
+        if row is None:
+            return False
+        self.record_exit(row["id"], exit_price=exit_price, is_gap_stop=is_gap_stop)
+        return True
+
     def closed_trades(self, strategy: str | None = None) -> list[ForwardPaperTrade]:
         if strategy:
             rows = self._con.execute(

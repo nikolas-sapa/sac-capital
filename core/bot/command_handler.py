@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
+
+from core.config import Settings, load_config
 
 
 class CommandHandler:
@@ -16,6 +19,9 @@ class CommandHandler:
         "/help":      "List all commands",
         "/stats":     "Equity portfolio summary",
         "/positions": "Open equity positions with entry/mark/PnL",
+        "/alpaca":    "Alpaca paper config status",
+        "/orders":    "Broker order status from local ledger",
+        "/risk":      "Risk limits and current local exposure",
         "/markets":   "Open Polymarket positions",
         "/pnl":       "Combined P&L across equity + Polymarket",
         "/kill":      "Kill gate progress toward live trading",
@@ -26,10 +32,12 @@ class CommandHandler:
         equity_db: str | Path = "data/equity.db",
         polymarket_db: str | Path = "data/ledger.db",
         forward_paper_db: str | Path = "data/forward_paper.db",
+        config_loader: Callable[[], Settings] = load_config,
     ) -> None:
         self._eq_path = Path(equity_db)
         self._pm_path = Path(polymarket_db)
         self._fp_path = Path(forward_paper_db)
+        self._config_loader = config_loader
 
     # ------------------------------------------------------------------
     # Dispatch
@@ -43,6 +51,9 @@ class CommandHandler:
             "/stats":     self._cmd_stats,
             "/positions": self._cmd_positions,
             "/pos":       self._cmd_positions,
+            "/alpaca":    self._cmd_alpaca,
+            "/orders":    self._cmd_orders,
+            "/risk":      self._cmd_risk,
             "/markets":   self._cmd_markets,
             "/pnl":       self._cmd_pnl,
             "/kill":      self._cmd_kill,
@@ -124,10 +135,141 @@ class CommandHandler:
                 f"{arrow} {r['ticker']}",
                 f"  Entry ${r['entry_price']:.2f}  ·  Mark ${mark:.2f}",
                 f"  Unrl  {_fmt_pnl(unrl)}  ({pct:+.1f}%)",
-                f"  🛑 ${r['stop_loss']:.2f}    🎯 ${r['take_profit']:.2f}",
+                f"  🛑 {_fmt_price(r['stop_loss'])}    🎯 {_fmt_price(r['take_profit'])}",
                 f"  Opened {opened}",
             ]
         return "\n".join(lines)
+
+    def _cmd_alpaca(self) -> str:
+        settings = self._config_loader()
+        key_id = settings.alpaca_api_key_id or ""
+        secret = settings.alpaca_secret_key or ""
+        provider = settings.execution_provider or "internal_paper"
+
+        alpaca_open = 0
+        alpaca_orders = 0
+        if self._eq_path.exists():
+            con = sqlite3.connect(str(self._eq_path))
+            try:
+                if _table_exists(con, "positions") and _has_columns(
+                    con, "positions", {"status", "execution_provider", "broker_order_id"}
+                ):
+                    alpaca_open = con.execute(
+                        "SELECT COUNT(*) FROM positions "
+                        "WHERE status='open' AND execution_provider='alpaca_paper'"
+                    ).fetchone()[0]
+                    alpaca_orders = con.execute(
+                        "SELECT COUNT(*) FROM positions WHERE broker_order_id <> ''"
+                    ).fetchone()[0]
+            finally:
+                con.close()
+
+        paper = "yes" if settings.alpaca_paper else "NO"
+        live_fuse = "ENABLED" if settings.live_trading_enabled else "off"
+        return "\n".join([
+            "🦙 ALPACA STATUS",
+            "─" * 22,
+            f"Provider: {provider}",
+            f"Paper: {paper}",
+            f"Base URL: {settings.alpaca_base_url}",
+            f"Key ID: {_mask_key(key_id)}",
+            f"Secret: {'configured' if secret else 'missing'}",
+            f"Live fuse: {live_fuse}",
+            f"Ledger Alpaca open: {alpaca_open}",
+            f"Ledger broker orders: {alpaca_orders}",
+        ])
+
+    def _cmd_orders(self) -> str:
+        if not self._eq_path.exists():
+            return "📋 No local broker orders recorded."
+
+        con = sqlite3.connect(str(self._eq_path))
+        con.row_factory = sqlite3.Row
+        try:
+            if not _table_exists(con, "positions"):
+                return "📋 No local broker orders recorded."
+            required = {
+                "ticker", "shares", "opened_at", "execution_provider",
+                "broker_order_id", "broker_order_status", "broker_filled_qty",
+                "broker_avg_fill_price",
+            }
+            if not _has_columns(con, "positions", required):
+                return "📋 Broker order columns are not present in the local ledger yet."
+            rows = con.execute(
+                "SELECT ticker, shares, opened_at, execution_provider, broker_order_id, "
+                "broker_order_status, broker_filled_qty, broker_avg_fill_price "
+                "FROM positions WHERE broker_order_id <> '' "
+                "ORDER BY opened_at DESC LIMIT 10"
+            ).fetchall()
+        finally:
+            con.close()
+
+        if not rows:
+            return "📋 No local broker orders recorded."
+
+        lines = [f"📋 BROKER ORDERS ({len(rows)})", "─" * 24]
+        for r in rows:
+            opened = r["opened_at"][:10] if r["opened_at"] else "?"
+            status = r["broker_order_status"] or "unknown"
+            avg = _fmt_price(r["broker_avg_fill_price"])
+            order_id = _short_id(r["broker_order_id"])
+            lines += [
+                "",
+                f"• {r['ticker']}  {status}",
+                f"  Provider {r['execution_provider']}  ·  Order {order_id}",
+                f"  Qty {r['shares']:.6f}  ·  Filled {r['broker_filled_qty']:.6f} @ {avg}",
+                f"  Opened {opened}",
+            ]
+        return "\n".join(lines)
+
+    def _cmd_risk(self) -> str:
+        settings = self._config_loader()
+        open_count = 0
+        gross_exposure = 0.0
+        largest_name = ""
+        largest_exposure = 0.0
+
+        if self._eq_path.exists():
+            con = sqlite3.connect(str(self._eq_path))
+            con.row_factory = sqlite3.Row
+            try:
+                if _table_exists(con, "positions") and _has_columns(
+                    con, "positions", {"ticker", "shares", "entry_price", "mark_price", "status"}
+                ):
+                    rows = con.execute(
+                        "SELECT ticker, shares, entry_price, mark_price "
+                        "FROM positions WHERE status='open'"
+                    ).fetchall()
+                    open_count = len(rows)
+                    for r in rows:
+                        mark = r["mark_price"] or r["entry_price"]
+                        exposure = abs((r["shares"] or 0.0) * mark)
+                        gross_exposure += exposure
+                        if exposure > largest_exposure:
+                            largest_exposure = exposure
+                            largest_name = r["ticker"]
+            finally:
+                con.close()
+
+        bankroll = settings.bankroll_usd or 0.0
+        exposure_pct = gross_exposure / bankroll * 100 if bankroll else 0.0
+        largest_pct = largest_exposure / bankroll * 100 if bankroll else 0.0
+        return "\n".join([
+            "🛡 RISK STATUS",
+            "─" * 20,
+            f"Bankroll: ${bankroll:.2f}",
+            f"Max position: {settings.max_position_pct * 100:.2f}%",
+            f"Research probe: {settings.research_probe_pct * 100:.2f}%",
+            f"Core DCA: {settings.core_dca_pct * 100:.2f}%",
+            f"Max order: ${settings.max_order_usd:.2f}",
+            f"Daily order cap: {settings.max_daily_order_count}",
+            f"Extended hours: {'yes' if settings.allow_extended_hours else 'no'}",
+            f"Live trading: {'ENABLED' if settings.live_trading_enabled else 'off'}",
+            "",
+            f"Open positions: {open_count}",
+            f"Gross local exposure: ${gross_exposure:.2f} ({exposure_pct:.2f}%)",
+            f"Largest name: {largest_name or 'n/a'} ${largest_exposure:.2f} ({largest_pct:.2f}%)",
+        ])
 
     def _cmd_markets(self) -> str:
         if not self._pm_path.exists():
@@ -232,3 +374,38 @@ class CommandHandler:
 def _fmt_pnl(val: float) -> str:
     sign = "+" if val >= 0 else ""
     return f"{sign}${val:.2f}"
+
+
+def _fmt_price(val: float | None) -> str:
+    if val is None:
+        return "n/a"
+    return f"${val:.2f}"
+
+
+def _mask_key(value: str) -> str:
+    if not value:
+        return "missing"
+    if len(value) <= 4:
+        return "configured"
+    return f"...{value[-4:]}"
+
+
+def _short_id(value: str) -> str:
+    if not value:
+        return "n/a"
+    if len(value) <= 12:
+        return value
+    return f"{value[:6]}…{value[-6:]}"
+
+
+def _table_exists(con: sqlite3.Connection, name: str) -> bool:
+    row = con.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+        (name,),
+    ).fetchone()
+    return row is not None
+
+
+def _has_columns(con: sqlite3.Connection, table: str, required: set[str]) -> bool:
+    existing = {row[1] for row in con.execute(f"PRAGMA table_info({table})").fetchall()}
+    return required.issubset(existing)

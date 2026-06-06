@@ -89,8 +89,16 @@ Otherwise output:
   "confidence": <0.0-1.0>,
   "horizon": "<e.g. 1-2 weeks>",
   "catalyst": "<one sentence: what specific event drives this>",
-  "thesis": "<2-3 sentences: what the market is missing>"
-}}"""
+  "thesis": "<2-3 sentences: what the market is missing>",
+  "business_quality": "<specific evidence on product, margins, growth, or competitive position>",
+  "valuation": "<specific valuation or expectation evidence, or why valuation is not decisive>",
+  "balance_sheet_risk": "<specific leverage, liquidity, dilution, or cash-flow risk evidence>",
+  "market_expectation_gap": "<what consensus or recent price action appears to miss>",
+  "invalidation": "<concrete fact, price action, filing, or result that would break the thesis>",
+  "evidence_citations": ["headline, filing, metric, or prompt fact used", "another concrete citation"]
+}}
+
+Reject if the memo would be generic or uncited. Every buy must cite concrete prompt evidence."""
 
 
 def build_analyst_prompt(

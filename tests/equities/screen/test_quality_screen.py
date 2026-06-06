@@ -38,6 +38,11 @@ class FakeFundamentals:
         return self._snaps[ticker]
 
 
+class FailingFundamentals:
+    def fetch(self, ticker: str) -> FundamentalsSnapshot:
+        raise RuntimeError("provider failed")
+
+
 def test_high_quality_passes():
     inst = _inst("MSFT")
     screen = QualityScreen(FakeFundamentals({"MSFT": _snap("MSFT")}))
@@ -130,4 +135,10 @@ def test_no_gross_margins_data_rejected():
         gross_margins=None, revenue_growth=0.10, sector="Unknown", analyst_count=0,
     )
     screen = QualityScreen(FakeFundamentals({"MYSTERY": snap}))
+    assert screen.scan([inst]) == []
+
+
+def test_provider_failure_skips_ticker():
+    inst = _inst("STALE")
+    screen = QualityScreen(FailingFundamentals())
     assert screen.scan([inst]) == []

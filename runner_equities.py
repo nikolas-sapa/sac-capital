@@ -2,24 +2,31 @@
 
 Usage:
     uv run python runner_equities.py                    # single pass
-    uv run python runner_equities.py --no-analyse       # screen only (no Claude API)
+    uv run python runner_equities.py --no-analyse       # screen only (no LLM)
     uv run python runner_equities.py --mark-only        # mark-to-market + exit check
+    uv run python runner_equities.py --reconcile-only   # broker reconciliation only
 
-Uses Claude Code subscription (claude -p) — no ANTHROPIC_API_KEY required.
+Uses LLM_PROVIDER=codex/openai/claude; this Mac is configured for Codex CLI.
 All trades are paper-only; LIVE mode does not exist yet.
 """
 from __future__ import annotations
 
 import argparse
 import asyncio
+import inspect
 import sys
+import time
+from contextlib import contextmanager
+from dataclasses import dataclass, field, replace
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Iterator
 
 from core.alerts.telegram import TelegramAlerts
 from core.assets.instrument import CapTier, Instrument
 from core.config import load_config
 from core.claude_client import ClaudeCodeClient
-from equities.analysis.analyst import EquityAnalyst
+from equities.analysis.analyst import EquityAnalyst, LLMFailureBudgetExceeded, LLMResponse
 from equities.analysis.budget import DailyBudget
 from equities.analysis.core_analyst import CoreDCAAnalyst
 from equities.data.news import YFinanceNewsProvider
@@ -31,12 +38,15 @@ from equities.data.calendar import YFinanceCalendar
 from equities.data.filings import SECEdgarFilings
 from equities.data.fundamentals import YFinanceFundamentals
 from equities.data.prices import YFinancePriceFeed
+from equities.execution.alpaca import AlpacaPaperExecutor, client_order_id_for
 from equities.killgate.tracker import ForwardPaperTracker
 from equities.ledger_equity import EquityLedger
-from equities.paper import EquityPaperTracker
+from equities.paper import EquityPaperTracker, PaperFill
 from equities.risk.kernel import RiskKernel
 from equities.killgate.thesis_health import ThesisHealthChecker
+from equities.research.store import ResearchArtifactStore
 from equities.screen.inflection_screen import InflectionScanner
+from equities.screen.relative_strength import RelativeStrengthScanner
 from equities.screen.thematic_monitor import ThematicMonitor
 from equities.screen.event_screen import (
     CalendarAdapter,
@@ -94,7 +104,7 @@ DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     Instrument("NET",   "Cloudflare",                 "NYSE",   CapTier.MID),
     Instrument("DDOG",  "Datadog",                    "NASDAQ", CapTier.MID),
     Instrument("SNOW",  "Snowflake",                  "NYSE",   CapTier.MID),
-    Instrument("SQ",    "Block",                      "NYSE",   CapTier.MID),
+    Instrument("XYZ",   "Block",                      "NYSE",   CapTier.MID),
     Instrument("AFRM",  "Affirm",                     "NASDAQ", CapTier.MID),
     Instrument("NU",    "Nu Holdings",                "NYSE",   CapTier.MID),
     Instrument("TSLA",  "Tesla",                      "NASDAQ", CapTier.LARGE),
@@ -108,7 +118,6 @@ DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     Instrument("S",     "SentinelOne",                "NYSE",   CapTier.MID),
     Instrument("PANW",  "Palo Alto Networks",         "NASDAQ", CapTier.LARGE),
     Instrument("FTNT",  "Fortinet",                   "NASDAQ", CapTier.LARGE),
-    Instrument("CYBR",  "CyberArk Software",          "NASDAQ", CapTier.MID),
     # Cloud / AI SaaS
     Instrument("NOW",   "ServiceNow",                 "NYSE",   CapTier.LARGE),
     Instrument("CRM",   "Salesforce",                 "NYSE",   CapTier.LARGE),
@@ -116,7 +125,6 @@ DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     Instrument("HUBS",  "HubSpot",                    "NYSE",   CapTier.MID),
     Instrument("MDB",   "MongoDB",                    "NASDAQ", CapTier.MID),
     Instrument("TTD",   "The Trade Desk",             "NASDAQ", CapTier.MID),
-    Instrument("CFLT",  "Confluent",                  "NASDAQ", CapTier.MID),
     Instrument("VEEV",  "Veeva Systems",              "NYSE",   CapTier.LARGE),
     # E-commerce / consumer tech
     Instrument("SHOP",  "Shopify",                    "NYSE",   CapTier.LARGE),
@@ -149,7 +157,7 @@ DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     Instrument("AMBA",  "Ambarella",                  "NASDAQ", CapTier.SMALL),
     Instrument("PRCT",  "PROCEPT BioRobotics",        "NASDAQ", CapTier.MID),
     # Inference / new IPOs
-    Instrument("CRBR",  "Cerebras Systems",           "NASDAQ", CapTier.MID),
+    Instrument("CBRS",  "Cerebras Systems",           "NASDAQ", CapTier.MID),
     Instrument("AI",    "C3.ai",                      "NYSE",   CapTier.SMALL),
 ]
 
@@ -179,28 +187,238 @@ DEFAULT_CORE_UNIVERSE: list[Instrument] = [
 # ---------------------------------------------------------------------------
 
 class _PriceAdapter:
-    def __init__(self, feed: YFinancePriceFeed) -> None:
+    def __init__(self, feed: YFinancePriceFeed, failure_callback=None) -> None:
         self._feed = feed
+        self._cache = {}
+        self._failure_callback = failure_callback
 
     def latest_close(self, ticker: str) -> float | None:
+        started = time.monotonic()
         try:
-            series = self._feed.history(ticker, period="5d")
+            series = self._latest_series(ticker)
             bar = series.latest
+            duration = time.monotonic() - started
+            print(f"  [PROVIDER] source=yfinance_price ticker={ticker} ok duration_s={duration:.2f}")
+            if bar is None and self._failure_callback is not None:
+                self._failure_callback()
             return bar.close if bar is not None else None
-        except Exception:
+        except Exception as exc:
+            duration = time.monotonic() - started
+            print(
+                f"  [PROVIDER] source=yfinance_price ticker={ticker} "
+                f"error={exc} duration_s={duration:.2f}"
+            )
+            if self._failure_callback is not None:
+                self._failure_callback()
             return None
+
+    def latest_bar(self, ticker: str):
+        started = time.monotonic()
+        try:
+            return self._latest_series(ticker).latest
+        except Exception as exc:
+            duration = time.monotonic() - started
+            print(
+                f"  [PROVIDER] source=yfinance_price_latest_bar ticker={ticker} "
+                f"error={exc} duration_s={duration:.2f}"
+            )
+            if self._failure_callback is not None:
+                self._failure_callback()
+            raise
+
+    def _latest_series(self, ticker: str):
+        if ticker not in self._cache:
+            self._cache[ticker] = self._feed.history(ticker, period="5d")
+        return self._cache[ticker]
+
+
+@dataclass
+class RunStats:
+    started_monotonic: float
+    max_runtime_seconds: int
+    max_provider_failures: int
+    max_llm_failures: int
+    provider_failures: int = 0
+    llm_failures: int = 0
+    exit_reason: str = "complete"
+    stages: list[tuple[str, str, float]] = field(default_factory=list)
+
+    def elapsed(self) -> float:
+        return time.monotonic() - self.started_monotonic
+
+    def record_provider_failure(self) -> None:
+        self.provider_failures += 1
+        self.check_runtime()
+
+    def record_llm_failure(self) -> None:
+        self.llm_failures += 1
+        if self.llm_failures > self.max_llm_failures:
+            self.exit_reason = "max_llm_failures_exceeded"
+            raise LLMFailureBudgetExceeded(
+                f"runner exceeded LLM failure budget "
+                f"{self.max_llm_failures} (seen={self.llm_failures})"
+            )
+
+    def check_runtime(self) -> None:
+        if self.elapsed() > self.max_runtime_seconds:
+            self.exit_reason = "max_runtime_exceeded"
+            raise TimeoutError(
+                f"runner exceeded max runtime {self.max_runtime_seconds}s "
+                f"(elapsed={self.elapsed():.1f}s)"
+            )
+        if self.provider_failures > self.max_provider_failures:
+            self.exit_reason = "max_provider_failures_exceeded"
+            raise RuntimeError(
+                f"runner exceeded provider failure budget "
+                f"{self.max_provider_failures} (seen={self.provider_failures})"
+            )
+        if self.llm_failures > self.max_llm_failures:
+            self.exit_reason = "max_llm_failures_exceeded"
+            raise RuntimeError(
+                f"runner exceeded LLM failure budget "
+                f"{self.max_llm_failures} (seen={self.llm_failures})"
+            )
+
+
+@contextmanager
+def _stage(stats: RunStats, name: str) -> Iterator[None]:
+    stats.check_runtime()
+    started = time.monotonic()
+    print(f"\n[STAGE START] {name}")
+    try:
+        yield
+    except Exception as exc:
+        duration = time.monotonic() - started
+        stats.stages.append((name, "fail", duration))
+        stats.exit_reason = f"stage_failed:{name}"
+        print(f"[STAGE FAIL] {name} duration_s={duration:.2f} error={exc}")
+        raise
+    else:
+        duration = time.monotonic() - started
+        stats.stages.append((name, "done", duration))
+        print(f"[STAGE DONE] {name} duration_s={duration:.2f}")
+        stats.check_runtime()
+
+
+def _print_run_summary(stats: RunStats, budget: DailyBudget | None = None) -> None:
+    print("\n=== Run summary ===")
+    print(f"exit_reason={stats.exit_reason}")
+    print(f"elapsed_s={stats.elapsed():.2f}")
+    print(f"provider_failures={stats.provider_failures}")
+    print(f"llm_failures={stats.llm_failures}")
+    for name, status, duration in stats.stages:
+        print(f"stage={name} status={status} duration_s={duration:.2f}")
+    if budget is not None:
+        print(f"Budget used today: ${budget.spent_today():.4f}")
 
 
 class _FilingsSummaryAdapter:
-    def __init__(self, client: SECEdgarFilings) -> None:
+    def __init__(self, client: SECEdgarFilings, failure_callback=None) -> None:
         self._client = client
+        self._failure_callback = failure_callback
 
     def summary(self, ticker: str, days: int = 90) -> list[str]:
-        filings = self._client.recent(ticker, days=days)
+        started = time.monotonic()
+        try:
+            filings = self._client.recent(ticker, days=days)
+        except Exception as exc:
+            duration = time.monotonic() - started
+            print(
+                f"  [PROVIDER] source=sec_filings_summary ticker={ticker} "
+                f"error={exc} duration_s={duration:.2f}"
+            )
+            if self._failure_callback is not None:
+                self._failure_callback()
+            return []
         return [
             f"{f.form_type} ({f.filed_date}) — items: {', '.join(f.items)}"
             for f in filings
         ]
+
+
+class _LLMFailureCountingClient:
+    def __init__(self, client: ClaudeCodeClient, stats: RunStats) -> None:
+        self._client = client
+        self._stats = stats
+
+    def complete(self, system: str, user: str, model: str) -> LLMResponse:
+        started = time.monotonic()
+        try:
+            return self._client.complete(system, user, model)
+        except LLMFailureBudgetExceeded:
+            raise
+        except Exception as exc:
+            duration = time.monotonic() - started
+            print(f"  [LLM] model={model} error={exc} duration_s={duration:.2f}")
+            self._stats.record_llm_failure()
+            raise
+
+
+class _FundamentalsFailureAdapter:
+    def __init__(self, provider: YFinanceFundamentals, failure_callback=None) -> None:
+        self._provider = provider
+        self._failure_callback = failure_callback
+
+    def fetch(self, ticker: str):
+        started = time.monotonic()
+        try:
+            return self._provider.fetch(ticker)
+        except Exception as exc:
+            duration = time.monotonic() - started
+            print(
+                f"  [PROVIDER] source=yfinance_fundamentals ticker={ticker} "
+                f"error={exc} duration_s={duration:.2f}"
+            )
+            if self._failure_callback is not None:
+                self._failure_callback()
+            raise
+
+
+def _make_alpaca_executor(settings) -> AlpacaPaperExecutor | None:
+    provider = (settings.execution_provider or "internal_paper").lower()
+    if provider in {"", "internal_paper"}:
+        return None
+    if provider != "alpaca_paper":
+        raise ValueError(f"Unsupported EXECUTION_PROVIDER={settings.execution_provider!r}")
+    return AlpacaPaperExecutor(settings)
+
+
+def _todays_alpaca_order_count(equity_ledger: EquityLedger) -> int:
+    today = datetime.now(tz=timezone.utc).date().isoformat()
+    return equity_ledger.broker_orders_opened_on(today, provider="alpaca_paper")
+
+
+_TERMINAL_LOCAL_ORDER_STATUSES = {"canceled", "expired", "rejected", "void", "closed"}
+
+
+def _has_active_broker_order(row: dict | None) -> bool:
+    return row is not None and row.get("status") not in _TERMINAL_LOCAL_ORDER_STATUSES
+
+
+async def run_reconcile_only() -> None:
+    """Run broker reconciliation when a reconciler implementation is present."""
+    settings = load_config()
+
+    reconcile = None
+    for module_name in (
+        "equities.execution.reconciler",
+        "equities.execution.alpaca_reconciler",
+    ):
+        try:
+            module = __import__(module_name, fromlist=["reconcile_alpaca"])
+        except ImportError:
+            continue
+        reconcile = getattr(module, "reconcile_alpaca", None)
+        if reconcile is not None:
+            break
+
+    if reconcile is None:
+        print("Reconcile-only mode requested, but no Alpaca reconciler is available yet.")
+        return
+
+    result = reconcile(settings)
+    if inspect.isawaitable(result):
+        await result
 
 
 # ---------------------------------------------------------------------------
@@ -212,208 +430,420 @@ async def run_once(
     core_universe: list[Instrument],
     no_analyse: bool = False,
     mark_only: bool = False,
+    dry_run: bool = False,
 ) -> None:
     settings = load_config()
+    dry_run = dry_run or bool(getattr(settings, "equity_runner_dry_run", False))
+    stats = RunStats(
+        started_monotonic=time.monotonic(),
+        max_runtime_seconds=settings.equity_runner_max_runtime_seconds,
+        max_provider_failures=settings.equity_runner_max_provider_failures,
+        max_llm_failures=settings.equity_runner_max_llm_failures,
+    )
+    budget: DailyBudget | None = None
 
     data_dir = Path("data")
     data_dir.mkdir(exist_ok=True)
 
     equity_ledger = EquityLedger(data_dir / "equity.db")
     fp_tracker = ForwardPaperTracker(data_dir / "forward_paper.db")
+    artifact_store = ResearchArtifactStore(data_dir / "research_artifacts.jsonl")
 
-    price_feed = YFinancePriceFeed()
-    prices = _PriceAdapter(price_feed)
+    def record_provider_failure() -> None:
+        stats.record_provider_failure()
+
+    price_feed = YFinancePriceFeed(
+        timeout=settings.equity_provider_timeout_seconds,
+        retries=settings.equity_provider_retries,
+    )
+    prices = _PriceAdapter(price_feed, failure_callback=record_provider_failure)
     news = CompositeNewsProvider([
         YFinanceNewsProvider(),
         TiingoNewsProvider(),   # no-op if TIINGO_API_KEY absent
-    ])
+    ], failure_callback=record_provider_failure)
     filings_client = SECEdgarFilings()
-    filings_summary = _FilingsSummaryAdapter(filings_client)
+    filings_summary = _FilingsSummaryAdapter(filings_client, failure_callback=record_provider_failure)
+    llm_client = _LLMFailureCountingClient(ClaudeCodeClient(), stats)
 
     paper = EquityPaperTracker(equity_ledger, prices)
+    alpaca_executor = _make_alpaca_executor(settings)
 
     alerts: TelegramAlerts | None = None
     if settings.telegram_bot_token:
         alerts = TelegramAlerts(settings.telegram_bot_token, settings.telegram_chat_id)
 
-    # --- Mark-to-market and fire exits ---
-    pre_mark = {pos["id"]: pos for pos in equity_ledger.open_positions()}
-    exits = paper.mark_and_check_exits()
-    if exits:
-        print(f"\n=== {len(exits)} exit(s) fired ===")
-        for ex in exits:
-            print(f"  [{ex.position_id}] {ex.reason} @ {ex.exit_price:.2f}")
-            if alerts is not None and ex.position_id in pre_mark:
-                pos = pre_mark[ex.position_id]
-                stats = equity_ledger.portfolio_stats()
-                await alerts.send(alerts.format_equity_exit(
-                    ex,
-                    ticker=pos["ticker"],
-                    entry_price=pos["entry_price"],
-                    shares=pos["shares"],
-                    portfolio_stats=stats,
-                ))
+    try:
+        # --- Mark-to-market and fire exits ---
+        with _stage(stats, "mark_to_market"):
+            pre_mark = {pos["id"]: pos for pos in equity_ledger.open_positions()}
+            if dry_run:
+                exits = []
+                print("  [DRY RUN] skipping mark-and-exit ledger writes")
+            else:
+                exits = paper.mark_and_check_exits()
+            if exits:
+                print(f"\n=== {len(exits)} exit(s) fired ===")
+                for ex in exits:
+                    print(f"  [{ex.position_id}] {ex.reason} @ {ex.exit_price:.2f}")
+                    if alerts is not None and ex.position_id in pre_mark:
+                        pos = pre_mark[ex.position_id]
+                        portfolio_stats = equity_ledger.portfolio_stats()
+                        await alerts.send(alerts.format_equity_exit(
+                            ex,
+                            ticker=pos["ticker"],
+                            entry_price=pos["entry_price"],
+                            shares=pos["shares"],
+                            portfolio_stats=portfolio_stats,
+                        ))
+                    if ex.position_id in pre_mark:
+                        pos = pre_mark[ex.position_id]
+                        if alpaca_executor is not None and pos.get("execution_provider") == "alpaca_paper":
+                            try:
+                                exit_order = alpaca_executor.sell(pos["ticker"], float(pos["shares"]))
+                                print(
+                                    f"  ALPACA SELL [{pos['ticker']}] "
+                                    f"order_id={exit_order.id} status={exit_order.status}"
+                                )
+                            except Exception as exc:
+                                print(f"  ALPACA SELL FAILED [{pos['ticker']}]: {exc}")
+                        fp_tracker.record_exit_for_open_trade(
+                            ticker=pos["ticker"],
+                            sleeve=pos.get("sleeve"),
+                            strategy=pos.get("strategy"),
+                            exit_price=ex.exit_price,
+                            is_gap_stop=ex.reason == "stop_hit",
+                        )
 
-    if mark_only:
-        print("Mark-only mode complete.")
+        if mark_only:
+            print("Mark-only mode complete.")
+            if alerts is not None:
+                await alerts.send(alerts.format_equity_portfolio(equity_ledger.portfolio_stats()))
+            return
+
+        # --- Macro regime classification ---
+        with _stage(stats, "macro_regime"):
+            regime_gate = MacroRegimeGate(failure_callback=record_provider_failure)
+            regime_snap = regime_gate.classify()
+            _vix_str = f"{regime_snap.vix:.1f}" if regime_snap.vix is not None else "n/a"
+            _yc_str = f"{regime_snap.yield_curve:.2f}" if regime_snap.yield_curve is not None else "n/a"
+            print(f"\n=== Macro Regime: {regime_snap.regime.upper()} | VIX={_vix_str} | Yield curve={_yc_str} ===")
+
+        # --- Thesis health check (nightly) ---
+        with _stage(stats, "thesis_health"):
+            open_swing = [p for p in equity_ledger.open_positions() if p.get("sleeve") == "swing"]
+            if open_swing and not mark_only:
+                health_checker = ThesisHealthChecker()
+                for health in health_checker.check_all(open_swing, news):
+                    print(f"  [HEALTH] {health.ticker}: {health.status} -> {health.action} | {health.reason}")
+                    if health.action == "exit" and alerts is not None:
+                        await alerts.send(f"Thesis exit signal: {health.ticker} — {health.reason}")
+
+        # --- Thematic concentration check ---
+        with _stage(stats, "thematic_concentration"):
+            thematic_monitor = ThematicMonitor(max_theme_pct=0.35, capital=settings.bankroll_usd)
+            for alert in thematic_monitor.check(equity_ledger.open_positions()):
+                print(f"  [THEMATIC] {alert}")
+
+        # --- Swing screen ---
+        with _stage(stats, "swing_screen"):
+            calendar = YFinanceCalendar()
+            event_screen = EventScreen(
+                earnings=CalendarAdapter(calendar, failure_callback=record_provider_failure),
+                filings=FilingsAdapter(filings_client, failure_callback=record_provider_failure),
+            )
+            swing_candidates = event_screen.scan(swing_universe)
+
+        with _stage(stats, "relative_strength_screen"):
+            rs_scanner = RelativeStrengthScanner(price_feed)
+            rs_evidence = rs_scanner.scan(swing_universe)
+            enriched_candidates = []
+            for candidate in swing_candidates:
+                evidence = rs_evidence.get(candidate.instrument.ticker)
+                if evidence is None:
+                    enriched_candidates.append(candidate)
+                    continue
+                enriched_candidates.append(
+                    replace(
+                        candidate,
+                        evidence=f"{candidate.evidence} | Technicals: {evidence.evidence}",
+                    )
+                )
+                print(f"  [RS] {candidate.instrument.ticker}: {evidence.evidence}")
+            swing_candidates = enriched_candidates
+
+        # --- Core screen ---
+        with _stage(stats, "core_screen"):
+            fundamentals_provider = _FundamentalsFailureAdapter(
+                YFinanceFundamentals(),
+                failure_callback=record_provider_failure,
+            )
+            quality_screen = QualityScreen(fundamentals_provider)
+            core_candidates = quality_screen.scan(core_universe)
+
+        print(f"\n=== Swing candidates: {len(swing_candidates)} ===")
+        for c in swing_candidates:
+            print(f"  [{c.event_type.value}] {c.instrument.ticker}: {c.evidence} (urgency={c.urgency:.2f})")
+
+        print(f"\n=== Core candidates: {len(core_candidates)} ===")
+        for c in core_candidates:
+            print(f"  [{c.instrument.ticker}] score={c.score:.3f}: {c.evidence}")
+
+        # --- Inflection screen ---
+        with _stage(stats, "inflection_screen"):
+            inflection_screen = InflectionScanner(fundamentals_provider)
+            inflection_candidates = inflection_screen.scan(swing_universe)
+            print(f"\n=== Inflection candidates: {len(inflection_candidates)} ===")
+            for c in inflection_candidates:
+                print(f"  [{c.ticker}] ~{c.quarters_to_profit}q to profit | {c.evidence}")
+
+        if no_analyse:
+            print("Screen-only mode complete.")
+            return
+
+        # --- VIX regime gate ---
+        with _stage(stats, "vix_gate"):
+            vix_gate = VIXRegimeGate(threshold=30.0)
+            entries_allowed, current_vix = vix_gate.allow_new_entries()
+            if current_vix is not None:
+                print(f"\nVIX: {current_vix:.1f} | entries_allowed={entries_allowed}")
+            if not entries_allowed:
+                print(f"VIX={current_vix:.1f} > 30 — blocking new entries. Running mark-to-market only.")
+                if alerts is not None:
+                    await alerts.send(f"VIX={current_vix:.1f} — new entries blocked today.")
+                return
+
+        # --- Scan summary alert ---
+        if alerts is not None:
+            analyst_count = min(len(swing_candidates), 5)
+            await alerts.send(alerts.format_equity_scan(swing_candidates, core_candidates, analyst_count))
+
+        # --- Analyst stage (OpenAI if configured, otherwise Claude CLI fallback) ---
+        budget = DailyBudget(daily_limit_usd=999.0)
+        analyst = EquityAnalyst(
+            llm=llm_client,
+            prices=prices,
+            news=news,
+            filings=filings_summary,
+            fundamentals=fundamentals_provider,
+            budget=budget,
+            max_candidates=5,
+            max_price_age_days=settings.equity_max_price_age_days,
+            artifact_store=artifact_store,
+        )
+
+        with _stage(stats, "analyst"):
+            swing_recommendations = analyst.analyse(
+                swing_candidates,
+                regime=regime_snap.regime,
+                vix=regime_snap.vix,
+                yield_curve=regime_snap.yield_curve,
+            )
+
+        # --- Core DCA analyst (risk-officer check before accumulating) ---
+        core_analyst = CoreDCAAnalyst(
+            llm=llm_client,
+            prices=prices,
+            news=news,
+            budget=budget,
+            max_candidates=4,
+        )
+        with _stage(stats, "core_analyst"):
+            core_recommendations = core_analyst.analyse(core_candidates)
+
+        all_recommendations = swing_recommendations + core_recommendations
+
+        # --- Risk kernel + paper open ---
+        kernel = RiskKernel(
+            capital=settings.bankroll_usd,
+            risk_pct=settings.equity_risk_pct,
+            max_positions=settings.equity_max_positions,
+            max_name_pct=settings.equity_max_name_pct,
+            max_sector_pct=settings.equity_max_sector_pct,
+            daily_loss_limit_pct=settings.equity_daily_loss_limit_pct,
+            drawdown_limit_pct=settings.equity_drawdown_limit_pct,
+        )
+        open_positions = equity_ledger.open_positions()
+        sector_lookup: dict[str, str] = {}
+
+        def sector_for(ticker: str) -> str:
+            if ticker in sector_lookup:
+                return sector_lookup[ticker]
+            try:
+                sector_lookup[ticker] = fundamentals_provider.fetch(ticker).sector
+            except Exception as exc:
+                print(f"  [PROVIDER] source=yfinance_fundamentals ticker={ticker} error={exc}")
+                sector_lookup[ticker] = ""
+            return sector_lookup[ticker]
+
+        for pos in open_positions:
+            ticker = str(pos.get("ticker", ""))
+            if ticker and not pos.get("sector"):
+                pos["sector"] = sector_for(ticker)
+        for rec in all_recommendations:
+            sector_for(rec.instrument.ticker)
+
+        today = datetime.now(tz=timezone.utc).date().isoformat()
+        portfolio_stats = equity_ledger.portfolio_stats()
+        current_equity = (
+            settings.bankroll_usd
+            + float(portfolio_stats.get("realized_pnl", 0.0))
+            + float(portfolio_stats.get("unrealized_pnl", 0.0))
+        )
+        today_realized_loss = equity_ledger.realized_pnl_on(today)
+
+        with _stage(stats, "risk_and_execution"):
+            print(f"\n=== Swing recommendations: {len(swing_recommendations)} ===")
+            print(f"=== Core DCA recommendations: {len(core_recommendations)} ===")
+            for rec in all_recommendations:
+                stats.check_runtime()
+                sized = kernel.approve(
+                    rec,
+                    open_positions,
+                    today_realized_loss=today_realized_loss,
+                    current_equity=current_equity,
+                    sector_lookup=sector_lookup,
+                )
+                if not sized.approved:
+                    print(f"  REJECTED [{rec.instrument.ticker}] ({rec.sleeve.value}): {sized.rejection_reason}")
+                    continue
+
+                order_notional = sized.shares * rec.entry
+                if order_notional > settings.max_order_usd:
+                    print(
+                        f"  REJECTED [{rec.instrument.ticker}] ({rec.sleeve.value}): "
+                        f"order_notional=${order_notional:.2f}_exceeds_max_order_usd=${settings.max_order_usd:.2f}"
+                    )
+                    continue
+                if alpaca_executor is not None and _todays_alpaca_order_count(equity_ledger) >= settings.max_daily_order_count:
+                    print(
+                        f"  REJECTED [{rec.instrument.ticker}] ({rec.sleeve.value}): "
+                        f"max_daily_order_count={settings.max_daily_order_count}_reached"
+                    )
+                    continue
+
+                if dry_run:
+                    print(
+                        f"  [DRY RUN] would_open [{rec.instrument.ticker}] "
+                        f"shares={sized.shares:.4f} entry={rec.entry:.2f} notional=${order_notional:.2f}"
+                    )
+                    continue
+
+                if alpaca_executor is not None:
+                    client_order_id = client_order_id_for(rec, sized.shares)
+                    existing_order = equity_ledger.position_by_broker_client_order_id(client_order_id)
+                    if _has_active_broker_order(existing_order):
+                        print(
+                            f"  SKIPPED [{rec.instrument.ticker}] duplicate_client_order_id="
+                            f"{client_order_id} status={existing_order.get('status')}"
+                        )
+                        continue
+                    try:
+                        order = alpaca_executor.buy(
+                            rec,
+                            sized.shares,
+                            client_order_id=client_order_id,
+                            max_notional=settings.max_order_usd,
+                        )
+                    except Exception as exc:
+                        print(f"  ALPACA REJECTED [{rec.instrument.ticker}]: {exc}")
+                        continue
+                    local_status = "open" if order.status == "filled" else (
+                        "partially_filled" if order.status == "partially_filled" else "submitted"
+                    )
+                    filled_shares = order.filled_qty if order.filled_qty > 0 else sized.shares
+                    ledger_entry_price = order.filled_avg_price if order.filled_avg_price is not None else rec.entry
+                    position_id = equity_ledger.open_position(
+                        rec,
+                        filled_shares,
+                        ledger_entry_price,
+                        datetime.now(tz=timezone.utc),
+                        mode="paper",
+                        strategy="equity_analyst",
+                        execution_provider="alpaca_paper",
+                        broker_order_id=order.id,
+                        broker_client_order_id=order.client_order_id or client_order_id,
+                        broker_order_status=order.status,
+                        sector=sector_lookup.get(rec.instrument.ticker, ""),
+                        status=local_status,
+                    )
+                    fill = PaperFill(
+                        position_id=position_id,
+                        ticker=rec.instrument.ticker,
+                        shares=filled_shares,
+                        entry_price=ledger_entry_price,
+                        sleeve=rec.sleeve.value,
+                    )
+                    print(
+                        f"  ALPACA BUY [{rec.instrument.ticker}] "
+                        f"order_id={order.id} client_order_id={order.client_order_id or client_order_id} "
+                        f"status={order.status}"
+                    )
+                    if order.status != "filled":
+                        print(
+                            f"  PENDING BROKER ORDER [{rec.instrument.ticker}] "
+                            f"status={order.status}; not recording forward-paper fill yet"
+                        )
+                        open_positions = equity_ledger.open_positions()
+                        continue
+                else:
+                    position_id = equity_ledger.open_position(
+                        rec,
+                        sized.shares,
+                        rec.entry,
+                        datetime.now(tz=timezone.utc),
+                        mode="paper",
+                        strategy="equity_analyst",
+                        sector=sector_lookup.get(rec.instrument.ticker, ""),
+                    )
+                    fill = PaperFill(
+                        position_id=position_id,
+                        ticker=rec.instrument.ticker,
+                        shares=sized.shares,
+                        entry_price=rec.entry,
+                        sleeve=rec.sleeve.value,
+                    )
+                fp_tracker.record_entry(
+                    ticker=rec.instrument.ticker,
+                    sleeve=rec.sleeve.value,
+                    entry_price=fill.entry_price,
+                    shares=fill.shares,
+                    strategy="equity_analyst",
+                )
+                if rec.sleeve.value == "core":
+                    print(
+                        f"  DCA OPEN [{rec.instrument.ticker}] "
+                        f"shares={sized.shares:.4f} entry={rec.entry:.2f} (no stop)"
+                    )
+                else:
+                    print(
+                        f"  PAPER OPEN [{rec.instrument.ticker}] "
+                        f"shares={sized.shares:.4f} entry={rec.entry:.2f} "
+                        f"stop={rec.stop_loss:.2f} tp={rec.take_profit:.2f}"
+                    )
+                if alerts is not None:
+                    await alerts.send(alerts.format_equity_open(rec, fill))
+                open_positions = equity_ledger.open_positions()
+
+        # --- Portfolio summary ---
         if alerts is not None:
             await alerts.send(alerts.format_equity_portfolio(equity_ledger.portfolio_stats()))
+    finally:
+        _print_run_summary(stats, budget)
         equity_ledger.close()
         fp_tracker.close()
-        return
-
-    # --- Macro regime classification ---
-    regime_gate = MacroRegimeGate()
-    regime_snap = regime_gate.classify()
-    _vix_str = f"{regime_snap.vix:.1f}" if regime_snap.vix is not None else "n/a"
-    _yc_str = f"{regime_snap.yield_curve:.2f}" if regime_snap.yield_curve is not None else "n/a"
-    print(f"\n=== Macro Regime: {regime_snap.regime.upper()} | VIX={_vix_str} | Yield curve={_yc_str} ===")
-
-    # --- Thesis health check (nightly) ---
-    open_swing = [p for p in equity_ledger.open_positions() if p.get("sleeve") == "swing"]
-    if open_swing and not mark_only:
-        health_checker = ThesisHealthChecker()
-        for health in health_checker.check_all(open_swing, news):
-            print(f"  [HEALTH] {health.ticker}: {health.status} -> {health.action} | {health.reason}")
-            if health.action == "exit" and alerts is not None:
-                await alerts.send(f"Thesis exit signal: {health.ticker} — {health.reason}")
-
-    # --- Thematic concentration check ---
-    thematic_monitor = ThematicMonitor(max_theme_pct=0.35, capital=settings.bankroll_usd)
-    for alert in thematic_monitor.check(equity_ledger.open_positions()):
-        print(f"  [THEMATIC] {alert}")
-
-    # --- Swing screen ---
-    calendar = YFinanceCalendar()
-    event_screen = EventScreen(
-        earnings=CalendarAdapter(calendar),
-        filings=FilingsAdapter(filings_client),
-    )
-    swing_candidates = event_screen.scan(swing_universe)
-
-    # --- Core screen ---
-    fundamentals_provider = YFinanceFundamentals()
-    quality_screen = QualityScreen(fundamentals_provider)
-    core_candidates = quality_screen.scan(core_universe)
-
-    print(f"\n=== Swing candidates: {len(swing_candidates)} ===")
-    for c in swing_candidates:
-        print(f"  [{c.event_type.value}] {c.instrument.ticker}: {c.evidence} (urgency={c.urgency:.2f})")
-
-    print(f"\n=== Core candidates: {len(core_candidates)} ===")
-    for c in core_candidates:
-        print(f"  [{c.instrument.ticker}] score={c.score:.3f}: {c.evidence}")
-
-    # --- Inflection screen ---
-    inflection_screen = InflectionScanner(fundamentals_provider)
-    inflection_candidates = inflection_screen.scan(swing_universe)
-    print(f"\n=== Inflection candidates: {len(inflection_candidates)} ===")
-    for c in inflection_candidates:
-        print(f"  [{c.ticker}] ~{c.quarters_to_profit}q to profit | {c.evidence}")
-
-    if no_analyse:
-        print("Screen-only mode complete.")
-        equity_ledger.close()
-        fp_tracker.close()
-        return
-
-    # --- VIX regime gate ---
-    vix_gate = VIXRegimeGate(threshold=30.0)
-    entries_allowed, current_vix = vix_gate.allow_new_entries()
-    if current_vix is not None:
-        print(f"\nVIX: {current_vix:.1f} | entries_allowed={entries_allowed}")
-    if not entries_allowed:
-        print(f"VIX={current_vix:.1f} > 30 — blocking new entries. Running mark-to-market only.")
-        if alerts is not None:
-            await alerts.send(f"VIX={current_vix:.1f} — new entries blocked today.")
-        equity_ledger.close()
-        fp_tracker.close()
-        return
-
-    # --- Scan summary alert ---
-    if alerts is not None:
-        analyst_count = min(len(swing_candidates), 5)
-        await alerts.send(alerts.format_equity_scan(swing_candidates, core_candidates, analyst_count))
-
-    # --- Analyst stage (uses Claude subscription via `claude -p`) ---
-    budget = DailyBudget(daily_limit_usd=999.0)  # subscription: not per-token billed
-    analyst = EquityAnalyst(
-        llm=ClaudeCodeClient(),
-        prices=prices,
-        news=news,
-        filings=filings_summary,
-        fundamentals=fundamentals_provider,
-        budget=budget,
-        max_candidates=5,
-    )
-
-    swing_recommendations = analyst.analyse(
-        swing_candidates,
-        regime=regime_snap.regime,
-        vix=regime_snap.vix,
-        yield_curve=regime_snap.yield_curve,
-    )
-
-    # --- Core DCA analyst (risk-officer check before accumulating) ---
-    core_analyst = CoreDCAAnalyst(
-        llm=ClaudeCodeClient(),
-        prices=prices,
-        news=news,
-        budget=budget,
-        max_candidates=4,
-    )
-    core_recommendations = core_analyst.analyse(core_candidates)
-
-    all_recommendations = swing_recommendations + core_recommendations
-
-    # --- Risk kernel + paper open ---
-    kernel = RiskKernel(capital=settings.bankroll_usd)
-    open_positions = equity_ledger.open_positions()
-
-    print(f"\n=== Swing recommendations: {len(swing_recommendations)} ===")
-    print(f"=== Core DCA recommendations: {len(core_recommendations)} ===")
-    for rec in all_recommendations:
-        sized = kernel.approve(rec, open_positions)
-        if not sized.approved:
-            print(f"  REJECTED [{rec.instrument.ticker}] ({rec.sleeve.value}): {sized.rejection_reason}")
-            continue
-
-        fill = paper.open_position(rec, sized.shares, rec.entry, strategy="equity_analyst")
-        fp_tracker.record_entry(
-            ticker=rec.instrument.ticker,
-            sleeve=rec.sleeve.value,
-            entry_price=rec.entry,
-            shares=sized.shares,
-            strategy="equity_analyst",
-        )
-        if rec.sleeve.value == "core":
-            print(
-                f"  DCA OPEN [{rec.instrument.ticker}] "
-                f"shares={sized.shares:.4f} entry={rec.entry:.2f} (no stop)"
-            )
-        else:
-            print(
-                f"  PAPER OPEN [{rec.instrument.ticker}] "
-                f"shares={sized.shares:.4f} entry={rec.entry:.2f} "
-                f"stop={rec.stop_loss:.2f} tp={rec.take_profit:.2f}"
-            )
-        if alerts is not None:
-            await alerts.send(alerts.format_equity_open(rec, fill))
-
-    # --- Portfolio summary ---
-    if alerts is not None:
-        await alerts.send(alerts.format_equity_portfolio(equity_ledger.portfolio_stats()))
-
-    print(f"\nBudget used today: ${budget.spent_today():.4f}")
-    equity_ledger.close()
-    fp_tracker.close()
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Equities paper runner")
     parser.add_argument("--no-analyse", action="store_true", help="Screen only; skip Claude analyst")
     parser.add_argument("--mark-only", action="store_true", help="Mark-to-market + exits only")
+    parser.add_argument("--reconcile-only", action="store_true", help="Broker reconciliation only")
+    parser.add_argument("--dry-run", action="store_true", help="Run without ledger, forward-tracker, or broker writes")
     args = parser.parse_args()
+
+    if args.reconcile_only:
+        asyncio.run(run_reconcile_only())
+        return
 
     asyncio.run(
         run_once(
@@ -421,6 +851,7 @@ def main() -> None:
             DEFAULT_CORE_UNIVERSE,
             no_analyse=args.no_analyse,
             mark_only=args.mark_only,
+            dry_run=args.dry_run,
         )
     )
 

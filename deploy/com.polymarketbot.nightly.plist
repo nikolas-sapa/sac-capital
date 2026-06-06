@@ -8,10 +8,7 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/env</string>
-        <string>uv</string>
-        <string>run</string>
-        <string>python</string>
+        <string>/Users/nikolassapalidis/polymarket-bot/.venv/bin/python</string>
         <string>/Users/nikolassapalidis/polymarket-bot/scripts/run_nightly.py</string>
     </array>
 
@@ -24,10 +21,10 @@
     </dict>
 
     <key>StandardOutPath</key>
-    <string>/Users/nikolassapalidis/polymarket-bot/logs/nightly.log</string>
+    <string>/Users/nikolassapalidis/polymarket-bot/data/nightly.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/nikolassapalidis/polymarket-bot/logs/nightly.err</string>
+    <string>/Users/nikolassapalidis/polymarket-bot/data/nightly.err.log</string>
 
     <key>WorkingDirectory</key>
     <string>/Users/nikolassapalidis/polymarket-bot</string>

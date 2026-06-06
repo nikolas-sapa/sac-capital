@@ -85,3 +85,10 @@ def test_snapshot_contains_sector_momentum():
     snap = gate.classify()
     assert "XLK" in snap.sector_momentum
     assert "XLF" in snap.sector_momentum
+
+
+def test_nested_yfinance_close_values_are_normalized():
+    gate = _make_gate({"^VIX": [[21.5], [22.5]]})  # type: ignore[list-item]
+    snap = gate.classify()
+    assert snap.regime == "risk_off"
+    assert snap.vix == pytest.approx(22.5)

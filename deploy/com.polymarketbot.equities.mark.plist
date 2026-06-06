@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.polymarketbot.equities.mark</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/nikolassapalidis/polymarket-bot/.venv/bin/python</string>
+        <string>runner_equities.py</string>
+        <string>--mark-only</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/nikolassapalidis/polymarket-bot</string>
+
+    <key>StartInterval</key>
+    <integer>3600</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/nikolassapalidis/polymarket-bot/data/equities_mark.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/nikolassapalidis/polymarket-bot/data/equities_mark.err.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>

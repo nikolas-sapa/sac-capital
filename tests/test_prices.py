@@ -50,3 +50,28 @@ def test_yfinance_feed_empty_df_returns_empty_series(monkeypatch):
     monkeypatch.setattr("equities.data.prices.yf.Ticker", FakeTicker)
     ps = YFinancePriceFeed().history("BADTICKER")
     assert ps.bars == []
+
+
+def test_yfinance_feed_exception_returns_empty_series(monkeypatch):
+    class FakeTicker:
+        def __init__(self, symbol):
+            pass
+        def history(self, period, interval, timeout=None):
+            raise RuntimeError("network failed")
+    monkeypatch.setattr("equities.data.prices.yf.Ticker", FakeTicker)
+    ps = YFinancePriceFeed(retries=0).history("BADTICKER")
+    assert ps.bars == []
+
+
+def test_yfinance_feed_passes_timeout_when_supported(monkeypatch):
+    seen = {}
+
+    class FakeTicker:
+        def __init__(self, symbol):
+            pass
+        def history(self, period, interval, timeout=None):
+            seen["timeout"] = timeout
+            return pd.DataFrame()
+    monkeypatch.setattr("equities.data.prices.yf.Ticker", FakeTicker)
+    YFinancePriceFeed(timeout=7).history("ACME")
+    assert seen["timeout"] == 7

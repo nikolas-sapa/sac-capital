@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -19,17 +20,18 @@ class MacroRegimeGate:
                 "XLK", "XLF", "XLE", "XLV"]
     _SECTORS = ["XLK", "XLF", "XLE", "XLV"]
 
-    def __init__(self, fetcher=None) -> None:
+    def __init__(self, fetcher=None, failure_callback=None) -> None:
         self._fetcher = fetcher  # injectable stub; None → live yfinance
+        self._failure_callback = failure_callback
 
     def _fetch(self, ticker: str, period: str = "1mo") -> list[float]:
         if self._fetcher is not None:
-            return self._fetcher(ticker, period)
+            return [_as_float(v) for v in self._fetcher(ticker, period)]
         import yfinance as yf
         data = yf.download(ticker, period=period, progress=False, auto_adjust=True)
         if data.empty:
             return []
-        return list(data["Close"].dropna().values.tolist())
+        return [_as_float(v) for v in data["Close"].dropna().values.tolist()]
 
     def _last(self, prices: list[float]) -> float | None:
         return prices[-1] if prices else None
@@ -77,7 +79,10 @@ class MacroRegimeGate:
 
             regime = self._classify_regime(vix, yield_curve, credit_spread, cs_trend)
 
-        except Exception:
+        except Exception as exc:
+            print(f"  [PROVIDER] source=macro_regime error={exc}")
+            if self._failure_callback is not None:
+                self._failure_callback()
             regime = "neutral"
             vix = yield_curve = credit_spread = dxy = cs_trend = None
             sector_momentum = {}
@@ -122,3 +127,10 @@ class MacroRegimeGate:
             return "risk_on"
 
         return "neutral"
+
+
+def _as_float(value: Any) -> float:
+    """Normalize yfinance scalar/list close values to plain floats."""
+    while isinstance(value, list | tuple) and len(value) == 1:
+        value = value[0]
+    return float(value)

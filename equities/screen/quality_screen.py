@@ -63,7 +63,10 @@ class QualityScreen:
             if inst.cap_tier != CapTier.LARGE:
                 continue
 
-            snap = self._fundamentals.fetch(inst.ticker)
+            try:
+                snap = self._fundamentals.fetch(inst.ticker)
+            except Exception:
+                continue
             candidate = self._evaluate(inst, snap)
             if candidate is not None:
                 results.append(candidate)
