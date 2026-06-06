@@ -52,3 +52,54 @@ def test_analyst_limits_news_to_8():
     prompt = build_analyst_prompt(event, 50.0, news=headlines, filings=[])
     assert "headline 7" in prompt
     assert "headline 8" not in prompt
+
+
+def test_analyst_omits_empty_memory_block():
+    event = _event("X")
+    prompt = build_analyst_prompt(event, 50.0, news=[], filings=[], memory_block="")
+    assert "## Decision memory" not in prompt
+
+
+def test_analyst_includes_non_empty_memory_block():
+    event = _event("X")
+    prompt = build_analyst_prompt(
+        event,
+        50.0,
+        news=[],
+        filings=[],
+        memory_block="Recent same-ticker decisions:\n- approved buy",
+    )
+    assert "## Decision memory" in prompt
+    assert "approved buy" in prompt
+
+
+def test_analyst_omits_empty_sentiment_block():
+    event = _event("X")
+    prompt = build_analyst_prompt(event, 50.0, news=[], filings=[], sentiment_block="")
+    assert "## Sentiment snapshot" not in prompt
+
+
+def test_analyst_includes_non_empty_sentiment_block():
+    event = _event("X")
+    prompt = build_analyst_prompt(
+        event,
+        50.0,
+        news=[],
+        filings=[],
+        sentiment_block="Net score: +0.33\nBullish evidence:\n- upgrade",
+    )
+    assert "## Sentiment snapshot" in prompt
+    assert "Net score: +0.33" in prompt
+
+
+def test_analyst_includes_non_empty_specialist_block():
+    event = _event("X")
+    prompt = build_analyst_prompt(
+        event,
+        50.0,
+        news=[],
+        filings=[],
+        specialist_block="- technical: neutral score=+0.10",
+    )
+    assert "## Specialist packets" in prompt
+    assert "technical: neutral" in prompt

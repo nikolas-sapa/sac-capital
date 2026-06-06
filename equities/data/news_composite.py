@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from equities.data.registry import ProviderRegistry
+
 
 class NewsProvider(Protocol):
     def headlines(self, ticker: str, limit: int = 15) -> list[str]: ...
@@ -11,8 +13,19 @@ class NewsProvider(Protocol):
 class CompositeNewsProvider:
     """Aggregate headlines from multiple providers, deduplicating by exact match."""
 
-    def __init__(self, providers: list[NewsProvider], failure_callback=None) -> None:
-        self._providers = providers
+    def __init__(
+        self,
+        providers: list[NewsProvider],
+        failure_callback=None,
+        registry: ProviderRegistry | None = None,
+    ) -> None:
+        self._registry = registry
+        if registry is not None:
+            for idx, provider in enumerate(providers):
+                registry.register("news", provider, priority=idx)
+            self._providers = registry.providers_for("news")
+        else:
+            self._providers = providers
         self._failure_callback = failure_callback
 
     def headlines(self, ticker: str, limit: int = 15) -> list[str]:
@@ -21,9 +34,13 @@ class CompositeNewsProvider:
         for provider in self._providers:
             try:
                 items = provider.headlines(ticker, limit=limit)
+                if self._registry is not None:
+                    self._registry.record_success(provider)
             except Exception as exc:
                 source = provider.__class__.__name__
                 print(f"  [PROVIDER] source={source} ticker={ticker} error={exc}")
+                if self._registry is not None:
+                    self._registry.record_failure(provider, exc)
                 if self._failure_callback is not None:
                     self._failure_callback()
                 items = []

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+import statistics
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Protocol
@@ -23,6 +25,9 @@ class ReplayTrade:
     pnl_pct: float
     outcome: str
     artifact_id: str
+    r_multiple: float = 0.0
+    benchmark_return_pct: float | None = None
+    catalyst_type: str = ""
 
 
 @dataclass(frozen=True)
@@ -37,6 +42,18 @@ class ReplayMetrics:
     max_sector_concentration: float
     promotable: bool
     rejection_reason: str = ""
+    profit_factor: float = 0.0
+    median_return_pct: float = 0.0
+    return_std_pct: float = 0.0
+    sharpe_like: float = 0.0
+    sortino_like: float = 0.0
+    max_consecutive_losses: int = 0
+    average_r_multiple: float = 0.0
+    alpha_vs_benchmark_pct: float = 0.0
+    beta_vs_benchmark: float = 0.0
+    sector_expectancy_pct: dict[str, float] | None = None
+    catalyst_expectancy_pct: dict[str, float] | None = None
+    exit_distribution: dict[str, int] | None = None
 
 
 @dataclass(frozen=True)
@@ -62,10 +79,12 @@ class ArtifactReplayEvaluator:
         prices: HistoryProvider,
         holding_days: int = 20,
         min_trades: int = 20,
+        benchmark_ticker: str = "SPY",
     ) -> None:
         self._prices = prices
         self._holding_days = holding_days
         self._min_trades = min_trades
+        self._benchmark_ticker = benchmark_ticker
 
     def evaluate(
         self,
@@ -123,6 +142,9 @@ class ArtifactReplayEvaluator:
 
         pnl_pct = (exit_price / entry_price) - 1.0
         candidate = artifact.candidate or {}
+        benchmark_return = self._benchmark_return(as_of, entry_index, exit_bar.day)
+        risk_per_share = entry_price - stop
+        r_multiple = ((exit_price - entry_price) / risk_per_share) if risk_per_share > 0 else 0.0
         return ReplayTrade(
             ticker=artifact.ticker,
             sector=str(candidate.get("sector", "")),
@@ -133,7 +155,33 @@ class ArtifactReplayEvaluator:
             pnl_pct=round(pnl_pct, 6),
             outcome=outcome,
             artifact_id=artifact.artifact_id,
+            r_multiple=round(r_multiple, 4),
+            benchmark_return_pct=benchmark_return,
+            catalyst_type=str(candidate.get("event_type", "")),
         )
+
+    def _benchmark_return(
+        self,
+        as_of: date,
+        ticker_entry_index: int,
+        exit_day: date,
+    ) -> float | None:
+        try:
+            bars = self._prices.history(self._benchmark_ticker, period="1y").bars
+            entry_index = _first_bar_index_on_or_after(bars, as_of)
+            if entry_index is None:
+                return None
+            exit_index = _first_bar_index_on_or_after(bars, exit_day)
+            if exit_index is None:
+                exit_index = min(len(bars) - 1, ticker_entry_index + self._holding_days)
+            if exit_index <= entry_index:
+                return None
+            entry = bars[entry_index].close
+            if entry <= 0:
+                return None
+            return round((bars[exit_index].close / entry) - 1.0, 6)
+        except Exception:
+            return None
 
 
 def _metrics(trades: list[ReplayTrade], min_trades: int) -> ReplayMetrics:
@@ -149,6 +197,9 @@ def _metrics(trades: list[ReplayTrade], min_trades: int) -> ReplayMetrics:
             max_sector_concentration=0.0,
             promotable=False,
             rejection_reason=f"sample_size_below_min_trades={min_trades}",
+            sector_expectancy_pct={},
+            catalyst_expectancy_pct={},
+            exit_distribution={},
         )
 
     wins = [trade.pnl_pct for trade in trades if trade.pnl_pct > 0]
@@ -158,13 +209,39 @@ def _metrics(trades: list[ReplayTrade], min_trades: int) -> ReplayMetrics:
         sector_counts[trade.sector or "Unknown"] = sector_counts.get(trade.sector or "Unknown", 0) + 1
     max_sector_concentration = max(sector_counts.values()) / len(trades)
     expectancy = sum(trade.pnl_pct for trade in trades) / len(trades)
+    returns = [trade.pnl_pct for trade in trades]
+    std = statistics.pstdev(returns) if len(returns) > 1 else 0.0
+    downside = [min(0.0, trade.pnl_pct) for trade in trades]
+    downside_std = statistics.pstdev(downside) if len(downside) > 1 else 0.0
+    gross_profit = sum(wins)
+    gross_loss = abs(sum(losses))
+    profit_factor = gross_profit / gross_loss if gross_loss > 0 else (math.inf if gross_profit > 0 else 0.0)
+    benchmark_pairs = [
+        (trade.pnl_pct, trade.benchmark_return_pct)
+        for trade in trades
+        if trade.benchmark_return_pct is not None
+    ]
+    alpha = (
+        sum(ret - bench for ret, bench in benchmark_pairs) / len(benchmark_pairs)
+        if benchmark_pairs
+        else 0.0
+    )
+    beta = _beta(benchmark_pairs)
+    exit_distribution: dict[str, int] = {}
+    for trade in trades:
+        exit_distribution[trade.outcome] = exit_distribution.get(trade.outcome, 0) + 1
     enough_sample = len(trades) >= min_trades
     positive_validation = expectancy > 0
+    positive_alpha = alpha > 0 if benchmark_pairs else True
     rejection = ""
     if not enough_sample:
         rejection = f"sample_size_below_min_trades={min_trades}"
     elif not positive_validation:
         rejection = "expectancy_not_positive"
+    elif profit_factor <= 1.2:
+        rejection = "profit_factor_below_1.2"
+    elif not positive_alpha:
+        rejection = "alpha_vs_benchmark_not_positive"
 
     return ReplayMetrics(
         trade_count=len(trades),
@@ -178,8 +255,20 @@ def _metrics(trades: list[ReplayTrade], min_trades: int) -> ReplayMetrics:
             4,
         ),
         max_sector_concentration=round(max_sector_concentration, 4),
-        promotable=enough_sample and positive_validation,
+        promotable=enough_sample and positive_validation and profit_factor > 1.2 and positive_alpha,
         rejection_reason=rejection,
+        profit_factor=round(profit_factor, 4) if math.isfinite(profit_factor) else math.inf,
+        median_return_pct=round(statistics.median(returns) * 100, 4),
+        return_std_pct=round(std * 100, 4),
+        sharpe_like=round(expectancy / std, 4) if std > 0 else 0.0,
+        sortino_like=round(expectancy / downside_std, 4) if downside_std > 0 else 0.0,
+        max_consecutive_losses=_max_consecutive_losses(trades),
+        average_r_multiple=round(sum(trade.r_multiple for trade in trades) / len(trades), 4),
+        alpha_vs_benchmark_pct=round(alpha * 100, 4),
+        beta_vs_benchmark=round(beta, 4),
+        sector_expectancy_pct=_group_expectancy(trades, "sector"),
+        catalyst_expectancy_pct=_group_expectancy(trades, "catalyst_type"),
+        exit_distribution=exit_distribution,
     )
 
 
@@ -193,6 +282,41 @@ def _max_drawdown_pct(trades: list[ReplayTrade]) -> float:
         drawdown = (high - equity) / high
         max_drawdown = max(max_drawdown, drawdown)
     return max_drawdown * 100
+
+
+def _max_consecutive_losses(trades: list[ReplayTrade]) -> int:
+    longest = current = 0
+    for trade in sorted(trades, key=lambda item: item.entry_day):
+        if trade.pnl_pct <= 0:
+            current += 1
+            longest = max(longest, current)
+        else:
+            current = 0
+    return longest
+
+
+def _beta(pairs: list[tuple[float, float | None]]) -> float:
+    clean = [(ret, bench) for ret, bench in pairs if bench is not None]
+    if len(clean) < 2:
+        return 0.0
+    returns = [ret for ret, _bench in clean]
+    benchmark = [bench for _ret, bench in clean]
+    bench_mean = sum(benchmark) / len(benchmark)
+    variance = sum((item - bench_mean) ** 2 for item in benchmark)
+    if variance == 0:
+        return 0.0
+    return sum((ret - sum(returns) / len(returns)) * (bench - bench_mean) for ret, bench in clean) / variance
+
+
+def _group_expectancy(trades: list[ReplayTrade], attr: str) -> dict[str, float]:
+    groups: dict[str, list[float]] = {}
+    for trade in trades:
+        label = str(getattr(trade, attr) or "Unknown")
+        groups.setdefault(label, []).append(trade.pnl_pct)
+    return {
+        label: round((sum(values) / len(values)) * 100, 4)
+        for label, values in sorted(groups.items())
+    }
 
 
 def _parse_day(value: str) -> date:
@@ -216,5 +340,10 @@ def _metrics_line(label: str, metrics: ReplayMetrics) -> str:
         f"avg_loss={metrics.average_loss_pct:.2f}% max_dd={metrics.max_drawdown_pct:.2f}% "
         f"avg_exposure_days={metrics.average_exposure_days:.1f} "
         f"max_sector_concentration={metrics.max_sector_concentration:.2%} "
+        f"profit_factor={metrics.profit_factor:.2f} median={metrics.median_return_pct:.2f}% "
+        f"std={metrics.return_std_pct:.2f}% sharpe_like={metrics.sharpe_like:.2f} "
+        f"sortino_like={metrics.sortino_like:.2f} max_consecutive_losses={metrics.max_consecutive_losses} "
+        f"avg_r={metrics.average_r_multiple:.2f} alpha_vs_benchmark={metrics.alpha_vs_benchmark_pct:.2f}% "
+        f"beta_vs_benchmark={metrics.beta_vs_benchmark:.2f} exits={metrics.exit_distribution or {}} "
         f"promotable={metrics.promotable} reason={metrics.rejection_reason or 'ok'}"
     )

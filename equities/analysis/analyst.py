@@ -10,12 +10,28 @@ remaining candidates are skipped for the day.
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol, TypeVar
 
 from core.assets.instrument import Instrument
 from equities.analysis.budget import DailyBudget
+from equities.analysis.checkpoint import (
+    AnalysisCheckpoint,
+    AnalysisCheckpointStore,
+    checkpoint_key,
+    utc_now_iso,
+)
+from equities.analysis.agents import (
+    AnalystPacket,
+    FundamentalAgent,
+    NewsCatalystAgent,
+    SentimentAgent,
+    TechnicalAgent,
+    TradeSynthesizer,
+    format_packets,
+)
 from equities.analysis.prompt import (
     _ANALYST_SYSTEM,
     _AUDITOR_SYSTEM,
@@ -26,20 +42,27 @@ from equities.analysis.prompt import (
     build_challenger_prompt,
     build_prefilter_prompt,
 )
+from equities.analysis.sentiment_agent import format_sentiment_snapshot
 from equities.analysis.schema import (
+    AnalystDecision,
     AnalystOutputError,
+    AuditorDecision,
+    ChallengerDecision,
+    PrefilterDecision,
     parse_analyst_decision_json,
     parse_auditor_decision,
     parse_challenger_decision,
     parse_prefilter_decision,
 )
 from equities.data.fundamentals import FundamentalsProvider
+from equities.data.sentiment import build_headline_sentiment_snapshot
 from equities.research.artifacts import (
     EquityResearchArtifact,
     ExtractionRef,
     SourceRef,
     stable_hash,
 )
+from equities.research.memory import EquityDecisionMemory, format_ticker_memory
 from equities.research.store import ResearchArtifactStore
 from equities.screen.event_screen import CandidateEvent
 from equities.strategy import Recommendation, Sleeve
@@ -116,6 +139,7 @@ _HAIKU_COST_PER_CANDIDATE = 0.0005
 _SONNET_COST_PER_CANDIDATE = 0.01
 _CHALLENGER_COST = 0.008
 _AUDITOR_COST = 0.006
+T = TypeVar("T")
 
 
 class EquityAnalyst:
@@ -143,6 +167,12 @@ class EquityAnalyst:
         max_candidates: int = 5,
         max_price_age_days: int = 7,
         artifact_store: ResearchArtifactStore | None = None,
+        memory_enabled: bool | None = None,
+        sentiment_enabled: bool | None = None,
+        specialist_agents_enabled: bool | None = None,
+        checkpoint_store: AnalysisCheckpointStore | None = None,
+        checkpoints_enabled: bool | None = None,
+        run_date: str | None = None,
     ) -> None:
         if llm is None:
             from core.claude_client import ClaudeCodeClient
@@ -156,6 +186,39 @@ class EquityAnalyst:
         self._max_candidates = max_candidates
         self._max_price_age_days = max_price_age_days
         self._artifact_store = artifact_store
+        if memory_enabled is None:
+            memory_enabled = os.getenv("EQUITY_MEMORY_ENABLED", "true").lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+        self._memory = (
+            EquityDecisionMemory(artifact_store, prices)
+            if memory_enabled and artifact_store is not None
+            else None
+        )
+        if sentiment_enabled is None:
+            sentiment_enabled = os.getenv("EQUITY_SENTIMENT_ENABLED", "true").lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+        self._sentiment_enabled = sentiment_enabled
+        if specialist_agents_enabled is None:
+            specialist_agents_enabled = os.getenv(
+                "EQUITY_SPECIALIST_AGENTS_ENABLED",
+                "false",
+            ).lower() in {"1", "true", "yes", "on"}
+        self._specialist_agents_enabled = specialist_agents_enabled
+        if checkpoints_enabled is None:
+            checkpoints_enabled = os.getenv(
+                "EQUITY_ANALYSIS_CHECKPOINTS_ENABLED",
+                "false",
+            ).lower() in {"1", "true", "yes", "on"}
+        self._checkpoint_store = checkpoint_store if checkpoints_enabled else None
+        self._run_date = run_date or date.today().isoformat()
         self._candidate_by_ticker: dict[str, CandidateEvent] = {}
 
     def analyse(
@@ -226,9 +289,16 @@ class EquityAnalyst:
 
         user_msg = build_prefilter_prompt(candidates)
         try:
-            resp = self._llm.complete(_PREFILTER_SYSTEM, user_msg, _HAIKU)
-            self._budget.record(resp.cost_usd("haiku"))
-            parsed = parse_prefilter_decision(resp.content)
+            _raw, parsed, _hit = self._complete_stage(
+                ticker="BATCH",
+                stage="prefilter",
+                system=_PREFILTER_SYSTEM,
+                user=user_msg,
+                model=_HAIKU,
+                parser=parse_prefilter_decision,
+                validator=PrefilterDecision.model_validate,
+                cost_model="haiku",
+            )
             scores: dict[str, int] = {r.ticker: r.score for r in parsed.rankings}
             ranked = sorted(candidates, key=lambda c: scores.get(c.instrument.ticker, 0), reverse=True)
             return ranked[: self._max_candidates]
@@ -275,6 +345,26 @@ class EquityAnalyst:
             except Exception:
                 pass
 
+        specialist_packets = self._specialist_packets(ticker, price, headlines, sector, analyst_count)
+        specialist_reject = TradeSynthesizer().rejection(specialist_packets)
+        if specialist_reject is not None:
+            self._record_artifact(
+                candidate,
+                price=price,
+                news=headlines,
+                filings=filings,
+                sector=sector,
+                analyst_count=analyst_count,
+                llm_model="",
+                prompt="",
+                raw_output="",
+                output_json=specialist_reject,
+                decision="rejected",
+                rejection_reason=str(specialist_reject["reason"]),
+                stage="specialist",
+            )
+            return None
+
         user_msg = build_analyst_prompt(
             candidate=candidate,
             current_price=price,
@@ -285,11 +375,21 @@ class EquityAnalyst:
             macro_regime=regime,
             vix=vix,
             yield_curve=yield_curve,
+            memory_block=self._memory_block(ticker),
+            sentiment_block=self._sentiment_block(ticker, headlines),
+            specialist_block=format_packets(specialist_packets),
         )
         try:
-            resp = self._llm.complete(_ANALYST_SYSTEM, user_msg, _SONNET)
-            self._budget.record(resp.cost_usd("sonnet"))
-            data = parse_analyst_decision_json(resp.content)
+            raw_output, data, _hit = self._complete_stage(
+                ticker=ticker,
+                stage="analyst",
+                system=_ANALYST_SYSTEM,
+                user=user_msg,
+                model=_SONNET,
+                parser=parse_analyst_decision_json,
+                validator=AnalystDecision.model_validate,
+                cost_model="sonnet",
+        )
         except AnalystOutputError as exc:
             print(f"  REJECTED [{ticker}] analyst_output_invalid: {exc}")
             self._record_artifact(
@@ -301,7 +401,7 @@ class EquityAnalyst:
                 analyst_count=analyst_count,
                 llm_model=_SONNET,
                 prompt=user_msg,
-                raw_output=resp.content if "resp" in locals() else "",
+                raw_output=raw_output if "raw_output" in locals() else "",
                 output_json=raw_data if "raw_data" in locals() else None,
                 decision="rejected",
                 rejection_reason=f"analyst_output_invalid:{exc}",
@@ -319,7 +419,7 @@ class EquityAnalyst:
                 analyst_count=analyst_count,
                 llm_model=_SONNET,
                 prompt=user_msg,
-                raw_output=resp.content if "resp" in locals() else "",
+                raw_output=raw_output if "raw_output" in locals() else "",
                 output_json=raw_data if "raw_data" in locals() else None,
                 decision="error",
                 rejection_reason=f"analyst_exception:{exc}",
@@ -336,13 +436,18 @@ class EquityAnalyst:
                 analyst_count=analyst_count,
                 llm_model=_SONNET,
                 prompt=user_msg,
-                raw_output=resp.content,
+                raw_output=raw_output,
                 output_json=data.model_dump(),
                 decision="rejected",
                 rejection_reason=data.reason or "llm_reject",
             )
             return None
 
+        output_json = data.model_dump()
+        if specialist_packets:
+            output_json["specialist_packets"] = [
+                packet.to_dict() for packet in specialist_packets
+            ]
         self._record_artifact(
             candidate,
             price=price,
@@ -352,8 +457,8 @@ class EquityAnalyst:
             analyst_count=analyst_count,
             llm_model=_SONNET,
             prompt=user_msg,
-            raw_output=resp.content,
-            output_json=data.model_dump(),
+            raw_output=raw_output,
+            output_json=output_json,
             decision="approved",
             rejection_reason="",
         )
@@ -412,6 +517,98 @@ class EquityAnalyst:
                 return None
 
         return price
+
+    def _memory_block(self, ticker: str) -> str:
+        if self._memory is None:
+            return ""
+        try:
+            return format_ticker_memory(self._memory.for_ticker(ticker, limit=5))
+        except Exception:
+            return ""
+
+    def _sentiment_block(self, ticker: str, headlines: list[str]) -> str:
+        if not self._sentiment_enabled:
+            return ""
+        try:
+            snapshot = build_headline_sentiment_snapshot(ticker, headlines)
+            if not snapshot.evidence:
+                return ""
+            return format_sentiment_snapshot(snapshot)
+        except Exception:
+            return ""
+
+    def _specialist_packets(
+        self,
+        ticker: str,
+        current_price: float,
+        headlines: list[str],
+        sector: str,
+        analyst_count: int,
+    ) -> list[AnalystPacket]:
+        if not self._specialist_agents_enabled:
+            return []
+        try:
+            sentiment = build_headline_sentiment_snapshot(ticker, headlines)
+            return [
+                FundamentalAgent().packet(ticker, sector=sector, analyst_count=analyst_count),
+                TechnicalAgent().packet(ticker, current_price),
+                NewsCatalystAgent().packet(ticker, headlines),
+                SentimentAgent().packet(sentiment),
+            ]
+        except Exception:
+            return []
+
+    def _complete_stage(
+        self,
+        *,
+        ticker: str,
+        stage: str,
+        system: str,
+        user: str,
+        model: str,
+        parser: Callable[[str], T],
+        validator: Callable[[object], T],
+        cost_model: str,
+    ) -> tuple[str, T, bool]:
+        prompt_hash = stable_hash(user)
+        key = checkpoint_key(
+            run_date=getattr(self, "_run_date", date.today().isoformat()),
+            ticker=ticker,
+            stage=stage,
+            prompt_hash=prompt_hash,
+            model=model,
+        )
+        checkpoint_store = getattr(self, "_checkpoint_store", None)
+        if checkpoint_store is not None:
+            checkpoint = checkpoint_store.get(key)
+            if checkpoint is not None:
+                try:
+                    return checkpoint.raw_output, validator(checkpoint.parsed_output), True
+                except Exception:
+                    pass
+
+        resp = self._llm.complete(system, user, model)
+        parsed = parser(resp.content)
+        cost = resp.cost_usd(cost_model)
+        self._budget.record(cost)
+        if checkpoint_store is not None:
+            parsed_output = (
+                parsed.model_dump() if hasattr(parsed, "model_dump") else dict(parsed)  # type: ignore[arg-type]
+            )
+            checkpoint_store.put(
+                AnalysisCheckpoint(
+                    key=key,
+                    ticker=ticker.upper(),
+                    stage=stage,
+                    model=model,
+                    prompt_hash=prompt_hash,
+                    raw_output=resp.content,
+                    parsed_output=parsed_output,
+                    cost_usd=cost,
+                    created_at=utc_now_iso(),
+                )
+            )
+        return resp.content, parsed, False
 
     def _record_artifact(
         self,
@@ -565,9 +762,16 @@ class EquityAnalyst:
             news=headlines,
         )
         try:
-            resp = self._llm.complete(_CHALLENGER_SYSTEM, user_msg, _SONNET)
-            self._budget.record(resp.cost_usd("sonnet"))
-            data = parse_challenger_decision(resp.content)
+            raw_output, data, _hit = self._complete_stage(
+                ticker=ticker,
+                stage="challenger",
+                system=_CHALLENGER_SYSTEM,
+                user=user_msg,
+                model=_SONNET,
+                parser=parse_challenger_decision,
+                validator=ChallengerDecision.model_validate,
+                cost_model="sonnet",
+            )
         except LLMFailureBudgetExceeded:
             raise
         except Exception as exc:
@@ -576,7 +780,7 @@ class EquityAnalyst:
                 stage="challenger",
                 llm_model=_SONNET,
                 prompt=user_msg,
-                raw_output=resp.content if "resp" in locals() else "",
+                raw_output=raw_output if "raw_output" in locals() else "",
                 output_json=None,
                 decision="error",
                 rejection_reason=f"challenger_output_invalid:{exc}",
@@ -592,7 +796,7 @@ class EquityAnalyst:
                 stage="challenger",
                 llm_model=_SONNET,
                 prompt=user_msg,
-                raw_output=resp.content,
+                raw_output=raw_output,
                 output_json=data.model_dump(),
                 decision="rejected",
                 rejection_reason="challenger_reject",
@@ -635,9 +839,16 @@ class EquityAnalyst:
             catalyst=rec.catalyst,
         )
         try:
-            resp = self._llm.complete(_AUDITOR_SYSTEM, user_msg, _SONNET)
-            self._budget.record(resp.cost_usd("sonnet"))
-            data = parse_auditor_decision(resp.content)
+            raw_output, data, _hit = self._complete_stage(
+                ticker=rec.instrument.ticker,
+                stage="auditor",
+                system=_AUDITOR_SYSTEM,
+                user=user_msg,
+                model=_SONNET,
+                parser=parse_auditor_decision,
+                validator=AuditorDecision.model_validate,
+                cost_model="sonnet",
+            )
         except LLMFailureBudgetExceeded:
             raise
         except Exception as exc:
@@ -646,7 +857,7 @@ class EquityAnalyst:
                 stage="auditor",
                 llm_model=_SONNET,
                 prompt=user_msg,
-                raw_output=resp.content if "resp" in locals() else "",
+                raw_output=raw_output if "raw_output" in locals() else "",
                 output_json=None,
                 decision="error",
                 rejection_reason=f"auditor_output_invalid:{exc}",
@@ -659,7 +870,7 @@ class EquityAnalyst:
                 stage="auditor",
                 llm_model=_SONNET,
                 prompt=user_msg,
-                raw_output=resp.content,
+                raw_output=raw_output,
                 output_json=data.model_dump(),
                 decision="rejected",
                 rejection_reason="auditor_reject",

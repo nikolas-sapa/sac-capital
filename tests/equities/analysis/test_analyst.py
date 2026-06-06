@@ -8,6 +8,7 @@ from core.assets.instrument import CapTier, Instrument
 from equities.analysis.analyst import EquityAnalyst, LLMResponse
 from equities.analysis.budget import DailyBudget
 from equities.analysis.core_analyst import CoreDCAAnalyst
+from equities.research.artifacts import EquityResearchArtifact, stable_hash
 from equities.research.store import ResearchArtifactStore
 from equities.screen.event_screen import CandidateEvent, EventType
 from equities.screen.quality_screen import QualityCandidate
@@ -285,6 +286,46 @@ def test_analyst_writes_research_artifacts_for_accept_and_reject(tmp_path):
     assert artifacts[0].prompt_hash
     assert artifacts[0].sources
     assert artifacts[2].rejection_reason
+
+
+def test_analyst_includes_existing_same_ticker_memory_in_prompt(tmp_path):
+    store = ResearchArtifactStore(tmp_path / "research_artifacts.jsonl")
+    store.append(
+        EquityResearchArtifact(
+            artifact_id=stable_hash({"ticker": "ARWR", "case": "memory"}),
+            as_of="2026-01-01T00:00:00+00:00",
+            ticker="ARWR",
+            candidate={"ticker": "ARWR", "evidence": "Prior earnings setup"},
+            output_json={
+                "action": "buy",
+                "entry": 70.0,
+                "stop_loss": 65.0,
+                "take_profit": 84.0,
+                "confidence": 0.66,
+                "catalyst": "Prior accepted catalyst from artifacts",
+                "thesis": "Prior thesis",
+            },
+            decision="approved",
+        )
+    )
+    llm = FakeLLMClient({_HAIKU: _PREFILTER_RESPONSE, _SONNET: _SONNET_BUY_RESPONSE})
+    analyst = EquityAnalyst(
+        llm,
+        FakePrices(),
+        FakeNews(),
+        FakeFilings(),
+        artifact_store=store,
+    )
+
+    analyst.analyse([_event("ARWR")])
+
+    analyst_prompts = [
+        user for model, user in llm.calls
+        if model == _SONNET and "Analyze this equity catalyst." in user
+    ]
+    assert analyst_prompts
+    assert "## Decision memory" in analyst_prompts[0]
+    assert "Prior accepted catalyst from artifacts" in analyst_prompts[0]
 
 
 def test_invalid_challenger_output_is_artifacted_and_trade_continues(tmp_path):

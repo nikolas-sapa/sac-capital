@@ -75,6 +75,9 @@ Cap tier: {cap_tier}
 
 ## Macro context
 Regime: {macro_regime} | VIX: {vix_str} | Yield curve (10y-3m): {yield_curve_str}
+{specialist_section}
+{sentiment_section}
+{memory_section}
 
 ## Task
 If this setup is already priced in OR has no clear thesis, output:
@@ -111,12 +114,28 @@ def build_analyst_prompt(
     macro_regime: str = "neutral",
     vix: float | None = None,
     yield_curve: float | None = None,
+    memory_block: str = "",
+    sentiment_block: str = "",
+    specialist_block: str = "",
 ) -> str:
     """Build the Sonnet deep-analyst user message."""
     news_block = "\n".join(f"- {h}" for h in news[:8]) or "  (none)"
     filings_block = "\n".join(f"- {f}" for f in filings[:5]) or "  (none)"
     vix_str = f"{vix:.1f}" if vix is not None else "n/a"
     yield_curve_str = f"{yield_curve:.2f}" if yield_curve is not None else "n/a"
+    memory_section = (
+        f"\n\n## Decision memory\n{memory_block.strip()}" if memory_block.strip() else ""
+    )
+    sentiment_section = (
+        f"\n\n## Sentiment snapshot\n{sentiment_block.strip()}"
+        if sentiment_block.strip()
+        else ""
+    )
+    specialist_section = (
+        f"\n\n## Specialist packets\n{specialist_block.strip()}"
+        if specialist_block.strip()
+        else ""
+    )
     return _ANALYST_USER.format(
         ticker=candidate.instrument.ticker,
         sector=sector or "Unknown",
@@ -130,6 +149,9 @@ def build_analyst_prompt(
         macro_regime=macro_regime,
         vix_str=vix_str,
         yield_curve_str=yield_curve_str,
+        specialist_section=specialist_section,
+        sentiment_section=sentiment_section,
+        memory_section=memory_section,
     )
 
 
@@ -258,6 +280,7 @@ Ticker: {ticker}
 Quality score: {score:.3f}/1.0
 Fundamentals: {evidence}
 Current price: ${current_price:.2f}
+{reviewer_section}
 
 ## Recent news (last 15 headlines)
 {news_block}
@@ -279,12 +302,19 @@ def build_core_dca_prompt(
     candidate: QualityCandidate,
     current_price: float,
     news: list[str],
+    reviewer_block: str = "",
 ) -> str:
     news_block = "\n".join(f"- {h}" for h in news[:15]) or "  (none)"
+    reviewer_section = (
+        f"\n\n## Deterministic reviewer checks\n{reviewer_block.strip()}"
+        if reviewer_block.strip()
+        else ""
+    )
     return _CORE_DCA_USER.format(
         ticker=candidate.instrument.ticker,
         score=candidate.score,
         evidence=candidate.evidence,
         current_price=current_price,
+        reviewer_section=reviewer_section,
         news_block=news_block,
     )

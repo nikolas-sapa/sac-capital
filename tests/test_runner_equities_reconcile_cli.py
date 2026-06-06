@@ -114,11 +114,15 @@ def test_existing_cli_modes_still_call_run_once(
         no_analyse=False,
         mark_only=False,
         dry_run=False,
+        checkpoint=False,
+        clear_analysis_checkpoints=False,
     ) -> None:
         calls.append({
             "no_analyse": no_analyse,
             "mark_only": mark_only,
             "dry_run": dry_run,
+            "checkpoint": checkpoint,
+            "clear_analysis_checkpoints": clear_analysis_checkpoints,
         })
 
     async def fail_reconcile_only() -> None:
@@ -134,6 +138,46 @@ def test_existing_cli_modes_still_call_run_once(
         "no_analyse": expected_no_analyse,
         "mark_only": expected_mark_only,
         "dry_run": expected_dry_run,
+        "checkpoint": False,
+        "clear_analysis_checkpoints": False,
+    }]
+
+
+def test_checkpoint_cli_flags_call_run_once(monkeypatch):
+    import runner_equities
+
+    calls: list[dict[str, bool]] = []
+
+    async def fake_run_once(
+        swing_universe,
+        core_universe,
+        no_analyse=False,
+        mark_only=False,
+        dry_run=False,
+        checkpoint=False,
+        clear_analysis_checkpoints=False,
+    ) -> None:
+        calls.append({
+            "checkpoint": checkpoint,
+            "clear_analysis_checkpoints": clear_analysis_checkpoints,
+        })
+
+    async def fail_reconcile_only() -> None:
+        raise AssertionError("run_reconcile_only should not run in normal modes")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["runner_equities.py", "--checkpoint", "--clear-analysis-checkpoints"],
+    )
+    monkeypatch.setattr(runner_equities, "run_once", fake_run_once)
+    monkeypatch.setattr(runner_equities, "run_reconcile_only", fail_reconcile_only)
+
+    runner_equities.main()
+
+    assert calls == [{
+        "checkpoint": True,
+        "clear_analysis_checkpoints": True,
     }]
 
 

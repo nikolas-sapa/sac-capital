@@ -28,10 +28,12 @@ from core.config import load_config
 from core.claude_client import ClaudeCodeClient
 from equities.analysis.analyst import EquityAnalyst, LLMFailureBudgetExceeded, LLMResponse
 from equities.analysis.budget import DailyBudget
+from equities.analysis.checkpoint import AnalysisCheckpointStore
 from equities.analysis.core_analyst import CoreDCAAnalyst
 from equities.data.news import YFinanceNewsProvider
 from equities.data.news_composite import CompositeNewsProvider
 from equities.data.news_tiingo import TiingoNewsProvider
+from equities.data.registry import ProviderRegistry
 from equities.data.macro_regime import MacroRegimeGate
 from equities.data.vix import VIXRegimeGate
 from equities.data.calendar import YFinanceCalendar
@@ -300,7 +302,11 @@ def _stage(stats: RunStats, name: str) -> Iterator[None]:
         stats.check_runtime()
 
 
-def _print_run_summary(stats: RunStats, budget: DailyBudget | None = None) -> None:
+def _print_run_summary(
+    stats: RunStats,
+    budget: DailyBudget | None = None,
+    provider_registry: ProviderRegistry | None = None,
+) -> None:
     print("\n=== Run summary ===")
     print(f"exit_reason={stats.exit_reason}")
     print(f"elapsed_s={stats.elapsed():.2f}")
@@ -310,6 +316,15 @@ def _print_run_summary(stats: RunStats, budget: DailyBudget | None = None) -> No
         print(f"stage={name} status={status} duration_s={duration:.2f}")
     if budget is not None:
         print(f"Budget used today: ${budget.spent_today():.4f}")
+    if provider_registry is not None:
+        failures = provider_registry.failures()
+        if failures:
+            print("Provider failures:")
+            for health in failures:
+                print(
+                    f"provider={health.name} kind={health.kind} "
+                    f"failures={health.failure_count} last_error={health.last_error}"
+                )
 
 
 class _FilingsSummaryAdapter:
@@ -431,6 +446,8 @@ async def run_once(
     no_analyse: bool = False,
     mark_only: bool = False,
     dry_run: bool = False,
+    checkpoint: bool = False,
+    clear_analysis_checkpoints: bool = False,
 ) -> None:
     settings = load_config()
     dry_run = dry_run or bool(getattr(settings, "equity_runner_dry_run", False))
@@ -448,6 +465,11 @@ async def run_once(
     equity_ledger = EquityLedger(data_dir / "equity.db")
     fp_tracker = ForwardPaperTracker(data_dir / "forward_paper.db")
     artifact_store = ResearchArtifactStore(data_dir / "research_artifacts.jsonl")
+    checkpoint_store = AnalysisCheckpointStore(data_dir / "equity_analysis_checkpoints.jsonl")
+    provider_registry = ProviderRegistry()
+    if clear_analysis_checkpoints:
+        removed = checkpoint_store.clear_all()
+        print(f"Cleared {removed} equity analysis checkpoint(s).")
 
     def record_provider_failure() -> None:
         stats.record_provider_failure()
@@ -460,7 +482,7 @@ async def run_once(
     news = CompositeNewsProvider([
         YFinanceNewsProvider(),
         TiingoNewsProvider(),   # no-op if TIINGO_API_KEY absent
-    ], failure_callback=record_provider_failure)
+    ], failure_callback=record_provider_failure, registry=provider_registry)
     filings_client = SECEdgarFilings()
     filings_summary = _FilingsSummaryAdapter(filings_client, failure_callback=record_provider_failure)
     llm_client = _LLMFailureCountingClient(ClaudeCodeClient(), stats)
@@ -629,6 +651,8 @@ async def run_once(
             max_candidates=5,
             max_price_age_days=settings.equity_max_price_age_days,
             artifact_store=artifact_store,
+            checkpoint_store=checkpoint_store,
+            checkpoints_enabled=checkpoint,
         )
 
         with _stage(stats, "analyst"):
@@ -644,6 +668,7 @@ async def run_once(
             llm=llm_client,
             prices=prices,
             news=news,
+            fundamentals=fundamentals_provider,
             budget=budget,
             max_candidates=4,
         )
@@ -828,7 +853,7 @@ async def run_once(
         if alerts is not None:
             await alerts.send(alerts.format_equity_portfolio(equity_ledger.portfolio_stats()))
     finally:
-        _print_run_summary(stats, budget)
+        _print_run_summary(stats, budget, provider_registry=provider_registry)
         equity_ledger.close()
         fp_tracker.close()
 
@@ -839,6 +864,12 @@ def main() -> None:
     parser.add_argument("--mark-only", action="store_true", help="Mark-to-market + exits only")
     parser.add_argument("--reconcile-only", action="store_true", help="Broker reconciliation only")
     parser.add_argument("--dry-run", action="store_true", help="Run without ledger, forward-tracker, or broker writes")
+    parser.add_argument("--checkpoint", action="store_true", help="Reuse validated LLM stage checkpoints")
+    parser.add_argument(
+        "--clear-analysis-checkpoints",
+        action="store_true",
+        help="Clear saved equity analysis checkpoints before running",
+    )
     args = parser.parse_args()
 
     if args.reconcile_only:
@@ -852,6 +883,8 @@ def main() -> None:
             no_analyse=args.no_analyse,
             mark_only=args.mark_only,
             dry_run=args.dry_run,
+            checkpoint=args.checkpoint,
+            clear_analysis_checkpoints=args.clear_analysis_checkpoints,
         )
     )
 

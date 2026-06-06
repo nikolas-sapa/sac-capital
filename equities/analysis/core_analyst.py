@@ -6,11 +6,18 @@ and no stop/take_profit. Approves unless there is a specific near-term risk.
 from __future__ import annotations
 
 import math
+import os
 
 from equities.analysis.analyst import LLMClient, LLMResponse, LLMFailureBudgetExceeded
 from equities.analysis.budget import DailyBudget
+from equities.analysis.core_reviewers import (
+    format_core_reviews,
+    has_hard_reject,
+    run_core_reviewers,
+)
 from equities.analysis.prompt import _CORE_DCA_SYSTEM, build_core_dca_prompt
 from equities.analysis.schema import parse_core_dca_decision
+from equities.data.fundamentals import FundamentalsProvider
 from equities.screen.quality_screen import QualityCandidate
 from equities.strategy import Recommendation, Sleeve
 
@@ -35,8 +42,10 @@ class CoreDCAAnalyst:
         llm: LLMClient | None = None,
         prices=None,
         news=None,
+        fundamentals: FundamentalsProvider | None = None,
         budget: DailyBudget | None = None,
         max_candidates: int = 4,
+        reviewers_enabled: bool | None = None,
     ) -> None:
         if llm is None:
             from core.claude_client import ClaudeCodeClient
@@ -44,8 +53,17 @@ class CoreDCAAnalyst:
         self._llm = llm
         self._prices = prices
         self._news = news
+        self._fundamentals = fundamentals
         self._budget = budget or DailyBudget(daily_limit_usd=1.0)
         self._max_candidates = max_candidates
+        if reviewers_enabled is None:
+            reviewers_enabled = os.getenv("EQUITY_CORE_REVIEWERS_ENABLED", "true").lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+        self._reviewers_enabled = reviewers_enabled
 
     def analyse(self, candidates: list[QualityCandidate]) -> list[Recommendation]:
         """Return DCA recommendations for approved candidates."""
@@ -68,8 +86,12 @@ class CoreDCAAnalyst:
             print(f"  REJECTED [{ticker}] core_market_data_invalid: latest_close={price!r}")
             return None
         headlines = self._news.headlines(ticker, limit=15) if self._news else []
+        reviewer_block = self._reviewer_block(candidate)
+        if reviewer_block is None:
+            print(f"  REJECTED [{ticker}] core_reviewer_hard_reject")
+            return None
 
-        user_msg = build_core_dca_prompt(candidate, price, headlines)
+        user_msg = build_core_dca_prompt(candidate, price, headlines, reviewer_block=reviewer_block)
         try:
             resp = self._llm.complete(_CORE_DCA_SYSTEM, user_msg, _SONNET)
             self._budget.record(resp.cost_usd("sonnet"))
@@ -97,4 +119,17 @@ class CoreDCAAnalyst:
             catalyst="DCA accumulation — quality screen pass",
             thesis=data.thesis,
             horizon="long-term",
+            memo={"core_reviewer_checks": reviewer_block} if reviewer_block else None,
         )
+
+    def _reviewer_block(self, candidate: QualityCandidate) -> str | None:
+        if not self._reviewers_enabled or self._fundamentals is None:
+            return ""
+        try:
+            snap = self._fundamentals.fetch(candidate.instrument.ticker)
+            reviews = run_core_reviewers(snap)
+        except Exception:
+            return ""
+        if has_hard_reject(reviews):
+            return None
+        return format_core_reviews(reviews)
