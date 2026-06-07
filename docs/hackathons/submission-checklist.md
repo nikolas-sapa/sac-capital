@@ -8,8 +8,8 @@
 - Repo URL: `TODO`
 - Demo URL: `TODO`
 - Video URL: `TODO`
-- Contract address: `TODO`
-- Explorer verification URL: `TODO`
+- Contract address: `0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
+- Explorer verification URL: `TODO - verify on Mantle Explorer`
 - Team info: `TODO`
 
 ## Deployment Award Checklist

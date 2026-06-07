@@ -8,8 +8,8 @@ Submission placeholders:
 
 - Public demo: `TODO`
 - Demo video: `TODO`
-- Mantle contract address: `TODO`
-- Mantle Explorer verification link: `TODO`
+- Mantle contract address: `0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
+- Mantle Explorer verification link: `TODO - verify on Mantle Explorer`
 
 Architecture:
 
@@ -72,7 +72,7 @@ forge script contracts/script/DeployAgentDecisionRegistry.s.sol \
 Submit one decision only after setting the real registry address:
 
 ```sh
-export AGENT_REGISTRY_ADDRESS=0x...
+export AGENT_REGISTRY_ADDRESS=0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887
 export AGENT_ID=mantle-verifiable-polymarket-agent
 
 ./.venv/bin/python scripts/submit_mantle_decisions.py \
@@ -95,7 +95,7 @@ For live Mantle event reads, set these before building or deploying the frontend
 
 ```sh
 VITE_MANTLE_RPC_URL=https://rpc.sepolia.mantle.xyz
-VITE_AGENT_REGISTRY_ADDRESS=0x...
+VITE_AGENT_REGISTRY_ADDRESS=0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887
 VITE_MANTLE_EXPLORER_BASE=https://sepolia.mantlescan.xyz
 ```
 
