@@ -1,3 +1,106 @@
+# Mantle-Verifiable AI Prediction Agent
+
+One-line pitch: AI prediction-market decisions are exported as deterministic `bytes32` commitments and anchored on Mantle so judges can verify agent behavior and outcomes.
+
+Hackathon track: `AI Alpha & Data`
+
+Submission placeholders:
+
+- Public demo: `TODO`
+- Demo video: `TODO`
+- Mantle contract address: `TODO`
+- Mantle Explorer verification link: `TODO`
+
+Architecture:
+
+```text
+Bot / LLM strategies
+  -> paper ledger + research artifacts
+  -> deterministic commitment exporter
+  -> AgentDecisionRegistry on Mantle
+  -> frontend verification and reputation demo
+```
+
+Mantle is the immutable benchmark layer: the bot keeps rich off-chain payloads public, hashes them with canonical JSON, records decision hashes on Mantle, and can later record outcome hashes against the original decision IDs. The frontend shows both the payload and the recomputed hash so reviewers can verify that the on-chain record matches the AI decision.
+
+Safety boundary: this remains paper-only. On-chain records are verifiability anchors for decisions and outcomes; they are not custody, brokerage, or live-trading instructions.
+
+## Hackathon Repro Steps
+
+Install Python dependencies:
+
+```sh
+uv sync
+```
+
+Run tests:
+
+```sh
+./.venv/bin/python -m pytest
+```
+
+Export decision commitments:
+
+```sh
+./.venv/bin/python scripts/export_mantle_commitments.py \
+  --ledger data/ledger.db \
+  --out data/mantle_commitments.jsonl
+```
+
+Run a dry-run Mantle submission:
+
+```sh
+./.venv/bin/python scripts/submit_mantle_decisions.py \
+  --commitments data/mantle_commitments.jsonl \
+  --contract 0x0000000000000000000000000000000000000001 \
+  --agent-id mantle-verifiable-polymarket-agent \
+  --limit 1
+```
+
+Deploy the contract after installing Foundry and funding a dedicated Mantle deployer wallet:
+
+```sh
+export MANTLE_RPC_URL=https://rpc.sepolia.mantle.xyz
+export MANTLE_PRIVATE_KEY=0x...
+
+forge test
+forge script contracts/script/DeployAgentDecisionRegistry.s.sol \
+  --rpc-url "$MANTLE_RPC_URL" \
+  --broadcast
+```
+
+Submit one decision only after setting the real registry address:
+
+```sh
+export AGENT_REGISTRY_ADDRESS=0x...
+export AGENT_ID=mantle-verifiable-polymarket-agent
+
+./.venv/bin/python scripts/submit_mantle_decisions.py \
+  --commitments data/mantle_commitments.jsonl \
+  --contract "$AGENT_REGISTRY_ADDRESS" \
+  --agent-id "$AGENT_ID" \
+  --limit 1 \
+  --send
+```
+
+Run the frontend locally:
+
+```sh
+cd frontend
+npm install
+npm run dev
+```
+
+For live Mantle event reads, set these before building or deploying the frontend:
+
+```sh
+VITE_MANTLE_RPC_URL=https://rpc.sepolia.mantle.xyz
+VITE_AGENT_REGISTRY_ADDRESS=0x...
+VITE_MANTLE_EXPLORER_BASE=https://sepolia.mantlescan.xyz
+```
+
+Vercel deployment: use `frontend/` as the project root, build command `npm run build`, and output directory `dist`.
+
 # Polymarket Bot
 
 Paper-trading research system for prediction markets and US equities.

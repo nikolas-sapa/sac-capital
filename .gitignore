@@ -20,6 +20,9 @@ dist/
 build/
 *.egg-info/
 .eggs/
+frontend/dist/
+frontend/node_modules/
+frontend/*.tsbuildinfo
 
 # Testing / coverage
 .pytest_cache/
@@ -39,4 +42,3 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
-

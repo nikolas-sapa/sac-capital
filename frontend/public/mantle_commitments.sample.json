@@ -1,0 +1,68 @@
+[
+  {
+    "bytes32": "0x0457fade4e4ab5b4141986b5651f601362d9784a96a92417ee8e31b60bb9431e",
+    "hash_algorithm": "sha256",
+    "kind": "polymarket_agent_decision",
+    "schema_version": "mantle-agent-decision-v1",
+    "source": "core.ledger.fills",
+    "payload": {
+      "row_id": 1,
+      "strategy": "dummy",
+      "question": "Will Lynne Roberts win the 2026 WNBA Coach of the Year award?",
+      "fair_prob": 0.65,
+      "avg_price": 0.4646,
+      "confidence": 1,
+      "stake": 20,
+      "shares": 43.04778303917348,
+      "reason": "dummy: always-on test signal",
+      "timestamp": "2026-06-06T15:50:45.350268+00:00",
+      "resolved": 0,
+      "won": null,
+      "pnl": null
+    }
+  },
+  {
+    "bytes32": "0x24e8f5a25043a02c7181ade97efa0ccf8a83ac7bb99c67608a477ad1e888879b",
+    "hash_algorithm": "sha256",
+    "kind": "polymarket_agent_decision",
+    "schema_version": "mantle-agent-decision-v1",
+    "source": "core.ledger.fills",
+    "payload": {
+      "row_id": 3,
+      "strategy": "dummy",
+      "question": "Exact Score: Indonesia 3 - 2 Mozambique?",
+      "fair_prob": 0.65,
+      "avg_price": 0.47975,
+      "confidence": 1,
+      "stake": 20,
+      "shares": 41.68837936425222,
+      "reason": "dummy: always-on test signal",
+      "timestamp": "2026-06-06T16:06:13.788375+00:00",
+      "resolved": 0,
+      "won": null,
+      "pnl": null
+    }
+  },
+  {
+    "bytes32": "0x8430d22683e1ad6c4d173b93cde34342d8a29fc48c4d78be3dc58cd6d66cf22d",
+    "hash_algorithm": "sha256",
+    "kind": "polymarket_agent_decision",
+    "schema_version": "mantle-agent-decision-v1",
+    "source": "core.ledger.fills",
+    "payload": {
+      "row_id": 5,
+      "strategy": "dummy",
+      "question": "US grants license for new nuclear reactor in 2026?",
+      "fair_prob": 0.65,
+      "avg_price": 0.2121,
+      "confidence": 1,
+      "stake": 20,
+      "shares": 94.29514380009431,
+      "reason": "dummy: always-on test signal",
+      "timestamp": "2026-06-06T16:16:56.067421+00:00",
+      "resolved": 0,
+      "won": null,
+      "pnl": null
+    }
+  }
+]
