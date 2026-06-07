@@ -12,7 +12,7 @@ Submission placeholders:
 - Mantle contract explorer: `https://explorer.sepolia.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
 - Mantle deployment transaction: `https://explorer.sepolia.mantle.xyz/tx/0x62b7b9ce6c469768fc979f2d00610a7aba39b71c48a55a0081fdca424e4efe4b`
 - Mantle decision transaction: `https://explorer.sepolia.mantle.xyz/tx/0x94ac5787a23f472a9d97e3ca435b9dc4818b734e0b3efad9ad2d2fd1251c6076`
-- Mantle Explorer verification link: `TODO - Mantle Explorer verification API is currently returning 503`
+- Mantle Explorer verification link: `https://explorer.sepolia.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887#code`
 
 Architecture:
 
