@@ -9,6 +9,9 @@ Submission placeholders:
 - Public demo: `TODO`
 - Demo video: `TODO`
 - Mantle contract address: `0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
+- Mantle contract explorer: `https://explorer.sepolia.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
+- Mantle deployment transaction: `https://explorer.sepolia.mantle.xyz/tx/0x62b7b9ce6c469768fc979f2d00610a7aba39b71c48a55a0081fdca424e4efe4b`
+- Mantle decision transaction: `https://explorer.sepolia.mantle.xyz/tx/0x94ac5787a23f472a9d97e3ca435b9dc4818b734e0b3efad9ad2d2fd1251c6076`
 - Mantle Explorer verification link: `TODO - verify on Mantle Explorer`
 
 Architecture:
@@ -81,6 +84,13 @@ export AGENT_ID=mantle-verifiable-polymarket-agent
   --agent-id "$AGENT_ID" \
   --limit 1 \
   --send
+```
+
+Submitted Mantle Sepolia decision:
+
+```text
+decisionHash: 0x0457fade4e4ab5b4141986b5651f601362d9784a96a92417ee8e31b60bb9431e
+transaction: 0x94ac5787a23f472a9d97e3ca435b9dc4818b734e0b3efad9ad2d2fd1251c6076
 ```
 
 Run the frontend locally:
