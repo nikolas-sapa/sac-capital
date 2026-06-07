@@ -64,7 +64,7 @@ class ThesisResult:
 
 
 class ThesisMiner:
-    _SONNET = "claude-sonnet-4-6"
+    _SONNET = "strong"
 
     def __init__(self, llm: LLMClient | None = None) -> None:
         if llm is None:

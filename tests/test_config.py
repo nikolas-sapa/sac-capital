@@ -34,6 +34,7 @@ class TestDefaults:
         assert s.core_dca_pct == 0.01
         assert s.max_order_usd == 25.0
         assert s.max_daily_order_count == 3
+        assert s.polymarket_scan_alerts is False
         assert s.allow_extended_hours is False
         assert s.allow_test_orders is False
         assert s.live_trading_enabled is False
@@ -58,6 +59,13 @@ class TestDefaults:
         s = load_config(env_file=None)
         assert s.anthropic_api_key == ""
 
+    def test_anthropic_model_defaults(self, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_FAST_MODEL", raising=False)
+        monkeypatch.delenv("ANTHROPIC_STRONG_MODEL", raising=False)
+        s = load_config(env_file=None)
+        assert s.anthropic_fast_model == "claude-haiku-4-5-20251001"
+        assert s.anthropic_strong_model == "claude-sonnet-4-6"
+
     def test_openai_defaults(self, monkeypatch):
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("OPENAI_FAST_MODEL", raising=False)
@@ -68,10 +76,10 @@ class TestDefaults:
         s = load_config(env_file=None)
         assert s.openai_api_key == ""
         assert s.openai_fast_model == "gpt-5-mini"
-        assert s.openai_strong_model == "gpt-5.2"
-        assert s.codex_fast_model == "gpt-5.5"
+        assert s.openai_strong_model == "gpt-5.5"
+        assert s.codex_fast_model == "gpt-5.4-mini"
         assert s.codex_strong_model == "gpt-5.5"
-        assert s.llm_provider == ""
+        assert s.llm_provider == "codex"
 
     def test_alpaca_defaults(self, monkeypatch):
         monkeypatch.delenv("ALPACA_API_KEY_ID", raising=False)
@@ -140,18 +148,25 @@ class TestEnvOverrides:
         s = load_config(env_file=None)
         assert s.anthropic_api_key == "sk-ant-test"
 
+    def test_anthropic_model_overrides(self, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_FAST_MODEL", "claude-haiku-4-5-20251001")
+        monkeypatch.setenv("ANTHROPIC_STRONG_MODEL", "claude-sonnet-4-6")
+        s = load_config(env_file=None)
+        assert s.anthropic_fast_model == "claude-haiku-4-5-20251001"
+        assert s.anthropic_strong_model == "claude-sonnet-4-6"
+
     def test_openai_overrides(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-test")
         monkeypatch.setenv("OPENAI_FAST_MODEL", "gpt-5-nano")
-        monkeypatch.setenv("OPENAI_STRONG_MODEL", "gpt-5.2")
-        monkeypatch.setenv("CODEX_FAST_MODEL", "gpt-5.5")
+        monkeypatch.setenv("OPENAI_STRONG_MODEL", "gpt-5.5")
+        monkeypatch.setenv("CODEX_FAST_MODEL", "gpt-5.4-mini")
         monkeypatch.setenv("CODEX_STRONG_MODEL", "gpt-5.5")
         monkeypatch.setenv("LLM_PROVIDER", "codex")
         s = load_config(env_file=None)
         assert s.openai_api_key == "sk-openai-test"
         assert s.openai_fast_model == "gpt-5-nano"
-        assert s.openai_strong_model == "gpt-5.2"
-        assert s.codex_fast_model == "gpt-5.5"
+        assert s.openai_strong_model == "gpt-5.5"
+        assert s.codex_fast_model == "gpt-5.4-mini"
         assert s.codex_strong_model == "gpt-5.5"
         assert s.llm_provider == "codex"
 
@@ -179,7 +194,7 @@ def test_equity_defaults_present():
     assert cfg.equity_max_price_age_days == 7
     assert cfg.equity_provider_timeout_seconds == 10
     assert cfg.equity_provider_retries == 1
-    assert cfg.equity_runner_max_runtime_seconds == 600
+    assert cfg.equity_runner_max_runtime_seconds == 1800
     assert cfg.equity_runner_max_provider_failures == 20
     assert cfg.equity_runner_max_llm_failures == 5
     assert cfg.equity_runner_dry_run is False

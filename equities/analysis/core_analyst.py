@@ -1,6 +1,6 @@
 """Core DCA analyst — risk-officer check before accumulating into quality large-caps.
 
-Runs one Sonnet call per candidate. Returns a Recommendation with sleeve=CORE
+Runs one strong-model call per candidate. Returns a Recommendation with sleeve=CORE
 and no stop/take_profit. Approves unless there is a specific near-term risk.
 """
 from __future__ import annotations
@@ -21,20 +21,19 @@ from equities.data.fundamentals import FundamentalsProvider
 from equities.screen.quality_screen import QualityCandidate
 from equities.strategy import Recommendation, Sleeve
 
-_SONNET = "claude-sonnet-4-6"
+_SONNET = "strong"
 _CORE_DCA_COST = 0.008
 
 
 class CoreDCAAnalyst:
-    """Sonnet risk-officer pass for core DCA candidates.
+    """Strong-model risk-officer pass for core DCA candidates.
 
     For each QualityCandidate:
       - Fetch recent news headlines
-      - Ask Sonnet: any specific reason to wait?
+      - Ask the strong model: any specific reason to wait?
       - "wait" → skip; "dca" → open a small position
 
-    When `llm` is None, uses OpenAI if OPENAI_API_KEY is set, otherwise Claude
-    CLI fallback.
+    When `llm` is None, uses the default LLM client.
     """
 
     def __init__(

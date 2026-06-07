@@ -50,7 +50,7 @@ class ThesisHealth:
 
 
 class ThesisHealthChecker:
-    _HAIKU = "claude-haiku-4-5-20251001"
+    _HAIKU = "fast"
 
     def __init__(self, llm: LLMClient | None = None) -> None:
         if llm is None:

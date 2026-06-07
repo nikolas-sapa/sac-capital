@@ -1,7 +1,8 @@
 """LLM client adapters for the trading bot.
 
-By default this module routes through OpenAI when OPENAI_API_KEY is set.
-It falls back to the Claude Code CLI for backward compatibility.
+By default this module routes through the local Codex CLI. OpenAI API,
+Anthropic SDK, and Claude CLI routes remain available through LLM_PROVIDER
+for compatibility.
 
 Two adapters provided:
   ClaudeCodeClient  — complete(system, user, model) -> LLMResponse
@@ -24,7 +25,7 @@ from pathlib import Path
 @dataclass(frozen=True)
 class LLMResponse:
     content: str
-    input_tokens: int   # estimated (claude -p doesn't report usage)
+    input_tokens: int   # estimated for local CLI providers
     output_tokens: int
 
     def cost_usd(self, model: str = "sonnet") -> float:
@@ -38,13 +39,16 @@ class OpenAIResponsesClient:
     """Call OpenAI Responses API using the same complete() shape as the bot.
 
     Model aliases preserve existing Haiku/Sonnet call sites:
+      - fast   -> OPENAI_FAST_MODEL   or gpt-5-mini
       - haiku  -> OPENAI_FAST_MODEL   or gpt-5-mini
-      - sonnet -> OPENAI_STRONG_MODEL or gpt-5.2
+      - sonnet -> OPENAI_STRONG_MODEL or gpt-5.5
     """
 
     _MODEL_MAP = {
         "claude-haiku-4-5-20251001": "fast",
         "claude-sonnet-4-6": "strong",
+        "fast": "fast",
+        "strong": "strong",
         "haiku": "fast",
         "sonnet": "strong",
     }
@@ -59,7 +63,7 @@ class OpenAIResponsesClient:
         from openai import OpenAI
 
         self._fast_model = fast_model or os.getenv("OPENAI_FAST_MODEL", "gpt-5-mini")
-        self._strong_model = strong_model or os.getenv("OPENAI_STRONG_MODEL", "gpt-5.2")
+        self._strong_model = strong_model or os.getenv("OPENAI_STRONG_MODEL", "gpt-5.5")
         self._client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"), timeout=timeout)
 
     def _map_model(self, model: str) -> str:
@@ -91,6 +95,64 @@ class OpenAIResponsesClient:
         return LLMResponse(content=text.strip(), input_tokens=input_tokens, output_tokens=output_tokens)
 
 
+class AnthropicResponsesClient:
+    """Call Anthropic's SDK using the same complete() shape as the bot.
+
+    Model aliases preserve existing Haiku/Sonnet call sites:
+      - fast   -> ANTHROPIC_FAST_MODEL   or claude-haiku-4-5-20251001
+      - haiku  -> ANTHROPIC_FAST_MODEL   or claude-haiku-4-5-20251001
+      - sonnet -> ANTHROPIC_STRONG_MODEL or claude-sonnet-4-6
+    """
+
+    _MODEL_MAP = {
+        "claude-haiku-4-5-20251001": "fast",
+        "claude-sonnet-4-6": "strong",
+        "fast": "fast",
+        "strong": "strong",
+        "haiku": "fast",
+        "sonnet": "strong",
+    }
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        timeout: int = 180,
+        fast_model: str | None = None,
+        strong_model: str | None = None,
+    ) -> None:
+        from anthropic import Anthropic
+
+        self._fast_model = fast_model or os.getenv("ANTHROPIC_FAST_MODEL", "claude-haiku-4-5-20251001")
+        self._strong_model = strong_model or os.getenv("ANTHROPIC_STRONG_MODEL", "claude-sonnet-4-6")
+        self._client = Anthropic(api_key=api_key or os.getenv("ANTHROPIC_API_KEY"), timeout=timeout)
+
+    def _map_model(self, model: str) -> str:
+        mapped = self._MODEL_MAP.get(model, model)
+        if mapped == "fast":
+            return self._fast_model
+        if mapped == "strong":
+            return self._strong_model
+        return mapped
+
+    def complete(self, system: str, user: str, model: str) -> LLMResponse:
+        mapped = self._map_model(model)
+        resp = self._client.messages.create(
+            model=mapped,
+            max_tokens=2048,
+            system=system,
+            messages=[{"role": "user", "content": user}],
+        )
+        text = resp.content[0].text if resp.content else ""
+        usage = getattr(resp, "usage", None)
+        input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
+        output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+        if input_tokens == 0:
+            input_tokens = (len(system) + len(user)) // 4
+        if output_tokens == 0:
+            output_tokens = len(text) // 4
+        return LLMResponse(content=text.strip(), input_tokens=input_tokens, output_tokens=output_tokens)
+
+
 class CodexCLIClient:
     """Call local Codex CLI non-interactively.
 
@@ -102,6 +164,8 @@ class CodexCLIClient:
     _MODEL_MAP = {
         "claude-haiku-4-5-20251001": "fast",
         "claude-sonnet-4-6": "strong",
+        "fast": "fast",
+        "strong": "strong",
         "haiku": "fast",
         "sonnet": "strong",
     }
@@ -113,7 +177,7 @@ class CodexCLIClient:
         strong_model: str | None = None,
     ) -> None:
         self._timeout = timeout
-        self._fast_model = fast_model or os.getenv("CODEX_FAST_MODEL", "gpt-5.5")
+        self._fast_model = fast_model or os.getenv("CODEX_FAST_MODEL", "gpt-5.4-mini")
         self._strong_model = strong_model or os.getenv("CODEX_STRONG_MODEL", "gpt-5.5")
 
     def _map_model(self, model: str) -> str:
@@ -173,10 +237,11 @@ class ClaudeCodeClient:
     """Backward-compatible client.
 
     Provider selection:
-      - LLM_PROVIDER=codex  -> local Codex CLI / ChatGPT login
-      - LLM_PROVIDER=openai -> OpenAI API (requires OPENAI_API_KEY)
-      - LLM_PROVIDER=claude -> Claude CLI
-      - blank              -> OpenAI API if OPENAI_API_KEY is set, else Claude CLI
+      - LLM_PROVIDER=codex     -> local Codex CLI / ChatGPT login
+      - LLM_PROVIDER=openai    -> OpenAI API (requires OPENAI_API_KEY)
+      - LLM_PROVIDER=claude    -> Claude CLI
+      - LLM_PROVIDER=anthropic -> Anthropic SDK
+      - blank / auto           -> Codex CLI, with Anthropic SDK fallback if configured
 
     Args:
         timeout: Max seconds to wait for a response (default 60).
@@ -185,31 +250,80 @@ class ClaudeCodeClient:
     _MODEL_MAP = {
         "claude-haiku-4-5-20251001": "claude-haiku-4-5-20251001",
         "claude-sonnet-4-6":         "claude-sonnet-4-6",
+        "fast":                      "claude-haiku-4-5-20251001",
+        "strong":                    "claude-sonnet-4-6",
         "haiku":                     "claude-haiku-4-5-20251001",
         "sonnet":                    "claude-sonnet-4-6",
     }
 
-    def __init__(self, timeout: int = 180, provider: str | None = None) -> None:
+    def __init__(
+        self,
+        timeout: int = 180,
+        provider: str | None = None,
+        anthropic_api_key: str | None = None,
+    ) -> None:
         self._timeout = timeout
-        provider = (provider or os.getenv("LLM_PROVIDER", "")).lower()
-        use_openai = provider == "openai" or (provider == "" and bool(os.getenv("OPENAI_API_KEY")))
-        use_codex = provider == "codex"
+        self._provider = (provider or os.getenv("LLM_PROVIDER", "")).lower()
+        use_openai = self._provider == "openai"
+        use_anthropic = self._provider == "anthropic"
+        use_codex = self._provider in {"", "codex", "auto"}
         self._openai: OpenAIResponsesClient | None = None
+        self._anthropic: AnthropicResponsesClient | None = None
         self._codex: CodexCLIClient | None = None
         if use_openai:
             if not os.getenv("OPENAI_API_KEY"):
                 raise RuntimeError("LLM_PROVIDER=openai requires OPENAI_API_KEY")
             self._openai = OpenAIResponsesClient(timeout=timeout)
+        if use_anthropic:
+            if not (anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")):
+                raise RuntimeError("LLM_PROVIDER=anthropic requires ANTHROPIC_API_KEY")
+            self._anthropic = AnthropicResponsesClient(api_key=anthropic_api_key, timeout=timeout)
         if use_codex:
             self._codex = CodexCLIClient(timeout=max(timeout, 300))
+        if self._provider in {"", "codex", "auto", "claude", "openai"} and (anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")):
+            self._anthropic = AnthropicResponsesClient(api_key=anthropic_api_key, timeout=timeout)
+
+    @staticmethod
+    def _should_fallback_to_anthropic(exc: Exception) -> bool:
+        text = f"{exc.__class__.__name__}: {exc}".lower()
+        return any(
+            marker in text
+            for marker in (
+                "insufficient_quota",
+                "quota",
+                "usage limit",
+                "rate limit",
+                "too many requests",
+                "billing",
+                "payment required",
+                "limit reached",
+                "quota exceeded",
+            )
+        )
 
     def complete(self, system: str, user: str, model: str) -> LLMResponse:
         """Send a prompt and return the response."""
         if self._openai is not None:
-            return self._openai.complete(system, user, model)
+            try:
+                return self._openai.complete(system, user, model)
+            except Exception as exc:
+                if self._anthropic is not None and self._should_fallback_to_anthropic(exc):
+                    return self._anthropic.complete(system, user, model)
+                raise
+        if self._provider == "anthropic":
+            if self._anthropic is None:
+                raise RuntimeError("LLM_PROVIDER=anthropic requires ANTHROPIC_API_KEY")
+            return self._anthropic.complete(system, user, model)
         if self._codex is not None:
-            return self._codex.complete(system, user, model)
+            try:
+                return self._codex.complete(system, user, model)
+            except Exception as exc:
+                if self._anthropic is not None and self._should_fallback_to_anthropic(exc):
+                    return self._anthropic.complete(system, user, model)
+                raise
+        return self._complete_with_claude_cli(system, user, model)
 
+    def _complete_with_claude_cli(self, system: str, user: str, model: str) -> LLMResponse:
         mapped = self._MODEL_MAP.get(model, model)
         full_prompt = f"{system}\n\n---\n\n{user}"
 
@@ -229,8 +343,9 @@ class ClaudeCodeClient:
 
         if result.returncode != 0:
             stderr = result.stderr.strip()
+            if self._anthropic is not None and self._should_fallback_to_anthropic(RuntimeError(stderr)):
+                return self._anthropic.complete(system, user, model)
             raise RuntimeError(f"claude -p failed (exit {result.returncode}): {stderr}")
-
 
         text = result.stdout.strip()
         # Rough token estimate (4 chars ≈ 1 token)
@@ -260,13 +375,13 @@ class ClaudeCodeBackend:
 def make_llm_client(api_key: str = "") -> "ClaudeCodeClient":
     """Return an LLM client.
 
-    Provider env vars take precedence. The Anthropic path is retained only for
-    older code that explicitly passes an API key here.
+    Provider env vars take precedence. Defaults to Codex CLI, with Anthropic
+    fallback when configured. Passing *api_key* preserves the older direct
+    Anthropic behavior for legacy call sites.
     """
     provider = os.getenv("LLM_PROVIDER")
     if provider or os.getenv("OPENAI_API_KEY"):
         return ClaudeCodeClient(provider=provider)
     if api_key:
-        from equities.analysis.analyst import AnthropicLLMClient
-        return AnthropicLLMClient(api_key)  # type: ignore[return-value]
+        return ClaudeCodeClient(provider="anthropic", anthropic_api_key=api_key)
     return ClaudeCodeClient()

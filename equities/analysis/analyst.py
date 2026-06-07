@@ -1,8 +1,8 @@
-"""07c — Three-stage equity analyst: Haiku prefilter → Sonnet thesis → Sonnet challenger.
+"""07c — Three-stage equity analyst: fast prefilter → strong thesis → strong challenger.
 
-Stage 1 (Haiku):      Score all candidates cheaply, keep top `max_candidates`.
-Stage 2 (Sonnet):     For each survivor, write bull thesis + entry/stop/TP.
-Stage 3 (Sonnet):     Challenger argues against the bull case; can reject or weaken.
+Stage 1 (fast):       Score all candidates cheaply, keep top `max_candidates`.
+Stage 2 (strong):     For each survivor, write bull thesis + entry/stop/TP.
+Stage 3 (strong):     Challenger argues against the bull case; can reject or weaken.
 
 Daily budget guard prevents runaway spend. When the budget is exhausted,
 remaining candidates are skipped for the day.
@@ -133,8 +133,8 @@ class FilingsSummaryProvider(Protocol):
 # Analyst
 # ---------------------------------------------------------------------------
 
-_HAIKU = "claude-haiku-4-5-20251001"
-_SONNET = "claude-sonnet-4-6"
+_HAIKU = "fast"
+_SONNET = "strong"
 _HAIKU_COST_PER_CANDIDATE = 0.0005
 _SONNET_COST_PER_CANDIDATE = 0.01
 _CHALLENGER_COST = 0.008
@@ -145,15 +145,14 @@ T = TypeVar("T")
 class EquityAnalyst:
     """Three-stage equity analyst: prefilter → bull thesis → challenger.
 
-    Stage 1: Haiku scores all candidates and returns top `max_candidates`.
-    Stage 2: Sonnet writes entry/stop/TP for each surviving candidate.
-    Stage 3: Sonnet challenger argues against the bull case.
+    Stage 1: fast model scores all candidates and returns top `max_candidates`.
+    Stage 2: strong model writes entry/stop/TP for each surviving candidate.
+    Stage 3: strong model challenger argues against the bull case.
               - "reject" → drop the trade
               - "weaken" → reduce confidence by objection delta
               - "pass"   → keep as-is
 
-    When `llm` is None, uses the default LLM client: OpenAI if OPENAI_API_KEY
-    is set, otherwise Claude CLI fallback.
+    When `llm` is None, uses the default LLM client.
     """
 
     def __init__(

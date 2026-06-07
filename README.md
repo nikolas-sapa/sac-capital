@@ -254,9 +254,24 @@ ALPACA_SECRET_KEY=...
 
 The project can route LLM calls through:
 
-- local Codex CLI / ChatGPT login
-- OpenAI API
-- Claude CLI fallback
+- local Codex CLI / ChatGPT login first
+- Anthropic SDK as the programmatic fallback when the primary path is exhausted or fails
+- OpenAI API when explicitly selected with `LLM_PROVIDER=openai`
+- Anthropic SDK when explicitly selected with `LLM_PROVIDER=anthropic`
+- Claude CLI when explicitly selected with `LLM_PROVIDER=claude`
+
+If `ANTHROPIC_API_KEY` is set, the default Codex path can fall back to the
+Anthropic API when the primary provider hits a quota-style failure.
+
+Anthropic uses its own fast/strong model knobs:
+
+- `ANTHROPIC_FAST_MODEL=claude-haiku-4-5-20251001`
+- `ANTHROPIC_STRONG_MODEL=claude-sonnet-4-6`
+
+Model mapping:
+
+- fast tasks use Haiku 4.5
+- reasoning / stronger tasks use Sonnet 4.6
 
 The equity analyst still treats LLM output as untrusted. Parsed outputs must pass typed schema checks before becoming recommendations.
 

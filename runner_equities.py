@@ -639,7 +639,7 @@ async def run_once(
             analyst_count = min(len(swing_candidates), 5)
             await alerts.send(alerts.format_equity_scan(swing_candidates, core_candidates, analyst_count))
 
-        # --- Analyst stage (OpenAI if configured, otherwise Claude CLI fallback) ---
+        # --- Analyst stage (Codex CLI by default; OpenAI/Claude are explicit fallbacks) ---
         budget = DailyBudget(daily_limit_usd=999.0)
         analyst = EquityAnalyst(
             llm=llm_client,
@@ -860,7 +860,7 @@ async def run_once(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Equities paper runner")
-    parser.add_argument("--no-analyse", action="store_true", help="Screen only; skip Claude analyst")
+    parser.add_argument("--no-analyse", action="store_true", help="Screen only; skip LLM analyst")
     parser.add_argument("--mark-only", action="store_true", help="Mark-to-market + exits only")
     parser.add_argument("--reconcile-only", action="store_true", help="Broker reconciliation only")
     parser.add_argument("--dry-run", action="store_true", help="Run without ledger, forward-tracker, or broker writes")

@@ -10,7 +10,7 @@
         <string>/Users/nikolassapalidis/polymarket-bot/.venv/bin/python</string>
         <string>runner.py</string>
         <string>--strategy</string>
-        <string>dummy</string>
+        <string>weather,crypto_updown</string>
     </array>
 
     <key>WorkingDirectory</key>

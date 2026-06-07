@@ -90,8 +90,8 @@ class FakeFilings:
         return ["8-K item 2.02 filed 3d ago"]
 
 
-_HAIKU = "claude-haiku-4-5-20251001"
-_SONNET = "claude-sonnet-4-6"
+_HAIKU = "fast"
+_SONNET = "strong"
 
 _PREFILTER_RESPONSE = json.dumps({
     "rankings": [{"ticker": "ARWR", "score": 8, "reason": "strong catalyst"}]

@@ -108,7 +108,7 @@ def test_checkpoint_store_get_put_clear_and_ignores_malformed_rows(tmp_path):
         key="k1",
         ticker="ARWR",
         stage="analyst",
-        model="claude-sonnet-4-6",
+        model="strong",
         prompt_hash="p1",
         raw_output='{"action":"reject","reason":"test"}',
         parsed_output={"action": "reject", "reason": "test"},
@@ -131,14 +131,14 @@ def test_checkpoint_key_changes_when_prompt_hash_changes():
         ticker="ARWR",
         stage="analyst",
         prompt_hash=stable_hash("prompt one"),
-        model="claude-sonnet-4-6",
+        model="strong",
     )
     key2 = checkpoint_key(
         run_date="2026-01-01",
         ticker="ARWR",
         stage="analyst",
         prompt_hash=stable_hash("prompt two"),
-        model="claude-sonnet-4-6",
+        model="strong",
     )
 
     assert key1 != key2
@@ -241,14 +241,14 @@ def test_schema_invalid_checkpoint_is_ignored_and_rerun(tmp_path):
         ticker="ARWR",
         stage="analyst",
         prompt_hash=stable_hash(prompt),
-        model="claude-sonnet-4-6",
+        model="strong",
     )
     store.put(
         AnalysisCheckpoint(
             key=key,
             ticker="ARWR",
             stage="analyst",
-            model="claude-sonnet-4-6",
+            model="strong",
             prompt_hash=stable_hash(prompt),
             raw_output='{"action":"buy"}',
             parsed_output={"action": "buy"},

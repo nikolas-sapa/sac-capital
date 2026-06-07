@@ -174,6 +174,16 @@ class Ledger:
         ).fetchall()
         return [dict(r) for r in rows]
 
+    def has_open_position(self, condition_id: str, token_id: str) -> bool:
+        """Return True if this market outcome already has an unresolved fill."""
+        row = self._con.execute(
+            "SELECT 1 FROM fills "
+            "WHERE condition_id = ? AND token_id = ? AND resolved = 0 "
+            "LIMIT 1",
+            (condition_id, token_id),
+        ).fetchone()
+        return row is not None
+
     def close(self) -> None:
         """Close the underlying sqlite connection."""
         self._con.close()

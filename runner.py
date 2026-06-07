@@ -79,6 +79,13 @@ async def run_once(
     for strategy in strategies:
         signals = strategy.scan(markets)
         for signal in signals:
+            ledger = getattr(executor, "_ledger", None)
+            if ledger is not None and ledger.has_open_position(
+                signal.market.condition_id,
+                signal.token_id,
+            ):
+                continue
+
             frac = kelly_fraction(signal.fair_prob, signal.price, frac=settings.kelly_fraction)
             if frac <= 0:
                 continue  # no edge — skip, don't force a trade
@@ -160,6 +167,8 @@ async def run_orchestrated(
     # 6. Execute and notify
     results: list[Fill] = []
     for ss in approved:
+        if ledger.has_open_position(ss.signal.market.condition_id, ss.signal.token_id):
+            continue
         fill = executor.place(ss.signal, ss.stake, strategy=ss.strategy)
         results.append(fill)
         if alerts is not None:
@@ -207,7 +216,7 @@ async def main(strategy_names: list[str], mode: str = "simple") -> None:
         if settings.telegram_bot_token:
             alerts = TelegramAlerts(settings.telegram_bot_token, settings.telegram_chat_id)
 
-        if alerts is not None:
+        if alerts is not None and settings.polymarket_scan_alerts:
             await alerts.send(alerts.format_polymarket_scan(len(markets), [s.name for s in strategies]))
 
         if mode == "orchestrated":

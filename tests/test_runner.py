@@ -193,3 +193,25 @@ async def test_run_once_attributes_strategy_name(tmp_path):
     positions = ledger.open_positions()
     assert len(positions) == 1
     assert positions[0]["strategy"] == "dummy"
+
+
+@pytest.mark.asyncio
+async def test_run_once_skips_already_open_market_outcome(tmp_path):
+    """A repeated scan should not reopen or re-alert the same unresolved token."""
+    from runner import run_once
+    from strategies.dummy import DummyStrategy
+
+    settings = _make_settings()
+    ledger = Ledger(tmp_path / "l.db")
+    executor = PaperExecutor(ledger, slippage=0.0, fee_rate=0.0)
+    alerts = MagicMock()
+    alerts.format_fill = MagicMock(return_value="[PAPER FILL] test")
+    alerts.send = AsyncMock()
+
+    first = await run_once([_make_market()], [DummyStrategy()], executor, settings, alerts=alerts)
+    second = await run_once([_make_market()], [DummyStrategy()], executor, settings, alerts=alerts)
+
+    assert len(first) == 1
+    assert second == []
+    assert len(ledger.open_positions()) == 1
+    alerts.send.assert_awaited_once()
