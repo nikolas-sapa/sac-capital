@@ -117,11 +117,38 @@ def main() -> None:
     parser.add_argument("--agent-id", required=True, help="bytes32 agent ID, or a name to sha256 into bytes32")
     parser.add_argument("--limit", type=int, default=1, help="number of commitments to process")
     parser.add_argument("--uri-base", default=os.getenv("PUBLIC_COMMITMENTS_URL", ""))
-    parser.add_argument("--rpc-url", default=os.getenv("MANTLE_RPC_URL", ""))
+    parser.add_argument(
+        "--network",
+        choices=["sepolia", "mainnet"],
+        default="sepolia",
+        help="target network (default: sepolia); sets RPC URL and explorer base unless --rpc-url overrides",
+    )
+    parser.add_argument("--rpc-url", default="", help="override RPC URL (overrides --network default)")
     parser.add_argument("--private-key-env", default="MANTLE_PRIVATE_KEY")
     parser.add_argument("--dry-run", action="store_true", help="print planned transactions without sending")
     parser.add_argument("--send", action="store_true", help="broadcast transactions; required for on-chain writes")
     args = parser.parse_args()
+
+    _network_defaults = {
+        "sepolia": {
+            "rpc_url": "https://rpc.sepolia.mantle.xyz",
+            "explorer_base": "https://sepolia.mantlescan.xyz",
+        },
+        "mainnet": {
+            "rpc_url": "https://rpc.mantle.xyz",
+            "explorer_base": "https://explorer.mantle.xyz",
+        },
+    }
+    network_cfg = _network_defaults[args.network]
+
+    # --rpc-url flag wins; fall back to env var, then network default
+    rpc_url = args.rpc_url or os.getenv("MANTLE_RPC_URL", "") or network_cfg["rpc_url"]
+
+    if args.network == "mainnet":
+        print(
+            "WARNING: mainnet broadcast — double-check contract address and agent ID before confirming.",
+            file=sys.stderr,
+        )
 
     if not ADDRESS_RE.fullmatch(args.contract):
         raise SystemExit("--contract must be a 20-byte hex address")
@@ -132,7 +159,7 @@ def main() -> None:
     agent_id = agent_id_to_bytes32(args.agent_id)
 
     if args.send:
-        if not args.rpc_url:
+        if not rpc_url:
             raise SystemExit("MANTLE_RPC_URL or --rpc-url is required with --send")
         PRIVATE_KEY_RE = re.compile(r"^0x[0-9a-fA-F]{64}$")
         private_key = os.getenv(args.private_key_env, "")
@@ -154,7 +181,7 @@ def main() -> None:
                     agent_id=agent_id,
                     commitment=item,
                     uri=uri,
-                    rpc_url=args.rpc_url,
+                    rpc_url=rpc_url,
                     private_key=private_key,
                 )
             )

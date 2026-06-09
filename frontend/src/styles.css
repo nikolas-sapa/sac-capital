@@ -289,6 +289,221 @@ pre {
   overflow-wrap: anywhere;
 }
 
+/* --- Tabs --- */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #e5e7eb;
+  padding-inline: clamp(20px, 5vw, 72px);
+  margin-top: 24px;
+  background: #ffffff;
+}
+
+.tab {
+  padding: 12px 20px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #6b7280;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab:hover {
+  color: #111827;
+}
+
+.tabActive {
+  color: #111827;
+  border-bottom-color: #111827;
+}
+
+.tabContent {
+  min-height: 480px;
+}
+
+/* --- Search --- */
+.searchRow {
+  margin-bottom: 14px;
+}
+
+.hashSearch {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  color: #111827;
+  background: #f9fafb;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.hashSearch:focus {
+  border-color: #6b7280;
+  background: #ffffff;
+}
+
+/* --- Show more --- */
+.showMore {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px;
+  background: none;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.showMore:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+/* --- Equity card --- */
+.decisionEquity {
+  border-left: 3px solid #111827;
+}
+
+.equityHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.equityTicker {
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.equityStatus {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.statusOpen {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.statusClosed {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+/* --- Performance tab --- */
+.perfSection.padded {
+  padding: clamp(20px, 5vw, 72px);
+  padding-top: 28px;
+}
+
+.perfLoading {
+  padding: 48px clamp(20px, 5vw, 72px);
+  color: #4b5563;
+}
+
+.perfGrid {
+  display: grid;
+  gap: 32px;
+}
+
+.perfStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1px;
+  background: #e5e7eb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.perfStatCard {
+  background: #ffffff;
+  padding: 20px;
+}
+
+.perfStatCard strong {
+  display: block;
+  font-size: 1.65rem;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+
+.perfStatCard span {
+  color: #6b7280;
+  font-size: 0.82rem;
+}
+
+.perfSection h3 {
+  font-size: 1rem;
+  font-weight: 800;
+  margin-bottom: 12px;
+  color: #111827;
+}
+
+.stratTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.stratTable th {
+  text-align: left;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 700;
+  color: #374151;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stratTable td {
+  padding: 9px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #111827;
+}
+
+.stratTable tr:last-child td {
+  border-bottom: none;
+}
+
+.stratTable tbody tr:hover td {
+  background: #f9fafb;
+}
+
+/* --- Utility --- */
+.muted {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.positive {
+  color: #15803d;
+}
+
+.negative {
+  color: #b91c1c;
+}
+
 @media (max-width: 860px) {
   .hero,
   .grid,
