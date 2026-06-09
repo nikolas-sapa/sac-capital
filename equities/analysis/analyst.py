@@ -341,6 +341,8 @@ class EquityAnalyst:
                 snap = self._fundamentals.fetch(ticker)
                 sector = snap.sector
                 analyst_count = snap.analyst_count
+            except (RuntimeError, TimeoutError):
+                raise
             except Exception:
                 pass
 
@@ -401,7 +403,7 @@ class EquityAnalyst:
                 llm_model=_SONNET,
                 prompt=user_msg,
                 raw_output=raw_output if "raw_output" in locals() else "",
-                output_json=raw_data if "raw_data" in locals() else None,
+                output_json=data if "data" in locals() else None,
                 decision="rejected",
                 rejection_reason=f"analyst_output_invalid:{exc}",
             )
@@ -419,7 +421,7 @@ class EquityAnalyst:
                 llm_model=_SONNET,
                 prompt=user_msg,
                 raw_output=raw_output if "raw_output" in locals() else "",
-                output_json=raw_data if "raw_data" in locals() else None,
+                output_json=data if "data" in locals() else None,
                 decision="error",
                 rejection_reason=f"analyst_exception:{exc}",
             )

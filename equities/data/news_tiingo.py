@@ -19,8 +19,11 @@ class TiingoNewsProvider:
             import httpx
             resp = httpx.get(
                 self._BASE,
-                params={"tickers": ticker, "limit": limit, "token": self._key},
-                headers={"Content-Type": "application/json"},
+                params={"tickers": ticker, "limit": limit},
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Token {self._key}",
+                },
                 timeout=8,
             )
             resp.raise_for_status()

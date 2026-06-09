@@ -15,6 +15,7 @@ Fuses enforced:
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -59,6 +60,8 @@ class RiskKernel:
         drawdown_limit_pct: float = 0.15,
         gap_pct: float = _DEFAULT_GAP_PCT,
     ) -> None:
+        if capital <= 0:
+            raise ValueError(f"RiskKernel capital must be positive, got {capital}")
         self.capital = capital
         self.risk_pct = risk_pct
         self.max_positions = max_positions
@@ -162,7 +165,7 @@ class RiskKernel:
             gap_pct=self.gap_pct,
         )
 
-        if shares <= 0:
+        if not math.isfinite(shares) or shares <= 0:
             return SizedRecommendation(recommendation, 0.0, False, "zero_shares_after_sizing")
 
         # --- Max position size cap ---

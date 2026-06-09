@@ -35,7 +35,8 @@ def _get_updates(token: str, offset: int) -> list[dict]:
     except httpx.TimeoutException:
         return []
     except Exception as exc:
-        print(f"getUpdates error: {exc}", flush=True)
+        safe_msg = str(exc).replace(token, "<token>")
+        print(f"getUpdates error: {safe_msg}", flush=True)
         time.sleep(30)
         return []
 
@@ -48,7 +49,8 @@ def _send(token: str, chat_id: str, text: str) -> None:
             timeout=10,
         )
     except Exception as exc:
-        print(f"sendMessage error: {exc}", flush=True)
+        safe_msg = str(exc).replace(token, "<token>")
+        print(f"sendMessage error: {safe_msg}", flush=True)
 
 
 def _register_commands(token: str) -> None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse as _urlparse
 
 import httpx
 
@@ -63,8 +64,12 @@ class AlpacaPaperExecutor:
             raise ValueError("AlpacaPaperExecutor requires ALPACA_PAPER=true")
         if not settings.alpaca_api_key_id or not settings.alpaca_secret_key:
             raise ValueError("Missing Alpaca API credentials")
-        if "paper-api.alpaca.markets" not in settings.alpaca_base_url:
-            raise ValueError("Refusing to use non-paper Alpaca base URL")
+        _parsed = _urlparse(settings.alpaca_base_url)
+        if _parsed.hostname != "paper-api.alpaca.markets":
+            raise ValueError(
+                f"Refusing non-paper Alpaca URL: hostname={_parsed.hostname!r}, "
+                "expected paper-api.alpaca.markets"
+            )
 
         self._base_url = settings.alpaca_base_url.rstrip("/")
         if self._base_url.endswith("/v2"):

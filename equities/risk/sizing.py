@@ -8,6 +8,8 @@ fraction of stop distance so the paper results don't lie. Default 2%.
 """
 from __future__ import annotations
 
+import math
+
 _DEFAULT_GAP_PCT = 0.02  # assume stop fills 2% worse than the stop price on gaps
 
 
@@ -30,6 +32,8 @@ def size_shares(
     Returns:
         Number of shares (float; Revolut supports fractional)
     """
+    if not math.isfinite(entry) or not math.isfinite(stop_loss):
+        raise ValueError(f"size_shares received non-finite value: entry={entry}, stop_loss={stop_loss}")
     if entry <= 0 or stop_loss <= 0 or entry <= stop_loss:
         return 0.0
     if not (0 < risk_pct <= 1):

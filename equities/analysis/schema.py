@@ -13,9 +13,9 @@ class AnalystOutputError(ValueError):
 class AnalystDecision(BaseModel):
     action: Literal["buy", "reject"]
     reason: str = ""
-    entry: float | None = None
-    stop_loss: float | None = None
-    take_profit: float | None = None
+    entry: float | None = Field(default=None, allow_inf_nan=False)
+    stop_loss: float | None = Field(default=None, allow_inf_nan=False)
+    take_profit: float | None = Field(default=None, allow_inf_nan=False)
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     horizon: str = ""
     catalyst: str = ""

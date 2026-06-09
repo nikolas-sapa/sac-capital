@@ -12,8 +12,13 @@ __pycache__/
 
 # Data files
 *.csv
+*.jsonl
+*.log
 /data/
 *.db
+
+# Exploratory spikes
+spike/
 
 # Distribution / packaging
 dist/

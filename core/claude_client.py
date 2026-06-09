@@ -197,6 +197,8 @@ class CodexCLIClient:
         )
         with tempfile.TemporaryDirectory() as tmp:
             out_path = Path(tmp) / "codex-last-message.txt"
+            _CODEX_SAFE_ENV_KEYS = {"PATH", "HOME", "TMPDIR", "TERM", "LANG", "LC_ALL", "USER", "LOGNAME"}
+            safe_env = {k: v for k, v in os.environ.items() if k in _CODEX_SAFE_ENV_KEYS}
             result = subprocess.run(
                 [
                     "codex",
@@ -221,6 +223,8 @@ class CodexCLIClient:
                 text=True,
                 timeout=self._timeout,
                 cwd=tmp,
+                env=safe_env,
+                start_new_session=True,
             )
             if result.returncode != 0:
                 stderr = result.stderr.strip()
@@ -333,12 +337,12 @@ class ClaudeCodeClient:
                 "--setting-sources=",   # don't load global settings → no MCP servers
                 "--strict-mcp-config",  # only use explicitly configured MCP (none)
                 "--permission-mode", "default",
-                full_prompt,
             ],
+            input=full_prompt,
             capture_output=True,
             text=True,
             timeout=self._timeout,
-            stdin=subprocess.DEVNULL,
+            start_new_session=True,
         )
 
         if result.returncode != 0:

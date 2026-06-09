@@ -99,7 +99,12 @@ def cast_command(
 def submit_with_cast(command: list[str]) -> str:
     if shutil.which("cast") is None:
         raise RuntimeError("cast is not installed; install Foundry or run without --send")
-    result = subprocess.run(command, check=True, text=True, capture_output=True)
+    try:
+        result = subprocess.run(command, check=True, text=True, capture_output=True)
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(
+            f"cast send failed (exit {exc.returncode}): {(exc.stderr or '').strip()}"
+        ) from None
     return result.stdout.strip()
 
 
@@ -129,9 +134,12 @@ def main() -> None:
     if args.send:
         if not args.rpc_url:
             raise SystemExit("MANTLE_RPC_URL or --rpc-url is required with --send")
+        PRIVATE_KEY_RE = re.compile(r"^0x[0-9a-fA-F]{64}$")
         private_key = os.getenv(args.private_key_env, "")
         if not private_key:
             raise SystemExit(f"{args.private_key_env} is required with --send")
+        if not PRIVATE_KEY_RE.fullmatch(private_key):
+            raise SystemExit(f"--private-key-env={args.private_key_env} did not resolve to a valid 0x+64hex private key")
     else:
         private_key = ""
 

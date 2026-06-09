@@ -407,7 +407,10 @@ _TERMINAL_LOCAL_ORDER_STATUSES = {"canceled", "expired", "rejected", "void", "cl
 
 
 def _has_active_broker_order(row: dict | None) -> bool:
-    return row is not None and row.get("status") not in _TERMINAL_LOCAL_ORDER_STATUSES
+    if row is None:
+        return False
+    status = row.get("status")
+    return status is not None and status not in _TERMINAL_LOCAL_ORDER_STATUSES
 
 
 async def run_reconcile_only() -> None:
@@ -494,6 +497,14 @@ async def run_once(
     if settings.telegram_bot_token:
         alerts = TelegramAlerts(settings.telegram_bot_token, settings.telegram_chat_id)
 
+    async def _send_alert(text: str) -> None:
+        if alerts is None:
+            return
+        try:
+            await alerts.send(text)
+        except Exception as exc:
+            print(f"  [ALERT] telegram send failed: {exc}")
+
     try:
         # --- Mark-to-market and fire exits ---
         with _stage(stats, "mark_to_market"):
@@ -510,7 +521,7 @@ async def run_once(
                     if alerts is not None and ex.position_id in pre_mark:
                         pos = pre_mark[ex.position_id]
                         portfolio_stats = equity_ledger.portfolio_stats()
-                        await alerts.send(alerts.format_equity_exit(
+                        await _send_alert(alerts.format_equity_exit(
                             ex,
                             ticker=pos["ticker"],
                             entry_price=pos["entry_price"],
@@ -538,8 +549,7 @@ async def run_once(
 
         if mark_only:
             print("Mark-only mode complete.")
-            if alerts is not None:
-                await alerts.send(alerts.format_equity_portfolio(equity_ledger.portfolio_stats()))
+            await _send_alert(alerts.format_equity_portfolio(equity_ledger.portfolio_stats()) if alerts is not None else "")
             return
 
         # --- Macro regime classification ---
@@ -558,7 +568,7 @@ async def run_once(
                 for health in health_checker.check_all(open_swing, news):
                     print(f"  [HEALTH] {health.ticker}: {health.status} -> {health.action} | {health.reason}")
                     if health.action == "exit" and alerts is not None:
-                        await alerts.send(f"Thesis exit signal: {health.ticker} — {health.reason}")
+                        await _send_alert(f"Thesis exit signal: {health.ticker} — {health.reason}")
 
         # --- Thematic concentration check ---
         with _stage(stats, "thematic_concentration"):
@@ -630,14 +640,13 @@ async def run_once(
                 print(f"\nVIX: {current_vix:.1f} | entries_allowed={entries_allowed}")
             if not entries_allowed:
                 print(f"VIX={current_vix:.1f} > 30 — blocking new entries. Running mark-to-market only.")
-                if alerts is not None:
-                    await alerts.send(f"VIX={current_vix:.1f} — new entries blocked today.")
+                await _send_alert(f"VIX={current_vix:.1f} — new entries blocked today.")
                 return
 
         # --- Scan summary alert ---
         if alerts is not None:
             analyst_count = min(len(swing_candidates), 5)
-            await alerts.send(alerts.format_equity_scan(swing_candidates, core_candidates, analyst_count))
+            await _send_alert(alerts.format_equity_scan(swing_candidates, core_candidates, analyst_count))
 
         # --- Analyst stage (Codex CLI by default; OpenAI/Claude are explicit fallbacks) ---
         budget = DailyBudget(daily_limit_usd=999.0)
@@ -695,6 +704,8 @@ async def run_once(
                 return sector_lookup[ticker]
             try:
                 sector_lookup[ticker] = fundamentals_provider.fetch(ticker).sector
+            except (RuntimeError, TimeoutError):
+                raise
             except Exception as exc:
                 print(f"  [PROVIDER] source=yfinance_fundamentals ticker={ticker} error={exc}")
                 sector_lookup[ticker] = ""
@@ -846,12 +857,12 @@ async def run_once(
                         f"stop={rec.stop_loss:.2f} tp={rec.take_profit:.2f}"
                     )
                 if alerts is not None:
-                    await alerts.send(alerts.format_equity_open(rec, fill))
+                    await _send_alert(alerts.format_equity_open(rec, fill))
                 open_positions = equity_ledger.open_positions()
 
         # --- Portfolio summary ---
         if alerts is not None:
-            await alerts.send(alerts.format_equity_portfolio(equity_ledger.portfolio_stats()))
+            await _send_alert(alerts.format_equity_portfolio(equity_ledger.portfolio_stats()))
     finally:
         _print_run_summary(stats, budget, provider_registry=provider_registry)
         equity_ledger.close()

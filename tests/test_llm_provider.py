@@ -49,7 +49,7 @@ def test_anthropic_provider_requires_api_key(monkeypatch):
 def test_codex_cli_writes_and_reads_last_message(monkeypatch):
     calls = {}
 
-    def fake_run(args, input, capture_output, text, timeout, cwd):
+    def fake_run(args, input, capture_output, text, timeout, cwd, env=None, start_new_session=False):
         calls["args"] = args
         calls["input"] = input
         out_idx = args.index("--output-last-message") + 1
