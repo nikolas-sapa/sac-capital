@@ -4,8 +4,8 @@ const BASE_URL =
   process.env.ALPACA_BASE_URL ?? "https://paper-api.alpaca.markets";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const keyId = process.env.ALPACA_KEY_ID;
-  const secret = process.env.ALPACA_SECRET_KEY;
+  const keyId = (process.env.ALPACA_KEY_ID ?? "").trim();
+  const secret = (process.env.ALPACA_SECRET_KEY ?? "").trim();
 
   if (!keyId || !secret) {
     return res.status(503).json({ error: "Alpaca credentials not configured" });
@@ -16,6 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       headers: {
         "APCA-API-KEY-ID": keyId,
         "APCA-API-SECRET-KEY": secret,
+        "Accept": "application/json",
       },
     });
 

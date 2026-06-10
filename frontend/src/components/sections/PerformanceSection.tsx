@@ -86,13 +86,12 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
           <p className="text-[10px] font-mono tracking-widest uppercase text-[#8B8D91] mb-3">
             Unrealized P&amp;L
           </p>
-          <div className={cn("font-black leading-none", pnlPositive ? "text-emerald-400" : "text-red-400")}
-               style={{ fontFamily: "Poppins, sans-serif" }}>
+          <div className={cn(pnlPositive ? "text-emerald-400" : "text-red-400")}>
             <AnimateNumber
               value={Math.abs(totalUnrealized)}
               prefix={totalUnrealized < 0 ? "-$" : "+$"}
               format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
-              className="text-5xl md:text-6xl font-black"
+              className="text-6xl font-semibold tracking-tight"
               duration={600}
             />
           </div>

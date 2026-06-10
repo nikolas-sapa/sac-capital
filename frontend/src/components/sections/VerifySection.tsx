@@ -21,9 +21,10 @@ export function VerifySection({ selected, verifiedHash }: VerifySectionProps) {
   const [copied, setCopied] = useState<"json" | "hash" | null>(null);
 
   const copy = async (text: string, which: "json" | "hash") => {
+    if (copied === which) return;
     await navigator.clipboard.writeText(text);
     setCopied(which);
-    setTimeout(() => setCopied(null), 1200);
+    setTimeout(() => setCopied(null), 10_000);
   };
 
   const jsonStr = selected ? canonicalJson(wrappedPayload(selected)) : "No payload loaded";
@@ -57,9 +58,10 @@ export function VerifySection({ selected, verifiedHash }: VerifySectionProps) {
               </span>
               <button
                 onClick={() => copy(jsonStr, "json")}
-                className="flex items-center gap-1.5 text-[10px] font-mono text-[#8B8D91] hover:text-[#F3F2EE] transition-colors"
+                disabled={copied === "json"}
+                className="flex items-center gap-1.5 text-[10px] font-mono transition-colors disabled:pointer-events-none text-[#8B8D91] hover:text-[#F3F2EE] disabled:text-emerald-400"
               >
-                <Copy className="size-3" />
+                {copied === "json" ? <CheckCircle className="size-3" /> : <Copy className="size-3" />}
                 {copied === "json" ? "Copied!" : "Copy"}
               </button>
             </div>
@@ -88,9 +90,10 @@ export function VerifySection({ selected, verifiedHash }: VerifySectionProps) {
                 {verifiedHash && (
                   <button
                     onClick={() => copy(verifiedHash, "hash")}
-                    className="shrink-0 text-[#8B8D91] hover:text-[#F3F2EE] transition-colors"
+                    disabled={copied === "hash"}
+                    className="shrink-0 transition-colors disabled:pointer-events-none text-[#8B8D91] hover:text-[#F3F2EE] disabled:text-emerald-400"
                   >
-                    <Copy className="size-3.5" />
+                    {copied === "hash" ? <CheckCircle className="size-3.5" /> : <Copy className="size-3.5" />}
                   </button>
                 )}
               </div>
