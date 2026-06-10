@@ -22,40 +22,50 @@ const flowSteps = ["Bot", "JSONL", "bytes32", "Mantle", "Verify"];
 export function HeroSection() {
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0B0B0D]">
-      {/* ShaderGradient sphere — hero-ai-infrastructure style, warm palette */}
+      {/* ShaderGradient — hero-digital-success exact settings */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <ShaderGradientCanvas
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+          style={{ position: "absolute", top: 0, left: 0, width: "100vw", height: "100vh" }}
           pixelDensity={1}
-          fov={45}
+          pointerEvents="none"
         >
           <ShaderGradient
             type="sphere"
             animate="on"
+            wireframe={false}
+            shader="defaults"
+            uTime={0}
             uSpeed={0.3}
-            uStrength={1.5}
+            uStrength={0.3}
             uDensity={0.8}
             uFrequency={5.5}
-            uAmplitude={1}
-            positionX={0}
+            uAmplitude={3.2}
+            positionX={-0.1}
             positionY={0}
             positionZ={0}
             rotationX={0}
             rotationY={130}
             rotationZ={70}
-            color1="#1a0805"
-            color2="#E55A1C"
-            color3="#0B0B0D"
-            wireframe={false}
-            envPreset="city"
-            lightType="3d"
+            color1="#92dbe0"
+            color2="#0b7bff"
+            color3="#3865cf"
             reflection={0.4}
-            brightness={1.1}
+            cAzimuthAngle={270}
+            cPolarAngle={180}
+            cDistance={0.5}
+            cameraZoom={15.1}
+            lightType="env"
+            brightness={0.8}
+            envPreset="city"
             grain="on"
+            toggleAxis={false}
+            zoomOut={false}
+            hoverState=""
+            enableTransition={false}
           />
         </ShaderGradientCanvas>
         {/* Dark vignette so text stays readable */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_50%,transparent_20%,rgba(11,11,13,0.75)_70%,#0B0B0D_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_50%,transparent_20%,rgba(11,11,13,0.72)_70%,#0B0B0D_100%)]" />
       </div>
 
       {/* Content */}
@@ -82,7 +92,7 @@ export function HeroSection() {
         <motion.h1
           variants={itemVariant}
           className="text-[clamp(3rem,9vw,8rem)] font-bold leading-[0.92] tracking-[-0.04em] text-white mb-6"
-          style={{ fontFamily: "Bricolage Grotesque, sans-serif" }}
+          style={{ fontFamily: "Poppins, sans-serif" }}
         >
           Every AI decision.
           <br />

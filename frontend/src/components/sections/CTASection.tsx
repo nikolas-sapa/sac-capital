@@ -41,7 +41,7 @@ export function CTASection() {
 
           <h2
             className="text-4xl md:text-6xl font-black text-[#F3F2EE] leading-tight mb-6"
-            style={{ fontFamily: "Bricolage Grotesque, sans-serif" }}
+            style={{ fontFamily: "Poppins, sans-serif" }}
           >
             Verify it yourself.
           </h2>
