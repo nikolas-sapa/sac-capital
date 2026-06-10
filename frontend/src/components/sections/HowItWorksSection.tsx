@@ -58,13 +58,13 @@ function StackedCard({ step, index }: { step: Step; index: number }) {
         style={{ zIndex: index + 1 }}
       >
         {/* Top edge glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-px bg-gradient-to-r from-transparent via-[rgba(229,90,28,0.4)] to-transparent" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-px bg-gradient-to-r from-transparent via-[rgba(11,123,255,0.4)] to-transparent" />
 
         <div className="flex items-start gap-6">
           {/* Icon block */}
           <div className="shrink-0 flex flex-col items-center gap-3">
-            <div className="w-12 h-12 rounded-[12px] border border-[rgba(229,90,28,0.2)] bg-[rgba(229,90,28,0.06)] flex items-center justify-center">
-              <Icon className="size-5 text-[#E55A1C]" />
+            <div className="w-12 h-12 rounded-[12px] border border-[rgba(11,123,255,0.2)] bg-[rgba(11,123,255,0.06)] flex items-center justify-center">
+              <Icon className="size-5 text-[#0b7bff]" />
             </div>
             <span className="text-[10px] font-mono text-[rgba(243,242,238,0.2)] tracking-widest">
               {step.num}
@@ -99,7 +99,7 @@ export function HowItWorksSection() {
   return (
     <section className="py-24 px-6 bg-[#0B0B0D]">
       <div className="max-w-4xl mx-auto mb-16 text-center">
-        <p className="text-[10px] font-mono tracking-widest uppercase text-[#E55A1C] mb-4">
+        <p className="text-[10px] font-mono tracking-widest uppercase text-[#0b7bff] mb-4">
           How it works
         </p>
         <h2

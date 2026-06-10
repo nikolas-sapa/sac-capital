@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from dataclasses import dataclass
 from datetime import date, timedelta, datetime
 from typing import Protocol, runtime_checkable
+
+
+_USER_AGENT = "polymarket-bot research@example.com"
 
 
 @dataclass(frozen=True)
@@ -22,7 +26,7 @@ class SECEdgarFilings:
 
     _BASE = "https://efts.sec.gov"
     _SUBMISSIONS = "https://data.sec.gov/submissions"
-    _SEARCH = "https://efts.sec.gov/LATEST/search-index"
+    _TICKERS = "https://www.sec.gov/files/company_tickers.json"
 
     def recent(self, ticker: str, days: int = 30) -> list[Filing]:
         import httpx
@@ -66,36 +70,31 @@ class SECEdgarFilings:
         return result
 
     def _cik(self, ticker: str) -> int | None:
-        import httpx
+        return _ticker_to_cik(ticker)
 
-        try:
-            resp = httpx.get(
-                f"https://efts.sec.gov/LATEST/search-index?q=%22{ticker}%22&forms=8-K&dateRange=custom&startdt=2020-01-01&enddt=2020-12-31",
-                headers={"User-Agent": "polymarket-bot research@example.com"},
-                timeout=10,
-            )
-            # Prefer the company search endpoint
-            search = httpx.get(
-                f"https://efts.sec.gov/LATEST/search-index?q=%22{ticker}%22&forms=10-K",
-                headers={"User-Agent": "polymarket-bot research@example.com"},
-                timeout=10,
-            )
-            hits = search.json().get("hits", {}).get("hits", [])
-            if hits:
-                return int(hits[0]["_source"].get("entity_id", 0)) or None
-        except Exception:
-            pass
 
-        # Fallback: company-ticker.json lookup
-        try:
-            resp = httpx.get(
-                "https://www.sec.gov/files/company_tickers.json",
-                headers={"User-Agent": "polymarket-bot research@example.com"},
-                timeout=15,
-            )
-            for entry in resp.json().values():
-                if entry.get("ticker", "").upper() == ticker.upper():
-                    return int(entry["cik_str"])
-        except Exception:
-            pass
-        return None
+@lru_cache(maxsize=1)
+def _company_ticker_map() -> dict[str, int]:
+    import httpx
+
+    try:
+        resp = httpx.get(
+            SECEdgarFilings._TICKERS,
+            headers={"User-Agent": _USER_AGENT},
+            timeout=httpx.Timeout(5.0, connect=2.0, read=3.0, write=2.0, pool=2.0),
+        )
+        resp.raise_for_status()
+        mapping: dict[str, int] = {}
+        for entry in resp.json().values():
+            ticker = str(entry.get("ticker", "")).upper().strip()
+            cik = int(entry.get("cik_str", 0) or 0)
+            if ticker and cik:
+                mapping[ticker] = cik
+        return mapping
+    except Exception:
+        return {}
+
+
+@lru_cache(maxsize=2048)
+def _ticker_to_cik(ticker: str) -> int | None:
+    return _company_ticker_map().get(ticker.upper().strip())

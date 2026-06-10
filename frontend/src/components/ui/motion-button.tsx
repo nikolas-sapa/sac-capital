@@ -19,7 +19,7 @@ const MotionButton: FC<Props> = ({ label, classes, onClick }) => {
       )}
     >
       <span
-        className="block h-12 w-12 overflow-hidden rounded-full bg-[#E55A1C] duration-500 group-hover:w-full"
+        className="block h-12 w-12 overflow-hidden rounded-full bg-[#0b7bff] duration-500 group-hover:w-full"
         aria-hidden="true"
       />
       <div className="absolute top-1/2 left-4 translate-x-0 -translate-y-1/2 duration-500 group-hover:translate-x-[0.4rem]">

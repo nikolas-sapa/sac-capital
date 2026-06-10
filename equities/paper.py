@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 
 from equities.ledger_equity import EquityLedger
 from equities.risk.exits import ExitSignal, check_exit
@@ -37,10 +37,12 @@ class EquityPaperTracker:
         self,
         ledger: EquityLedger,
         prices: Any,
+        price_fallback: Callable[[str], float | None] | None = None,
         time_stop_days: int = 21,
     ) -> None:
         self._ledger = ledger
         self._prices = prices
+        self._price_fallback = price_fallback
         self._time_stop_days = time_stop_days
 
     def open_position(
@@ -77,6 +79,8 @@ class EquityPaperTracker:
                 continue
             ticker = pos["ticker"]
             price = self._prices.latest_close(ticker)
+            if price is None and self._price_fallback is not None:
+                price = self._price_fallback(ticker)
             if price is None:
                 continue
 

@@ -33,7 +33,7 @@ export function VerifySection({ selected, verifiedHash }: VerifySectionProps) {
     <section id="verify" className="py-24 px-6 bg-[#0B0B0D]">
       <div className="max-w-6xl mx-auto">
         <div className="mb-12">
-          <p className="text-[10px] font-mono tracking-widest uppercase text-[#E55A1C] mb-3">
+          <p className="text-[10px] font-mono tracking-widest uppercase text-[#0b7bff] mb-3">
             Verification panel
           </p>
           <h2
@@ -100,7 +100,7 @@ export function VerifySection({ selected, verifiedHash }: VerifySectionProps) {
               <span className="text-[10px] font-mono text-[#8B8D91] uppercase tracking-wider block mb-2">
                 Exported bytes32 (on-chain)
               </span>
-              <code className="text-[11px] font-mono text-[#E55A1C] break-all leading-relaxed">
+              <code className="text-[11px] font-mono text-[#0b7bff] break-all leading-relaxed">
                 {selected?.bytes32 || "pending..."}
               </code>
             </div>

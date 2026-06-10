@@ -50,7 +50,7 @@ export function PerformanceSection({ commitments, perf }: PerformanceSectionProp
     <section id="performance" className="py-24 px-6 bg-[#0B0B0D]">
       <div className="max-w-6xl mx-auto">
         <div className="mb-12">
-          <p className="text-[10px] font-mono tracking-widest uppercase text-[#E55A1C] mb-3">
+          <p className="text-[10px] font-mono tracking-widest uppercase text-[#0b7bff] mb-3">
             Performance summary
           </p>
           <h2
@@ -125,7 +125,7 @@ export function PerformanceSection({ commitments, perf }: PerformanceSectionProp
                     className="border-b border-[rgba(243,242,238,0.04)] last:border-0 hover:bg-[rgba(243,242,238,0.02)]"
                   >
                     <td className="px-6 py-3 font-mono text-[#F3F2EE]">{s.name}</td>
-                    <td className="px-6 py-3 font-mono text-right text-[#E55A1C]">{s.count}</td>
+                    <td className="px-6 py-3 font-mono text-right text-[#0b7bff]">{s.count}</td>
                   </tr>
                 ))}
               </tbody>

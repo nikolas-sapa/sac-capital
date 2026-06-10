@@ -48,11 +48,11 @@ export function NavBar() {
             href="https://explorer.sepolia.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono text-[#E55A1C] border border-[rgba(229,90,28,0.3)] hover:border-[rgba(229,90,28,0.6)] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono text-[#0b7bff] border border-[rgba(11,123,255,0.3)] hover:border-[rgba(11,123,255,0.6)] transition-colors"
           >
             <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E55A1C] opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#E55A1C]" />
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0b7bff] opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#0b7bff]" />
             </span>
             Mantle Live
           </a>

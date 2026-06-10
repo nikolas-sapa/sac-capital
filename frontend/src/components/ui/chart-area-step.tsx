@@ -49,7 +49,7 @@ export default function ChartAreaStep({
   const yTicks = Array.from({ length: 5 }, (_, i) => Math.round((maxValue / 4) * i));
 
   return (
-    <div className="w-full rounded-none border-[3px] border-[rgba(243,242,238,0.12)] bg-[#0B0B0D] p-4 text-[#F3F2EE] shadow-[4px_4px_0_0_#E55A1C]">
+    <div className="w-full rounded-none border-[3px] border-[rgba(243,242,238,0.12)] bg-[#0B0B0D] p-4 text-[#F3F2EE] shadow-[4px_4px_0_0_#0b7bff]">
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-widest text-[#8B8D91] font-mono">{title}</p>
@@ -58,7 +58,7 @@ export default function ChartAreaStep({
         {active && (
           <div className="border-[2px] border-[rgba(243,242,238,0.12)] bg-[#1A1A1E] px-3 py-2 text-right text-[10px] leading-relaxed">
             <span className="block text-[#8B8D91] font-mono">{active.label}</span>
-            <span className="text-[#E55A1C] font-mono font-bold">{active.value}</span>
+            <span className="text-[#0b7bff] font-mono font-bold">{active.value}</span>
           </div>
         )}
       </div>
@@ -92,8 +92,8 @@ export default function ChartAreaStep({
           );
         })}
 
-        <path d={areaPath(data, maxValue)} fill="#E55A1C" opacity="0.15" />
-        <path d={stepPath(data, maxValue)} fill="none" stroke="#E55A1C" strokeWidth="3" strokeLinejoin="miter" strokeLinecap="square" />
+        <path d={areaPath(data, maxValue)} fill="#0b7bff" opacity="0.15" />
+        <path d={stepPath(data, maxValue)} fill="none" stroke="#0b7bff" strokeWidth="3" strokeLinejoin="miter" strokeLinecap="square" />
 
         {data.map((item, index) => {
           const p = pt(index, item.value, data, maxValue);
@@ -109,8 +109,8 @@ export default function ChartAreaStep({
               <line x1={p.x} x2={p.x} y1={PAD.top} y2={HEIGHT - PAD.bottom} stroke="transparent" strokeWidth="46" />
               <rect
                 x={p.x - 7} y={p.y - 7} width="14" height="14"
-                fill={isActive ? "#E55A1C" : "#1A1A1E"}
-                stroke={isActive ? "#E55A1C" : "rgba(243,242,238,0.3)"}
+                fill={isActive ? "#0b7bff" : "#1A1A1E"}
+                stroke={isActive ? "#0b7bff" : "rgba(243,242,238,0.3)"}
                 strokeWidth="2"
               />
             </g>
@@ -130,7 +130,7 @@ export default function ChartAreaStep({
           <g transform={`translate(${Math.min(activePoint.x + 14, WIDTH - 170)} ${Math.max(activePoint.y - 62, 18)})`}>
             <rect width="152" height="46" fill="#0B0B0D" stroke="rgba(243,242,238,0.2)" strokeWidth="2" />
             <text x="12" y="18" fontSize="10" fill="#8B8D91" fontFamily="monospace">{active.label}</text>
-            <text x="12" y="34" fontSize="10" fill="#E55A1C" fontFamily="monospace">Value: {active.value}</text>
+            <text x="12" y="34" fontSize="10" fill="#0b7bff" fontFamily="monospace">Value: {active.value}</text>
           </g>
         )}
       </svg>

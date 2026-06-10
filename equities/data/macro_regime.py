@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from equities.data.yfinance_utils import call_quietly
+
 
 @dataclass(frozen=True)
 class RegimeSnapshot:
@@ -28,7 +30,7 @@ class MacroRegimeGate:
         if self._fetcher is not None:
             return [_as_float(v) for v in self._fetcher(ticker, period)]
         import yfinance as yf
-        data = yf.download(ticker, period=period, progress=False, auto_adjust=True)
+        data = call_quietly(lambda: yf.download(ticker, period=period, progress=False, auto_adjust=True))
         if data.empty:
             return []
         return [_as_float(v) for v in data["Close"].dropna().values.tolist()]

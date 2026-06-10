@@ -1,6 +1,8 @@
 """VIX regime gate — blocks new swing entries during high-fear market regimes."""
 from __future__ import annotations
 
+from equities.data.yfinance_utils import call_quietly
+
 
 class VIXRegimeGate:
     """Fetch current VIX and determine whether new swing entries are permitted.
@@ -14,7 +16,7 @@ class VIXRegimeGate:
     def current_vix(self) -> float | None:
         try:
             import yfinance as yf
-            data = yf.Ticker("^VIX").history(period="2d")
+            data = call_quietly(lambda: yf.Ticker("^VIX").history(period="2d"))
             if data.empty:
                 return None
             return float(data["Close"].iloc[-1])

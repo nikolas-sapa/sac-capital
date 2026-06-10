@@ -30,7 +30,7 @@ function DecisionCard({ item, index }: { item: Commitment; index: number }) {
       className={cn(
         "rounded-[12px] border bg-[#1A1A1E] p-5",
         isEquity
-          ? "border-l-2 border-l-[#E55A1C] border-[rgba(243,242,238,0.06)]"
+          ? "border-l-2 border-l-[#0b7bff] border-[rgba(243,242,238,0.06)]"
           : "border-[rgba(243,242,238,0.06)]"
       )}
       style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "1rem" }}
@@ -49,7 +49,7 @@ function DecisionCard({ item, index }: { item: Commitment; index: number }) {
                 className={cn(
                   "text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-[4px]",
                   p.status === "open"
-                    ? "bg-[rgba(229,90,28,0.1)] text-[#E55A1C]"
+                    ? "bg-[rgba(11,123,255,0.1)] text-[#0b7bff]"
                     : "bg-[rgba(243,242,238,0.06)] text-[#8B8D91]"
                 )}
               >
@@ -135,7 +135,7 @@ export function DecisionsSection({
       <div className="max-w-6xl mx-auto">
         <div className="flex items-end justify-between mb-12 flex-wrap gap-4">
           <div>
-            <p className="text-[10px] font-mono tracking-widest uppercase text-[#E55A1C] mb-3">
+            <p className="text-[10px] font-mono tracking-widest uppercase text-[#0b7bff] mb-3">
               Decision feed
             </p>
             <h2
@@ -154,7 +154,7 @@ export function DecisionsSection({
                 setShowAll(false);
               }}
               placeholder="Filter by hash..."
-              className="pl-9 pr-4 py-2.5 rounded-[8px] border border-[rgba(243,242,238,0.08)] bg-[#1A1A1E] text-sm text-[#F3F2EE] placeholder:text-[#8B8D91] outline-none focus:border-[rgba(229,90,28,0.4)] transition-colors font-mono w-64"
+              className="pl-9 pr-4 py-2.5 rounded-[8px] border border-[rgba(243,242,238,0.08)] bg-[#1A1A1E] text-sm text-[#F3F2EE] placeholder:text-[#8B8D91] outline-none focus:border-[rgba(11,123,255,0.4)] transition-colors font-mono w-64"
             />
           </div>
         </div>
@@ -185,7 +185,7 @@ export function DecisionsSection({
 
           {/* Registry panel */}
           <aside className="rounded-[12px] border border-[rgba(243,242,238,0.06)] bg-[#1A1A1E] p-6 h-fit">
-            <p className="text-[10px] font-mono tracking-widest uppercase text-[#E55A1C] mb-1">
+            <p className="text-[10px] font-mono tracking-widest uppercase text-[#0b7bff] mb-1">
               Mantle registry
             </p>
             <h3
@@ -210,7 +210,7 @@ export function DecisionsSection({
                       href={explorerLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[#E55A1C] hover:underline"
+                      className="text-[#0b7bff] hover:underline"
                     >
                       Mantle Sepolia
                     </a>
@@ -230,7 +230,7 @@ export function DecisionsSection({
               {registryItems.map((ev) => (
                 <div
                   key={`${ev.id}-${ev.decisionHash}`}
-                  className="pl-3 border-l-2 border-[rgba(229,90,28,0.3)] py-1"
+                  className="pl-3 border-l-2 border-[rgba(11,123,255,0.3)] py-1"
                 >
                   <strong className="block text-[10px] font-mono text-[#F3F2EE]">
                     #{ev.id} {shortHash(ev.decisionHash)}

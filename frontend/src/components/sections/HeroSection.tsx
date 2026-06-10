@@ -77,44 +77,36 @@ export function HeroSection() {
       >
         {/* Eyebrow badge */}
         <motion.div variants={itemVariant}>
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[rgba(229,90,28,0.25)] bg-[rgba(11,11,13,0.6)] px-4 py-1.5 backdrop-blur-sm">
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[rgba(11,123,255,0.3)] bg-[rgba(11,11,13,0.6)] px-4 py-1.5 backdrop-blur-sm">
             <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E55A1C] opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#E55A1C]" />
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#92dbe0] opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#92dbe0]" />
             </span>
-            <span className="font-mono tracking-widest uppercase text-[10px] text-[#E55A1C]">
+            <span className="font-mono tracking-widest uppercase text-[10px] text-[#92dbe0]">
               AI Alpha &amp; Data · Mantle Track
             </span>
           </div>
         </motion.div>
 
-        {/* Headline — hero-digital-success scale */}
+        {/* Headline — wave animation: white → orange+blue sweep → dark */}
         <motion.h1
           variants={itemVariant}
-          className="text-[clamp(3rem,9vw,8rem)] font-bold leading-[0.92] tracking-[-0.04em] text-white mb-6"
+          className="hero-wave-text text-[clamp(3rem,9vw,8rem)] font-bold leading-[0.92] tracking-[-0.04em] mb-6"
           style={{ fontFamily: "Poppins, sans-serif" }}
         >
           Every AI decision.
           <br />
-          <span
-            className="text-transparent bg-clip-text"
-            style={{
-              backgroundImage:
-                "linear-gradient(90deg, #E55A1C 0%, #ff8a50 50%, #E55A1C 100%)",
-            }}
-          >
-            Anchored on Mantle.
-          </span>
+          Anchored on Mantle.
         </motion.h1>
 
         {/* Subline */}
         <motion.p
           variants={itemVariant}
-          className="text-neutral-400 text-lg md:text-xl max-w-2xl leading-relaxed mb-12 font-light"
+          className="text-neutral-200 text-lg md:text-xl max-w-2xl leading-relaxed mb-12 font-light"
           style={{ fontFamily: "DM Sans, sans-serif" }}
         >
           Deterministic{" "}
-          <code className="font-mono text-[#E55A1C] text-sm bg-[rgba(229,90,28,0.1)] px-1.5 py-0.5 rounded">
+          <code className="font-mono text-[#92dbe0] text-sm bg-[rgba(146,219,224,0.1)] px-1.5 py-0.5 rounded">
             bytes32
           </code>{" "}
           commitments from every trade decision. Judges verify on-chain. Zero custody.
@@ -149,8 +141,8 @@ export function HeroSection() {
           {flowSteps.map((step, i) => (
             <div key={step} className="flex items-center gap-3">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] border border-[rgba(255,255,255,0.08)] bg-[rgba(11,11,13,0.7)] backdrop-blur-md">
-                {i === 3 && <Shield className="size-3 text-[#E55A1C]" />}
-                <span className={i === 3 ? "text-[#E55A1C]" : "text-neutral-400"}>{step}</span>
+                {i === 3 && <Shield className="size-3 text-[#0b7bff]" />}
+                <span className={i === 3 ? "text-[#0b7bff]" : "text-neutral-400"}>{step}</span>
               </div>
               {i < flowSteps.length - 1 && (
                 <span className="text-[rgba(255,255,255,0.15)]">→</span>

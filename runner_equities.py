@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import inspect
+import socket
 import sys
 import time
 from contextlib import contextmanager
@@ -413,6 +414,14 @@ def _has_active_broker_order(row: dict | None) -> bool:
     return status is not None and status not in _TERMINAL_LOCAL_ORDER_STATUSES
 
 
+def _host_resolves(hostname: str) -> bool:
+    try:
+        socket.getaddrinfo(hostname, 443)
+        return True
+    except OSError:
+        return False
+
+
 async def run_reconcile_only() -> None:
     """Run broker reconciliation when a reconciler implementation is present."""
     settings = load_config()
@@ -490,20 +499,39 @@ async def run_once(
     filings_summary = _FilingsSummaryAdapter(filings_client, failure_callback=record_provider_failure)
     llm_client = _LLMFailureCountingClient(ClaudeCodeClient(), stats)
 
-    paper = EquityPaperTracker(equity_ledger, prices)
+    def fallback_mark_price(ticker: str) -> float | None:
+        for pos in equity_ledger.open_positions():
+            if pos.get("ticker") != ticker:
+                continue
+            mark_price = pos.get("mark_price")
+            if mark_price is not None:
+                return float(mark_price)
+            entry_price = pos.get("entry_price")
+            if entry_price is not None:
+                return float(entry_price)
+        return None
+
+    paper = EquityPaperTracker(
+        equity_ledger,
+        prices,
+        price_fallback=fallback_mark_price,
+    )
     alpaca_executor = _make_alpaca_executor(settings)
 
     alerts: TelegramAlerts | None = None
-    if settings.telegram_bot_token:
+    alerts_disabled = False
+    if settings.telegram_bot_token and _host_resolves("api.telegram.org"):
         alerts = TelegramAlerts(settings.telegram_bot_token, settings.telegram_chat_id)
 
     async def _send_alert(text: str) -> None:
-        if alerts is None:
+        nonlocal alerts_disabled
+        if alerts is None or alerts_disabled or not text:
             return
         try:
             await alerts.send(text)
         except Exception as exc:
             print(f"  [ALERT] telegram send failed: {exc}")
+            alerts_disabled = True
 
     try:
         # --- Mark-to-market and fire exits ---

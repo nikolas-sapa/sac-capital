@@ -1,6 +1,8 @@
 """YFinance-backed news provider for the equity analyst pipeline."""
 from __future__ import annotations
 
+from equities.data.yfinance_utils import call_quietly
+
 try:
     import yfinance as yf
 except ImportError:  # pragma: no cover
@@ -14,7 +16,7 @@ class YFinanceNewsProvider:
         if yf is None:
             return []
         try:
-            news = yf.Ticker(ticker).news or []
+            news = call_quietly(lambda: yf.Ticker(ticker).news) or []
             results: list[str] = []
             for n in news[:limit]:
                 content = n.get("content", {})

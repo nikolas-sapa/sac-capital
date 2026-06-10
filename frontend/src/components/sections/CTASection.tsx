@@ -20,7 +20,7 @@ export function CTASection() {
           <Suspense fallback={null}>
             <Dithering
               colorBack="#00000000"
-              colorFront="#E55A1C"
+              colorFront="#0b7bff"
               shape="warp"
               type="4x4"
               speed={isHovered ? 0.6 : 0.2}
@@ -31,10 +31,10 @@ export function CTASection() {
         </div>
 
         <div className="relative z-10 text-center px-6 max-w-3xl mx-auto flex flex-col items-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[rgba(229,90,28,0.2)] bg-[rgba(229,90,28,0.06)] px-4 py-1.5 text-[10px] font-mono text-[#E55A1C] uppercase tracking-widest">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[rgba(11,123,255,0.2)] bg-[rgba(11,123,255,0.06)] px-4 py-1.5 text-[10px] font-mono text-[#0b7bff] uppercase tracking-widest">
             <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E55A1C] opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#E55A1C]" />
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0b7bff] opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#0b7bff]" />
             </span>
             Deployed on Mantle Sepolia
           </div>
@@ -54,7 +54,7 @@ export function CTASection() {
             href="https://explorer.sepolia.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887"
             target="_blank"
             rel="noopener noreferrer"
-            className="group inline-flex h-12 items-center gap-3 rounded-full bg-[#E55A1C] px-8 text-sm font-bold text-white transition-all duration-300 hover:bg-[#C94A12] hover:scale-105 active:scale-95"
+            className="group inline-flex h-12 items-center gap-3 rounded-full bg-[#0b7bff] px-8 text-sm font-bold text-white transition-all duration-300 hover:bg-[#0060d9] hover:scale-105 active:scale-95"
           >
             View on Mantle Explorer
             <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" />

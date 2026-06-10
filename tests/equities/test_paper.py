@@ -33,6 +33,21 @@ class FakePrices:
         return self._prices.get(ticker)
 
 
+def test_mark_uses_fallback_price_when_live_price_missing(tmp_path):
+    ledger = EquityLedger(tmp_path / "e.db")
+    tracker = EquityPaperTracker(
+        ledger,
+        FakePrices({}),
+        price_fallback=lambda ticker: 79.0 if ticker == "ARWR" else None,
+        time_stop_days=100,
+    )
+    tracker.open_position(_rec("ARWR", entry=74.0, stop=68.0, tp=120.0), shares=2.0, fill_price=74.0)
+    tracker.mark_and_check_exits()
+    pos = ledger.open_positions()[0]
+    assert pos["mark_price"] == pytest.approx(79.0)
+    assert pos["unrealized_pnl"] == pytest.approx((79.0 - 74.0) * 2.0)
+
+
 def test_open_position_recorded(tmp_path):
     ledger = EquityLedger(tmp_path / "e.db")
     tracker = EquityPaperTracker(ledger, FakePrices({"ARWR": 74.0}))

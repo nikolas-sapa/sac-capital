@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Protocol, runtime_checkable
 
+from equities.data.yfinance_utils import call_quietly
+
 
 @dataclass(frozen=True)
 class EarningsSnapshot:
@@ -23,7 +25,7 @@ class YFinanceCalendar:
     def fetch(self, ticker: str) -> EarningsSnapshot:
         import yfinance as yf
 
-        t = yf.Ticker(ticker)
+        t = call_quietly(lambda: yf.Ticker(ticker))
         next_date = self._next_date(t)
         last_surprise = self._last_surprise(t)
         return EarningsSnapshot(
@@ -34,7 +36,7 @@ class YFinanceCalendar:
 
     def _next_date(self, t: object) -> date | None:
         try:
-            cal = t.calendar  # type: ignore[attr-defined]
+            cal = call_quietly(lambda: t.calendar)  # type: ignore[attr-defined]
             if cal is None:
                 return None
             # yfinance ≥0.2: calendar is a dict with 'Earnings Date' key
@@ -55,7 +57,7 @@ class YFinanceCalendar:
 
     def _last_surprise(self, t: object) -> float | None:
         try:
-            history = t.earnings_history  # type: ignore[attr-defined]
+            history = call_quietly(lambda: t.earnings_history)  # type: ignore[attr-defined]
             if history is not None and not history.empty:
                 col = [c for c in history.columns if "surprise" in str(c).lower()]
                 if col:

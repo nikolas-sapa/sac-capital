@@ -7,6 +7,7 @@ from typing import Protocol, runtime_checkable
 import yfinance as yf
 
 from core.assets.bar import Bar, PriceSeries
+from equities.data.yfinance_utils import call_quietly
 
 
 @runtime_checkable
@@ -27,13 +28,17 @@ class YFinancePriceFeed:
             started = time.monotonic()
             try:
                 try:
-                    df = yf.Ticker(ticker).history(
-                        period=period,
-                        interval=interval,
-                        timeout=self._timeout,
+                    df = call_quietly(
+                        lambda: yf.Ticker(ticker).history(
+                            period=period,
+                            interval=interval,
+                            timeout=self._timeout,
+                        )
                     )
                 except TypeError:
-                    df = yf.Ticker(ticker).history(period=period, interval=interval)
+                    df = call_quietly(
+                        lambda: yf.Ticker(ticker).history(period=period, interval=interval)
+                    )
                 duration = time.monotonic() - started
                 print(
                     f"  [PROVIDER] source=yfinance_history ticker={ticker} "
