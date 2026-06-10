@@ -31,11 +31,8 @@ export function NavBar() {
         {/* Left spacer — balances the right badge so links stay centered */}
         <div className="hidden md:flex flex-1" />
 
-        {/* Desktop links — hidden when pill is narrow to avoid overlap */}
-        <ul className={cn(
-          "hidden md:flex items-center gap-1 transition-all duration-200",
-          scrolled ? "opacity-0 pointer-events-none w-0 overflow-hidden" : ""
-        )}>
+        {/* Desktop links */}
+        <ul className="hidden md:flex items-center gap-1">
           {navLinks.map((link) => (
             <li key={link.href}>
               <a

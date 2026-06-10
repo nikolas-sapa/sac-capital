@@ -131,56 +131,20 @@ export function DecisionsSection({ positions }: DecisionsSectionProps) {
   const displayed = showAll ? visible : visible.slice(0, INITIAL_COUNT);
   const hiddenCount = visible.length - INITIAL_COUNT;
 
-  const totalUnrealized = positions
-    .filter((p) => p.status === "open")
-    .reduce((s, p) => s + (p.unrealized_pnl ?? 0), 0);
-
-  const totalRealized = positions
-    .filter((p) => p.status === "closed")
-    .reduce((s, p) => s + (p.realized_pnl ?? 0), 0);
-
   return (
     <section id="decisions" className="py-24 px-6 bg-[#0B0B0D]">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-          <div>
-            <p className="text-[10px] font-mono tracking-widest uppercase text-[#0b7bff] mb-3">
-              Alpaca Paper Portfolio
-            </p>
-            <h2
-              className="text-4xl font-black text-[#F3F2EE]"
-              style={{ fontFamily: "Poppins, sans-serif" }}
-            >
-              Stock Positions
-            </h2>
-          </div>
-
-          {/* Summary stats */}
-          <div className="flex gap-6">
-            <div className="text-right">
-              <p className="text-[10px] font-mono text-[#8B8D91] uppercase tracking-wider mb-1">Unrealized</p>
-              <div className={cn("text-xl font-bold font-mono", pnlColor(totalUnrealized))}>
-                <AnimateNumber
-                  value={Math.abs(totalUnrealized)}
-                  prefix={totalUnrealized < 0 ? "-$" : "+$"}
-                  format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
-                  className="text-xl font-bold"
-                />
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] font-mono text-[#8B8D91] uppercase tracking-wider mb-1">Realized</p>
-              <div className={cn("text-xl font-bold font-mono", pnlColor(totalRealized))}>
-                <AnimateNumber
-                  value={Math.abs(totalRealized)}
-                  prefix={totalRealized < 0 ? "-$" : "+$"}
-                  format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
-                  className="text-xl font-bold"
-                />
-              </div>
-            </div>
-          </div>
+        <div className="mb-10">
+          <p className="text-[10px] font-mono tracking-widest uppercase text-[#0b7bff] mb-3">
+            Alpaca Paper Portfolio
+          </p>
+          <h2
+            className="text-4xl font-black text-[#F3F2EE]"
+            style={{ fontFamily: "Poppins, sans-serif" }}
+          >
+            Stock Positions
+          </h2>
         </div>
 
         {/* Filter tabs */}

@@ -45,12 +45,27 @@ export default function App() {
       .catch(() => {});
   }, []);
 
-  // Alpaca equity positions
+  // Alpaca equity positions — live API with static fallback
   useEffect(() => {
-    fetch("/equity_positions.json")
-      .then((r) => r.json())
-      .then((data: EquityPosition[]) => setPositions(data))
-      .catch(() => {});
+    async function loadPositions() {
+      try {
+        const r = await fetch("/api/positions");
+        if (r.ok) {
+          const data: EquityPosition[] = await r.json();
+          setPositions(data);
+          return;
+        }
+      } catch {}
+      // fallback to static snapshot
+      try {
+        const r = await fetch("/equity_positions.json");
+        if (r.ok) setPositions(await r.json());
+      } catch {}
+    }
+
+    loadPositions();
+    const id = setInterval(loadPositions, 30_000);
+    return () => clearInterval(id);
   }, []);
 
   // Performance summary
