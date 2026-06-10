@@ -102,7 +102,7 @@ export function HeroSection() {
         {/* Subline */}
         <motion.p
           variants={itemVariant}
-          className="text-neutral-200 text-lg md:text-xl max-w-2xl leading-relaxed mb-12 font-light"
+          className="hero-subheading text-lg md:text-xl max-w-2xl leading-relaxed mb-12 font-light"
           style={{ fontFamily: "DM Sans, sans-serif" }}
         >
           Deterministic{" "}

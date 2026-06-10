@@ -18,10 +18,22 @@ export function PerformanceSection({ commitments, perf }: PerformanceSectionProp
       const date = ts.slice(5, 10);
       groups[date] = (groups[date] || 0) + 1;
     }
-    return Object.entries(groups)
+    const real = Object.entries(groups)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .slice(-8)
       .map(([label, value]) => ({ label, value }));
+    if (real.length < 2) {
+      const pad: { label: string; value: number }[] = [];
+      for (let i = 7; i >= 1; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        pad.push({ label: `${mm}-${dd}`, value: 0 });
+      }
+      return [...pad, ...real];
+    }
+    return real;
   }, [commitments]);
 
   const eq = perf?.equity_trades;
@@ -92,7 +104,7 @@ export function PerformanceSection({ commitments, perf }: PerformanceSectionProp
           </div>
         )}
 
-        {chartData.length > 1 ? (
+        {chartData.length > 0 ? (
           <ChartAreaStep data={chartData} title="Decisions" subtitle="Anchored decisions by date" />
         ) : (
           <div className="rounded-[12px] border border-[rgba(243,242,238,0.06)] bg-[#1A1A1E] p-8 text-center">

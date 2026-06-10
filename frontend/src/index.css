@@ -31,6 +31,16 @@
 * { box-sizing: border-box; }
 body { margin: 0; }
 
+@keyframes subheading-reveal {
+  0%   { color: rgba(146, 219, 224, 0.9); }
+  60%  { color: rgba(146, 219, 224, 0.6); }
+  100% { color: rgba(229, 229, 229, 0.85); }
+}
+
+.hero-subheading {
+  animation: subheading-reveal 2s ease-out 1.8s 1 both;
+}
+
 @keyframes hero-wave {
   from { background-position: 100% center; }
   to   { background-position: -100% center; }
