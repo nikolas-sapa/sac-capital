@@ -2,9 +2,9 @@
 
 **Track:** AI Alpha & Data
 **Demo:** https://sapa-fund.vercel.app
-**Contract (Mantle Sepolia):** `0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
-**Decision tx:** `0x94ac5787a23f472a9d97e3ca435b9dc4818b734e0b3efad9ad2d2fd1251c6076`
-**Explorer:** https://sepolia.mantlescan.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887
+**Contract (Mantle Mainnet):** `0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
+**Deploy tx:** `0x46bbaa02a9e7fd1025f00896c70405978cc3596e04d0559e07c5c1b0cac1222b`
+**Explorer:** https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887
 
 ---
 
