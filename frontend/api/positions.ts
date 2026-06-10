@@ -4,7 +4,7 @@ const BASE_URL =
   process.env.ALPACA_BASE_URL ?? "https://paper-api.alpaca.markets";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const keyId = (process.env.ALPACA_KEY_ID ?? "").trim();
+  const keyId = (process.env.ALPACA_API_KEY_ID ?? process.env.ALPACA_KEY_ID ?? "").trim();
   const secret = (process.env.ALPACA_SECRET_KEY ?? "").trim();
 
   if (!keyId || !secret) {
