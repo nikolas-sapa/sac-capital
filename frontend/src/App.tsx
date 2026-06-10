@@ -96,8 +96,8 @@ export default function App() {
       <HeroSection />
       <StatsBar commitments={commitments} events={events} />
       <HowItWorksSection />
-      <DecisionsSection positions={positions} />
       <PerformanceSection positions={positions} perf={perf} />
+      <DecisionsSection positions={positions} />
       <VerifySection selected={selected} verifiedHash={verifiedHash} />
       <CTASection />
       <footer className="border-t border-[rgba(243,242,238,0.06)] py-8 px-6 text-center">

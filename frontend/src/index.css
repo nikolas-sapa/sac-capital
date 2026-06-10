@@ -36,9 +36,28 @@ body { margin: 0; }
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes subtitle-letter-shimmer {
+  0%   { background-position: 0% center; }
+  50%  { background-position: 100% center; }
+  100% { background-position: 0% center; }
+}
+
 .hero-subheading {
-  color: rgba(229, 229, 229, 0.85);
-  animation: subheading-reveal 1.2s cubic-bezier(0.22, 1, 0.36, 1) 1.6s 1 both;
+  background: linear-gradient(
+    90deg,
+    rgba(220, 220, 220, 0.85) 0%,
+    rgba(146, 219, 224, 1) 25%,
+    rgba(255, 255, 255, 1) 45%,
+    rgba(146, 219, 224, 1) 65%,
+    rgba(220, 220, 220, 0.85) 100%
+  );
+  background-size: 300% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation:
+    subheading-reveal 1.2s cubic-bezier(0.22, 1, 0.36, 1) 1.6s 1 both,
+    subtitle-letter-shimmer 8s ease-in-out 3s infinite;
 }
 
 @keyframes hero-wave {

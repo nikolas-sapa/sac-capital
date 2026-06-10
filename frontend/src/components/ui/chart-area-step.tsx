@@ -4,30 +4,58 @@ type ChartPoint = { label: string; value: number };
 
 const WIDTH = 720;
 const HEIGHT = 360;
-const PAD = { top: 28, right: 28, bottom: 48, left: 46 };
+const PAD = { top: 28, right: 28, bottom: 48, left: 58 };
 
-function pt(index: number, value: number, data: ChartPoint[], maxValue: number) {
+interface Scale {
+  min: number;
+  max: number;
+  range: number;
+}
+
+function makeScale(data: ChartPoint[]): Scale {
+  const vals = data.map((d) => d.value);
+  const raw_min = Math.min(...vals);
+  const raw_max = Math.max(...vals);
+  // Always include 0 in the axis range
+  const min = Math.min(raw_min, 0);
+  const max = Math.max(raw_max, 0);
+  const range = Math.max(max - min, 0.01);
+  const pad = range * 0.15;
+  return { min: min - pad, max: max + pad, range: range + 2 * pad };
+}
+
+function pt(index: number, value: number, data: ChartPoint[], scale: Scale) {
   const iw = WIDTH - PAD.left - PAD.right;
   const ih = HEIGHT - PAD.top - PAD.bottom;
   return {
     x: PAD.left + (iw / Math.max(data.length - 1, 1)) * index,
-    y: PAD.top + ih - (value / maxValue) * ih,
+    y: PAD.top + ih * (1 - (value - scale.min) / scale.range),
   };
 }
 
-function stepPath(data: ChartPoint[], maxValue: number) {
+function zeroY(scale: Scale) {
+  const ih = HEIGHT - PAD.top - PAD.bottom;
+  return PAD.top + ih * (1 - (0 - scale.min) / scale.range);
+}
+
+function stepPath(data: ChartPoint[], scale: Scale) {
   return data
     .map((item, i) => {
-      const p = pt(i, item.value, data, maxValue);
+      const p = pt(i, item.value, data, scale);
       return i === 0 ? `M ${p.x} ${p.y}` : `H ${p.x} V ${p.y}`;
     })
     .join(" ");
 }
 
-function areaPath(data: ChartPoint[], maxValue: number) {
-  const points = data.map((item, i) => pt(i, item.value, data, maxValue));
-  const baseY = HEIGHT - PAD.bottom;
-  return `${stepPath(data, maxValue)} L ${points[points.length - 1].x} ${baseY} H ${points[0].x} Z`;
+function areaPath(data: ChartPoint[], scale: Scale) {
+  const points = data.map((item, i) => pt(i, item.value, data, scale));
+  const baseY = zeroY(scale);
+  return `${stepPath(data, scale)} L ${points[points.length - 1].x} ${baseY} H ${points[0].x} Z`;
+}
+
+function fmtTick(v: number) {
+  if (Math.abs(v) >= 1000) return `$${(v / 1000).toFixed(1)}k`;
+  return `$${v.toFixed(v % 1 === 0 ? 0 : 2)}`;
 }
 
 interface ChartAreaStepProps {
@@ -41,12 +69,20 @@ export default function ChartAreaStep({
   title = "Performance",
   subtitle = "Step Area Chart",
 }: ChartAreaStepProps) {
-  const [activeIndex, setActiveIndex] = React.useState(Math.min(1, data.length - 1));
-  const maxValue = Math.max(...data.map((d) => d.value), 1) * 1.2;
+  const [activeIndex, setActiveIndex] = React.useState(data.length - 1);
+  const scale = makeScale(data);
   const active = data[activeIndex];
-  const activePoint = active ? pt(activeIndex, active.value, data, maxValue) : null;
+  const activePoint = active ? pt(activeIndex, active.value, data, scale) : null;
+  const z = zeroY(scale);
+  const hasNegative = scale.min < 0;
 
-  const yTicks = Array.from({ length: 5 }, (_, i) => Math.round((maxValue / 4) * i));
+  const yTicks = Array.from({ length: 5 }, (_, i) => {
+    return scale.min + (scale.range / 4) * i;
+  });
+
+  // Positive PnL → blue, negative → red
+  const lineColor = (active?.value ?? 0) >= 0 ? "#0b7bff" : "#f87171";
+  const fillColor = (active?.value ?? 0) >= 0 ? "#0b7bff" : "#f87171";
 
   return (
     <div className="w-full rounded-none border-[3px] border-[rgba(243,242,238,0.12)] bg-[#0B0B0D] p-4 text-[#F3F2EE] shadow-[4px_4px_0_0_#0b7bff]">
@@ -58,7 +94,12 @@ export default function ChartAreaStep({
         {active && (
           <div className="border-[2px] border-[rgba(243,242,238,0.12)] bg-[#1A1A1E] px-3 py-2 text-right text-[10px] leading-relaxed">
             <span className="block text-[#8B8D91] font-mono">{active.label}</span>
-            <span className="text-[#0b7bff] font-mono font-bold">{active.value}</span>
+            <span
+              className="font-mono font-bold"
+              style={{ color: active.value >= 0 ? "#0b7bff" : "#f87171" }}
+            >
+              {active.value >= 0 ? "+" : ""}${active.value.toFixed(2)}
+            </span>
           </div>
         )}
       </div>
@@ -73,6 +114,10 @@ export default function ChartAreaStep({
           <pattern id="pixel-grid-dark" width="16" height="16" patternUnits="userSpaceOnUse">
             <path d="M 16 0 L 0 0 0 16" fill="none" stroke="rgba(243,242,238,0.04)" strokeWidth="2" />
           </pattern>
+          <linearGradient id="area-gradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={fillColor} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={fillColor} stopOpacity="0.02" />
+          </linearGradient>
         </defs>
 
         <rect
@@ -82,22 +127,44 @@ export default function ChartAreaStep({
           fill="url(#pixel-grid-dark)"
         />
 
-        {yTicks.map((tick) => {
-          const y = pt(0, tick, data, maxValue).y;
+        {/* Y axis ticks */}
+        {yTicks.map((tick, i) => {
+          const y = pt(0, tick, data, scale).y;
           return (
-            <g key={tick}>
-              <line x1={PAD.left} x2={WIDTH - PAD.right} y1={y} y2={y} stroke="rgba(243,242,238,0.08)" strokeDasharray="8 8" />
-              <text x={PAD.left - 14} y={y + 4} textAnchor="end" fontSize="10" fill="#8B8D91">{tick}</text>
+            <g key={i}>
+              <line x1={PAD.left} x2={WIDTH - PAD.right} y1={y} y2={y}
+                stroke="rgba(243,242,238,0.07)" strokeDasharray="6 6" />
+              <text x={PAD.left - 6} y={y + 4} textAnchor="end" fontSize="9" fill="#8B8D91">
+                {fmtTick(tick)}
+              </text>
             </g>
           );
         })}
 
-        <path d={areaPath(data, maxValue)} fill="#0b7bff" opacity="0.15" />
-        <path d={stepPath(data, maxValue)} fill="none" stroke="#0b7bff" strokeWidth="3" strokeLinejoin="miter" strokeLinecap="square" />
+        {/* Zero baseline */}
+        {hasNegative && (
+          <line
+            x1={PAD.left} x2={WIDTH - PAD.right}
+            y1={z} y2={z}
+            stroke="rgba(243,242,238,0.25)" strokeWidth="1.5" strokeDasharray="4 4"
+          />
+        )}
 
+        <path d={areaPath(data, scale)} fill="url(#area-gradient)" />
+        <path
+          d={stepPath(data, scale)}
+          fill="none"
+          stroke={lineColor}
+          strokeWidth="2.5"
+          strokeLinejoin="miter"
+          strokeLinecap="square"
+        />
+
+        {/* Hit-targets + dots */}
         {data.map((item, index) => {
-          const p = pt(index, item.value, data, maxValue);
+          const p = pt(index, item.value, data, scale);
           const isActive = index === activeIndex;
+          const dotColor = item.value >= 0 ? "#0b7bff" : "#f87171";
           return (
             <g
               key={item.label}
@@ -106,31 +173,39 @@ export default function ChartAreaStep({
               tabIndex={0}
               className="cursor-pointer outline-none"
             >
-              <line x1={p.x} x2={p.x} y1={PAD.top} y2={HEIGHT - PAD.bottom} stroke="transparent" strokeWidth="46" />
+              <line x1={p.x} x2={p.x} y1={PAD.top} y2={HEIGHT - PAD.bottom}
+                stroke="transparent" strokeWidth="40" />
               <rect
-                x={p.x - 7} y={p.y - 7} width="14" height="14"
-                fill={isActive ? "#0b7bff" : "#1A1A1E"}
-                stroke={isActive ? "#0b7bff" : "rgba(243,242,238,0.3)"}
+                x={p.x - 5} y={p.y - 5} width="10" height="10"
+                fill={isActive ? dotColor : "#1A1A1E"}
+                stroke={isActive ? dotColor : "rgba(243,242,238,0.3)"}
                 strokeWidth="2"
               />
             </g>
           );
         })}
 
+        {/* X labels */}
         {data.map((item, index) => {
-          const p = pt(index, item.value, data, maxValue);
+          const p = pt(index, item.value, data, scale);
           return (
-            <text key={item.label} x={p.x} y={HEIGHT - 18} textAnchor="middle" fontSize="10" fill="#8B8D91">
+            <text key={item.label} x={p.x} y={HEIGHT - 16}
+              textAnchor="middle" fontSize="9" fill="#8B8D91">
               {item.label}
             </text>
           );
         })}
 
+        {/* Tooltip */}
         {activePoint && active && (
-          <g transform={`translate(${Math.min(activePoint.x + 14, WIDTH - 170)} ${Math.max(activePoint.y - 62, 18)})`}>
-            <rect width="152" height="46" fill="#0B0B0D" stroke="rgba(243,242,238,0.2)" strokeWidth="2" />
-            <text x="12" y="18" fontSize="10" fill="#8B8D91" fontFamily="monospace">{active.label}</text>
-            <text x="12" y="34" fontSize="10" fill="#0b7bff" fontFamily="monospace">Value: {active.value}</text>
+          <g transform={`translate(${Math.min(activePoint.x + 12, WIDTH - 155)},${Math.max(activePoint.y - 52, PAD.top)})`}>
+            <rect width="148" height="42" rx="2" fill="#0B0B0D"
+              stroke="rgba(243,242,238,0.2)" strokeWidth="1.5" />
+            <text x="10" y="16" fontSize="10" fill="#8B8D91" fontFamily="monospace">{active.label}</text>
+            <text x="10" y="30" fontSize="10" fontFamily="monospace"
+              fill={active.value >= 0 ? "#0b7bff" : "#f87171"}>
+              P&L: {active.value >= 0 ? "+" : ""}${active.value.toFixed(2)}
+            </text>
           </g>
         )}
       </svg>

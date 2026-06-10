@@ -1,25 +1,5 @@
 [
   {
-    "id": "1",
-    "ticker": "RBRK",
-    "side": "buy",
-    "status": "closed",
-    "shares": 1.90295,
-    "entry_price": 84.5,
-    "mark_price": 73.41000366210938,
-    "stop_loss": 75.5,
-    "take_profit": 98.0,
-    "unrealized_pnl": 0.0,
-    "realized_pnl": -21.103708531188964,
-    "exit_price": 73.41000366210938,
-    "exit_reason": "stop_hit",
-    "confidence": 0.55,
-    "strategy": "equity_analyst",
-    "mode": "paper",
-    "opened_at": "2026-06-02T10:13:28.085024+00:00",
-    "closed_at": "2026-06-06T04:46:39.350584+00:00"
-  },
-  {
     "id": "2",
     "ticker": "AMAT",
     "side": "buy",
