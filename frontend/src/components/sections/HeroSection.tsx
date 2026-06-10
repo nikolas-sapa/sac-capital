@@ -75,18 +75,6 @@ export function HeroSection() {
         animate="visible"
         className="relative z-10 max-w-5xl mx-auto px-6 text-center flex flex-col items-center"
       >
-        {/* Eyebrow badge */}
-        <motion.div variants={itemVariant}>
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[rgba(11,123,255,0.3)] bg-[rgba(11,11,13,0.6)] px-4 py-1.5 backdrop-blur-sm">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#92dbe0] opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#92dbe0]" />
-            </span>
-            <span className="font-mono tracking-widest uppercase text-[10px] text-[#92dbe0]">
-              AI Alpha &amp; Data · Mantle Track
-            </span>
-          </div>
-        </motion.div>
 
         {/* Headline — wave animation: white → orange+blue sweep → dark */}
         <motion.h1
