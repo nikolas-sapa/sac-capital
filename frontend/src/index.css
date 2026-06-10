@@ -32,13 +32,13 @@
 body { margin: 0; }
 
 @keyframes subheading-reveal {
-  0%   { color: rgba(146, 219, 224, 0.9); }
-  60%  { color: rgba(146, 219, 224, 0.6); }
-  100% { color: rgba(229, 229, 229, 0.85); }
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .hero-subheading {
-  animation: subheading-reveal 2s ease-out 1.8s 1 both;
+  color: rgba(229, 229, 229, 0.85);
+  animation: subheading-reveal 1.2s cubic-bezier(0.22, 1, 0.36, 1) 1.6s 1 both;
 }
 
 @keyframes hero-wave {

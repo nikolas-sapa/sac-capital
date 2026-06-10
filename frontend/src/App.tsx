@@ -8,7 +8,7 @@ import { DecisionsSection } from "@/components/sections/DecisionsSection";
 import { PerformanceSection } from "@/components/sections/PerformanceSection";
 import { VerifySection } from "@/components/sections/VerifySection";
 import { CTASection } from "@/components/sections/CTASection";
-import type { Commitment, RegistryEvent, PerformanceSummary } from "@/types";
+import type { Commitment, RegistryEvent, PerformanceSummary, EquityPosition } from "@/types";
 import {
   canonicalJson,
   sha256Hex,
@@ -30,23 +30,30 @@ function wrappedPayload(c: Commitment) {
 
 export default function App() {
   const [commitments, setCommitments] = useState<Commitment[]>([]);
+  const [positions, setPositions] = useState<EquityPosition[]>([]);
   const [events, setEvents] = useState<RegistryEvent[]>([]);
   const [verifiedHash, setVerifiedHash] = useState("");
-  const [status, setStatus] = useState("Loading exported decision payloads");
   const [perf, setPerf] = useState<PerformanceSummary | null>(null);
 
   const selected = commitments[0];
 
+  // Mantle commitments (for VerifySection hash proof)
   useEffect(() => {
     fetch("/mantle_commitments.sample.json")
       .then((r) => r.json())
-      .then((data: Commitment[]) => {
-        setCommitments(data);
-        setStatus("Static exported payloads loaded. Add Mantle env vars for live registry events.");
-      })
-      .catch(() => setStatus("Could not load fallback commitment data."));
+      .then((data: Commitment[]) => setCommitments(data))
+      .catch(() => {});
   }, []);
 
+  // Alpaca equity positions
+  useEffect(() => {
+    fetch("/equity_positions.json")
+      .then((r) => r.json())
+      .then((data: EquityPosition[]) => setPositions(data))
+      .catch(() => {});
+  }, []);
+
+  // Performance summary
   useEffect(() => {
     fetch("/performance_summary.json")
       .then((r) => r.json())
@@ -54,6 +61,7 @@ export default function App() {
       .catch(() => setPerf(null));
   }, []);
 
+  // Live Mantle registry events
   useEffect(() => {
     if (!rpcUrl || !registryAddress) return;
     const client = createMantleClient(rpcUrl);
@@ -73,11 +81,8 @@ export default function App() {
               uri: String(log.args.uri ?? ""),
             }))
         );
-        setStatus("Live Mantle registry events loaded.");
       })
-      .catch(() =>
-        setStatus("Mantle RPC configured, but registry events could not be loaded.")
-      );
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -91,14 +96,8 @@ export default function App() {
       <HeroSection />
       <StatsBar commitments={commitments} events={events} />
       <HowItWorksSection />
-      <DecisionsSection
-        commitments={commitments}
-        events={events}
-        explorerBase={explorerBase}
-        registryAddress={registryAddress}
-        status={status}
-      />
-      <PerformanceSection commitments={commitments} perf={perf} />
+      <DecisionsSection positions={positions} />
+      <PerformanceSection positions={positions} perf={perf} />
       <VerifySection selected={selected} verifiedHash={verifiedHash} />
       <CTASection />
       <footer className="border-t border-[rgba(243,242,238,0.06)] py-8 px-6 text-center">

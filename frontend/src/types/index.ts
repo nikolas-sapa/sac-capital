@@ -38,6 +38,27 @@ export type RegistryEvent = {
   uri: string;
 };
 
+export type EquityPosition = {
+  id: string;
+  ticker: string;
+  side: string;
+  status: "open" | "closed" | "submitted" | string;
+  shares: number | null;
+  entry_price: number | null;
+  mark_price: number | null;
+  stop_loss: number | null;
+  take_profit: number | null;
+  unrealized_pnl: number | null;
+  realized_pnl: number | null;
+  exit_price: number | null;
+  exit_reason: string | null;
+  confidence: number | null;
+  strategy: string;
+  mode: string;
+  opened_at: string;
+  closed_at: string | null;
+};
+
 export type PerformanceSummary = {
   generated_at: string;
   total_commitments: number;
