@@ -28,8 +28,14 @@ export function NavBar() {
             : "rounded-[20px] border border-[rgba(243,242,238,0.06)] bg-[rgba(11,11,13,0.4)] backdrop-blur-md"
         )}
       >
-        {/* Desktop links */}
-        <ul className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
+        {/* Left spacer — balances the right badge so links stay centered */}
+        <div className="hidden md:flex flex-1" />
+
+        {/* Desktop links — hidden when pill is narrow to avoid overlap */}
+        <ul className={cn(
+          "hidden md:flex items-center gap-1 transition-all duration-200",
+          scrolled ? "opacity-0 pointer-events-none w-0 overflow-hidden" : ""
+        )}>
           {navLinks.map((link) => (
             <li key={link.href}>
               <a
@@ -42,13 +48,13 @@ export function NavBar() {
           ))}
         </ul>
 
-        {/* Live badge */}
-        <div className="hidden md:flex items-center gap-2 shrink-0">
+        {/* Live badge — right-aligned, always visible */}
+        <div className="hidden md:flex flex-1 items-center justify-end">
           <a
             href="https://explorer.sepolia.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono text-[#0b7bff] border border-[rgba(11,123,255,0.3)] hover:border-[rgba(11,123,255,0.6)] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono text-[#0b7bff] border border-[rgba(11,123,255,0.3)] hover:border-[rgba(11,123,255,0.6)] transition-colors whitespace-nowrap"
           >
             <span className="relative flex h-1.5 w-1.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0b7bff] opacity-75" />

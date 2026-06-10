@@ -119,13 +119,17 @@ function PositionCard({ pos, index }: { pos: EquityPosition; index: number }) {
 
 const FILTERS = ["all", "open", "submitted", "closed"] as const;
 type Filter = typeof FILTERS[number];
+const INITIAL_COUNT = 6;
 
 export function DecisionsSection({ positions }: DecisionsSectionProps) {
   const [filter, setFilter] = useState<Filter>("all");
+  const [showAll, setShowAll] = useState(false);
 
   const visible = positions.filter((p) =>
     filter === "all" ? true : p.status === filter
   );
+  const displayed = showAll ? visible : visible.slice(0, INITIAL_COUNT);
+  const hiddenCount = visible.length - INITIAL_COUNT;
 
   const totalUnrealized = positions
     .filter((p) => p.status === "open")
@@ -204,7 +208,7 @@ export function DecisionsSection({ positions }: DecisionsSectionProps) {
         <AnimatePresence mode="popLayout">
           {visible.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {visible.map((pos, i) => (
+              {displayed.map((pos, i) => (
                 <PositionCard key={pos.id} pos={pos} index={i} />
               ))}
             </div>
@@ -218,6 +222,18 @@ export function DecisionsSection({ positions }: DecisionsSectionProps) {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Show more / less */}
+        {hiddenCount > 0 && (
+          <div className="mt-6 flex justify-center">
+            <button
+              onClick={() => setShowAll((v) => !v)}
+              className="px-5 py-2 rounded-full text-xs font-mono uppercase tracking-wider border border-[rgba(243,242,238,0.1)] text-[#8B8D91] hover:text-[#F3F2EE] hover:border-[rgba(243,242,238,0.2)] transition-colors"
+            >
+              {showAll ? "Show less" : `Show ${hiddenCount} more`}
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );

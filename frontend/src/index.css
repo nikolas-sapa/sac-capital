@@ -45,16 +45,19 @@ body { margin: 0; }
 .hero-subheading {
   background: linear-gradient(
     90deg,
-    rgba(220, 220, 220, 0.85) 0%,
-    rgba(146, 219, 224, 1) 25%,
-    rgba(255, 255, 255, 1) 45%,
-    rgba(146, 219, 224, 1) 65%,
-    rgba(220, 220, 220, 0.85) 100%
+    rgba(243, 242, 238, 0.9) 0%,
+    rgba(255, 255, 255, 1) 30%,
+    rgba(146, 219, 224, 1) 50%,
+    rgba(255, 255, 255, 1) 70%,
+    rgba(243, 242, 238, 0.9) 100%
   );
   background-size: 300% 100%;
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
+  font-family: "Poppins", sans-serif;
+  font-weight: 500;
+  filter: drop-shadow(0 1px 6px rgba(0, 0, 0, 0.85)) drop-shadow(0 0 16px rgba(0, 0, 0, 0.6));
   animation:
     subheading-reveal 1.2s cubic-bezier(0.22, 1, 0.36, 1) 1.6s 1 both,
     subtitle-letter-shimmer 8s ease-in-out 3s infinite;
