@@ -32,7 +32,7 @@ const steps: Step[] = [
     num: "04",
     icon: Shield,
     title: "Anchored on Mantle",
-    body: "The bytes32 commitment is recorded in the AgentDecisionRegistry smart contract on Mantle Sepolia. Immutable, timestamped, publicly verifiable on-chain.",
+    body: "The bytes32 commitment is recorded in the AgentDecisionRegistry smart contract on Mantle Mainnet. Immutable, timestamped, publicly verifiable on-chain.",
   },
   {
     num: "05",

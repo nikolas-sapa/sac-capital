@@ -36,7 +36,7 @@ export function CTASection() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0b7bff] opacity-75" />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#0b7bff]" />
             </span>
-            Deployed on Mantle Sepolia
+            Deployed on Mantle Mainnet
           </div>
 
           <h2
@@ -51,7 +51,7 @@ export function CTASection() {
           </p>
 
           <a
-            href="https://explorer.sepolia.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887"
+            href="https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887"
             target="_blank"
             rel="noopener noreferrer"
             className="group inline-flex h-12 items-center gap-3 rounded-full bg-[#0b7bff] px-8 text-sm font-bold text-white transition-all duration-300 hover:bg-[#0060d9] hover:scale-105 active:scale-95"

@@ -2,6 +2,7 @@ import type { Hex } from "viem";
 
 export type Commitment = {
   bytes32: Hex;
+  canonical_json: string;
   kind: string;
   source: string;
   schema_version: string;

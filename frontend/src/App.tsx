@@ -10,7 +10,6 @@ import { VerifySection } from "@/components/sections/VerifySection";
 import { CTASection } from "@/components/sections/CTASection";
 import type { Commitment, RegistryEvent, PerformanceSummary, EquityPosition } from "@/types";
 import {
-  canonicalJson,
   sha256Hex,
   explorerBase,
   registryAddress,
@@ -19,14 +18,6 @@ import {
   createRegistryContract,
 } from "@/data/mantle";
 
-function wrappedPayload(c: Commitment) {
-  return {
-    kind: c.kind,
-    payload: c.payload,
-    schema_version: c.schema_version,
-    source: c.source,
-  };
-}
 
 export default function App() {
   const [commitments, setCommitments] = useState<Commitment[]>([]);
@@ -102,7 +93,7 @@ export default function App() {
 
   useEffect(() => {
     if (!selected) return;
-    sha256Hex(canonicalJson(wrappedPayload(selected))).then(setVerifiedHash);
+    sha256Hex(selected.canonical_json).then(setVerifiedHash);
   }, [selected]);
 
   return (

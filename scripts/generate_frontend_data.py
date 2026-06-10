@@ -41,13 +41,26 @@ def parse_args():
     return p.parse_args()
 
 
+def _commitment_canonical_json(record: dict) -> str:
+    wrapped = {
+        "kind": record["kind"],
+        "payload": record["payload"],
+        "schema_version": record["schema_version"],
+        "source": record["source"],
+    }
+    return json.dumps(wrapped, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
 def read_commitments(ledger_path: Path) -> list:
     records = []
     with ledger_path.open("r", encoding="utf-8") as fh:
         for line in fh:
             line = line.strip()
             if line:
-                records.append(json.loads(line))
+                rec = json.loads(line)
+                if "canonical_json" not in rec:
+                    rec["canonical_json"] = _commitment_canonical_json(rec)
+                records.append(rec)
     return records
 
 

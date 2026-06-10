@@ -48,7 +48,7 @@ export function NavBar() {
         {/* Live badge — right-aligned, always visible */}
         <div className="hidden md:flex flex-1 items-center justify-end">
           <a
-            href="https://explorer.sepolia.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887"
+            href="https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono text-[#0b7bff] border border-[rgba(11,123,255,0.3)] hover:border-[rgba(11,123,255,0.6)] transition-colors whitespace-nowrap"

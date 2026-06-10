@@ -35,7 +35,7 @@ export const registryAddress = import.meta.env.VITE_AGENT_REGISTRY_ADDRESS as He
 export const rpcUrl = import.meta.env.VITE_MANTLE_RPC_URL as string | undefined;
 export const explorerBase =
   (import.meta.env.VITE_MANTLE_EXPLORER_BASE as string | undefined) ||
-  "https://sepolia.mantlescan.xyz";
+  "https://explorer.mantle.xyz";
 
 export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;

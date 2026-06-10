@@ -32,6 +32,7 @@ class Commitment:
             "schema_version": SCHEMA_VERSION,
             "hash_algorithm": "sha256",
             "bytes32": self.bytes32,
+            "canonical_json": self.canonical_json,
             "payload": self.payload,
         }
 

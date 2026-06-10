@@ -1,16 +1,6 @@
 import { useState } from "react";
 import { CheckCircle, Copy } from "lucide-react";
-import { canonicalJson } from "@/data/mantle";
 import type { Commitment } from "@/types";
-
-function wrappedPayload(c: Commitment) {
-  return {
-    kind: c.kind,
-    payload: c.payload,
-    schema_version: c.schema_version,
-    source: c.source,
-  };
-}
 
 interface VerifySectionProps {
   selected: Commitment | undefined;
@@ -27,7 +17,7 @@ export function VerifySection({ selected, verifiedHash }: VerifySectionProps) {
     setTimeout(() => setCopied(null), 10_000);
   };
 
-  const jsonStr = selected ? canonicalJson(wrappedPayload(selected)) : "No payload loaded";
+  const jsonStr = selected?.canonical_json ?? "No payload loaded";
   const match = Boolean(selected && verifiedHash && verifiedHash === selected.bytes32);
 
   return (
