@@ -111,7 +111,7 @@ export default function App() {
       <HeroSection />
       <StatsBar commitments={commitments} events={events} />
       <HowItWorksSection />
-      <PerformanceSection positions={positions} perf={perf} />
+      <PerformanceSection positions={positions} />
       <DecisionsSection positions={positions} />
       <VerifySection selected={selected} verifiedHash={verifiedHash} />
       <CTASection />
