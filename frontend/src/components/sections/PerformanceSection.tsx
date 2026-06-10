@@ -55,8 +55,6 @@ export function PerformanceSection({ positions, perf }: PerformanceSectionProps)
     ? [
         { value: positions.length, label: "Total positions", green: false },
         { value: openPositions.length, label: "Open positions", green: openPositions.length > 0 },
-        { value: eq.realized_pnl, label: "Realized P&L", green: eq.realized_pnl >= 0, prefix: "$", decimals: 2 },
-        { value: totalUnrealized, label: "Unrealized P&L", green: totalUnrealized >= 0, prefix: "$", decimals: 2 },
         { value: Math.round(eq.win_rate * 1000) / 10, label: "Win rate", green: eq.win_rate > 0.5, suffix: "%", decimals: 1 },
         { value: Math.round(eq.avg_confidence * 1000) / 10, label: "Avg confidence", green: false, suffix: "%", decimals: 1 },
       ]
@@ -94,8 +92,8 @@ export function PerformanceSection({ positions, perf }: PerformanceSectionProps)
                   style={{ fontFamily: "Poppins, sans-serif" }}
                 >
                   <AnimateNumber
-                    value={s.decimals ? s.value : Math.round(s.value)}
-                    prefix={s.prefix}
+                    value={Math.abs(s.decimals ? s.value : Math.round(s.value))}
+                    prefix={s.prefix ? (s.value < 0 ? `-${s.prefix}` : s.prefix) : undefined}
                     suffix={s.suffix}
                     format={s.decimals ? { minimumFractionDigits: s.decimals, maximumFractionDigits: s.decimals } : undefined}
                     className="text-2xl font-black"
