@@ -10,10 +10,11 @@ export function StatsBar({ commitments, events }: StatsBarProps) {
   const anchored = events.length || commitments.length;
   const resolved = commitments.filter((c) => c.payload.resolved).length;
   const pnl = commitments.reduce((sum, c) => sum + (c.payload.pnl ?? 0), 0);
+  const confEntries = commitments.filter((c) => c.payload.confidence != null);
   const avgConf =
-    commitments.length === 0
+    confEntries.length === 0
       ? 0
-      : commitments.reduce((sum, c) => sum + (c.payload.confidence ?? 0), 0) / commitments.length;
+      : confEntries.reduce((sum, c) => sum + c.payload.confidence!, 0) / confEntries.length;
 
   const stats = [
     { value: anchored, label: "Decisions anchored", decimals: 0 },
