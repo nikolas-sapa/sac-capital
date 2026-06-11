@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import ChartAreaSmooth from "@/components/ui/chart-area-smooth";
+import ChartAreaStep from "@/components/ui/chart-area-step";
 import { AnimateNumber } from "@/components/ui/animated-blur-number";
 import type { EquityPosition } from "@/types";
 import { cn } from "@/lib/utils";
@@ -40,17 +40,23 @@ function buildChartData(positions: EquityPosition[], range: TimeRange) {
 
   const nowTs = today.getTime();
 
+  const todayDate = new Date(today);
+  todayDate.setHours(0, 0, 0, 0);
+
   return days.map((day) => {
     const dayTs = day.getTime();
+    const isToday = day.toDateString() === todayDate.toDateString();
     let cumPnl = 0;
 
     for (const pos of positions) {
       const openTs = pos.opened_at
         ? new Date(pos.opened_at).setHours(0, 0, 0, 0)
-        : nowTs - 7 * 86400_000; // live API positions: distribute over last 7 days
+        : nowTs - 7 * 86400_000;
       if (dayTs < openTs) continue;
-      const totalMs = Math.max(nowTs - openTs, 1);
-      const fraction = Math.min((dayTs - openTs) / totalMs, 1);
+      // always use fraction=1 for today so current P&L is exact
+      const fraction = isToday
+        ? 1
+        : Math.min((dayTs - openTs) / Math.max(nowTs - openTs, 1), 1);
       cumPnl += ((pos.unrealized_pnl ?? 0) + (pos.realized_pnl ?? 0)) * fraction;
     }
 
@@ -180,7 +186,7 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
               ))}
             </div>
           </div>
-          <ChartAreaSmooth data={chartData} positive={pnlPositive} />
+          <ChartAreaStep data={chartData} />
         </div>
       </div>
     </section>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { TrendingUp, TrendingDown, Clock, CheckCircle, Circle } from "lucide-react";
+import { TrendingUp, TrendingDown, Clock, CheckCircle, Circle, ChevronDown } from "lucide-react";
 import type { EquityPosition } from "@/types";
 import { AnimateNumber } from "@/components/ui/animated-blur-number";
 import { cn } from "@/lib/utils";
@@ -190,12 +190,22 @@ export function DecisionsSection({ positions }: DecisionsSectionProps) {
         {/* Show more / less */}
         {hiddenCount > 0 && (
           <div className="mt-6 flex justify-center">
-            <button
+            <motion.button
               onClick={() => setShowAll((v) => !v)}
-              className="px-5 py-2 rounded-full text-xs font-mono uppercase tracking-wider border border-[rgba(243,242,238,0.1)] text-[#8B8D91] hover:text-[#F3F2EE] hover:border-[rgba(243,242,238,0.2)] transition-colors"
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
+              transition={{ type: "spring", stiffness: 400, damping: 20 }}
+              className="group relative flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-mono uppercase tracking-wider border border-[rgba(243,242,238,0.12)] text-[#8B8D91] hover:text-[#F3F2EE] hover:border-[rgba(11,123,255,0.4)] hover:shadow-[0_0_16px_rgba(11,123,255,0.15)] transition-all duration-200"
             >
-              {showAll ? "Show less" : `Show ${hiddenCount} more`}
-            </button>
+              <span>{showAll ? "Show less" : `Show ${hiddenCount} more`}</span>
+              <motion.span
+                animate={{ rotate: showAll ? 180 : 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 22 }}
+                className="inline-flex"
+              >
+                <ChevronDown className="size-3.5 text-[#0b7bff]" />
+              </motion.span>
+            </motion.button>
           </div>
         )}
       </div>
