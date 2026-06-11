@@ -9,6 +9,7 @@ const navLinks = [
   { label: "Decisions", href: "#decisions" },
   { label: "Performance", href: "#performance" },
   { label: "Verify", href: "#verify" },
+  { label: "GitHub", href: "https://github.com/nikolas-sapa/sapa-fund", external: true },
 ];
 
 export function NavBar() {
@@ -37,6 +38,7 @@ export function NavBar() {
             <li key={link.href}>
               <a
                 href={link.href}
+                {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                 className="px-4 py-1.5 text-sm text-[#8B8D91] hover:text-[#F3F2EE] transition-colors rounded-full hover:bg-[rgba(243,242,238,0.06)]"
               >
                 {link.label}
@@ -89,6 +91,7 @@ export function NavBar() {
                   <a
                     href={link.href}
                     onClick={() => setOpen(false)}
+                    {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                     className="block px-4 py-3 text-sm text-[#8B8D91] hover:text-[#F3F2EE] hover:bg-[rgba(243,242,238,0.06)] rounded-[12px] transition-colors"
                   >
                     {link.label}
