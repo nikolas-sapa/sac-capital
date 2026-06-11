@@ -1,4 +1,4 @@
-# Mantle-Verifiable AI Trading Agent
+# SAC Capital
 
 **Track:** AI Alpha & Data
 **Demo:** https://sapa-fund.vercel.app

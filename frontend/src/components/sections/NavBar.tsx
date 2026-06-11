@@ -9,7 +9,7 @@ const navLinks = [
   { label: "Decisions", href: "#decisions" },
   { label: "Performance", href: "#performance" },
   { label: "Verify", href: "#verify" },
-  { label: "GitHub", href: "https://github.com/nikolas-sapa/sapa_fund", external: true },
+  { label: "GitHub", href: "https://github.com/nikolas-sapa/sac-capital", external: true },
 ];
 
 export function NavBar() {
@@ -29,8 +29,10 @@ export function NavBar() {
             : "rounded-[20px] border border-[rgba(243,242,238,0.06)] bg-[rgba(11,11,13,0.4)] backdrop-blur-md"
         )}
       >
-        {/* Left spacer — balances the right badge so links stay centered */}
-        <div className="hidden md:flex flex-1" />
+        {/* Logo */}
+        <div className="hidden md:flex flex-1 items-center">
+          <img src="/sac-capital.png" alt="SAC Capital" className="h-7 w-auto object-contain" />
+        </div>
 
         {/* Desktop links */}
         <ul className="hidden md:flex items-center gap-1">
@@ -48,18 +50,18 @@ export function NavBar() {
         </ul>
 
         {/* Live badge — right-aligned, always visible */}
-        <div className="hidden md:flex flex-1 items-center justify-end">
+        <div className="hidden md:flex flex-1 items-center justify-end shrink-0">
           <a
             href="https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono text-[#0b7bff] border border-[rgba(11,123,255,0.3)] hover:border-[rgba(11,123,255,0.6)] transition-colors whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono text-[#0b7bff] border border-[rgba(11,123,255,0.3)] hover:border-[rgba(11,123,255,0.6)] transition-colors whitespace-nowrap overflow-hidden"
           >
-            <span className="relative flex h-1.5 w-1.5">
+            <span className="relative flex h-1.5 w-1.5 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0b7bff] opacity-75" />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#0b7bff]" />
             </span>
-            Mantle Live
+            <span className="truncate">Mantle Live</span>
           </a>
         </div>
 

@@ -117,7 +117,7 @@ export default function App() {
           >
             Nikolas Sapalidis
           </a>
-          {" "}· Mantle-Verifiable AI Trading Agent · DoraHacks AI Alpha &amp; Data
+          {" "}· SAC Capital · Mantle-Verifiable AI Trading Agent · DoraHacks AI Alpha &amp; Data
         </p>
       </footer>
     </div>
