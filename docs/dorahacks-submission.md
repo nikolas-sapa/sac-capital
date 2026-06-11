@@ -74,4 +74,4 @@ Paper-only. `LIVE_TRADING_ENABLED=false`. Alpaca paper URLs enforced at the exec
 | Deploy tx | `https://explorer.mantle.xyz/tx/0x46bbaa02a9e7fd1025f00896c70405978cc3596e04d0559e07c5c1b0cac1222b` |
 | Track | AI Alpha & Data |
 | Category | AI / Robotics |
-| Team | Nikolas Sapalidis (Lead Developer), Team (Assisted with trading principles) |
+| Team | Nikolas Sapalidis (Lead Developer — architecture, AI pipeline, investment strategy) · Konstantopoulos Ilias (Safety features & stock research) · George Apostolakis (Investment strategy & Mantle network funding) |

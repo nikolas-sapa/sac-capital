@@ -12,7 +12,7 @@
 - Contract explorer URL: `https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
 - Deployment transaction: `https://explorer.mantle.xyz/tx/0x46bbaa02a9e7fd1025f00896c70405978cc3596e04d0559e07c5c1b0cac1222b`
 - Explorer verification URL: `https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887#code`
-- Team: Nikolas Sapalidis (Lead Developer), Team (Assisted with trading principles)
+- Team: Nikolas Sapalidis (Lead Developer — architecture, AI pipeline, investment strategy), Konstantopoulos Ilias (Safety features & stock research), George Apostolakis (Investment strategy & Mantle network funding)
 
 ## Deployment Award Checklist
 

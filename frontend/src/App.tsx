@@ -115,7 +115,7 @@ export default function App() {
           >
             Nikolas Sapalidis
           </a>
-          {" "}· SAC Capital · Mantle-Verifiable AI Trading Agent · DoraHacks AI Alpha &amp; Data
+          {" "}· SAC Capital · Developed with Konstantopoulos Ilias &amp; George Apostolakis · DoraHacks AI Alpha &amp; Data
         </p>
       </footer>
     </div>

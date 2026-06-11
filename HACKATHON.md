@@ -164,7 +164,8 @@ This loop is bounded and auditable: proposed changes are logged as research arti
 
 | Name | Role |
 |---|---|
-| **Nikolas Sapalidis** | Lead Developer — architecture, Mantle integration, AI pipeline, frontend verifier |
-| Team | Assisted with trading principles |
+| **Nikolas Sapalidis** | Lead Developer — architecture, Mantle integration, AI pipeline, frontend, investment strategy |
+| **Konstantopoulos Ilias** | Safety features & stock research |
+| **George Apostolakis** | Investment strategy & Mantle network funding |
 
 **Site:** [nikolas.helpmarq.com](https://nikolas.helpmarq.com)

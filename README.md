@@ -159,7 +159,8 @@ ANTHROPIC_STRONG_MODEL=claude-sonnet-4-6
 
 | Name | Role |
 |---|---|
-| **Nikolas Sapalidis** | Lead Developer — architecture, Mantle integration, AI pipeline, frontend |
-| Team | Assisted with trading principles |
+| **Nikolas Sapalidis** | Lead Developer — architecture, Mantle integration, AI pipeline, frontend, investment strategy |
+| **Konstantopoulos Ilias** | Safety features & stock research |
+| **George Apostolakis** | Investment strategy & Mantle network funding |
 
 [nikolas.helpmarq.com](https://nikolas.helpmarq.com)
