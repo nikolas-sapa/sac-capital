@@ -44,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       confidence: null,
       strategy: "alpaca_live",
       mode: "paper",
-      opened_at: new Date().toISOString(),
+      opened_at: null,
       closed_at: null,
     }));
 

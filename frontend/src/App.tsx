@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import type { Hex } from "viem";
 import { NavBar } from "@/components/sections/NavBar";
 import { HeroSection } from "@/components/sections/HeroSection";
-import { StatsBar } from "@/components/sections/StatsBar";
 import { HowItWorksSection } from "@/components/sections/HowItWorksSection";
 import { DecisionsSection } from "@/components/sections/DecisionsSection";
 import { PerformanceSection } from "@/components/sections/PerformanceSection";
@@ -100,8 +99,7 @@ export default function App() {
     <div className="min-h-screen bg-[#0B0B0D]">
       <NavBar />
       <HeroSection />
-      <StatsBar commitments={commitments} events={events} />
-      <HowItWorksSection />
+<HowItWorksSection />
       <PerformanceSection positions={positions} />
       <DecisionsSection positions={positions} />
       <VerifySection selected={selected} verifiedHash={verifiedHash} />

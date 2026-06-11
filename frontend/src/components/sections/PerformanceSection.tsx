@@ -5,45 +5,32 @@ import type { EquityPosition } from "@/types";
 import { cn } from "@/lib/utils";
 
 type TimeRange = "1D" | "1W" | "1M" | "6M" | "1Y" | "All";
-
 const RANGES: TimeRange[] = ["1D", "1W", "1M", "6M", "1Y", "All"];
-
 const DAYS_BACK: Record<TimeRange, number> = {
-  "1D": 1,
-  "1W": 7,
-  "1M": 30,
-  "6M": 180,
-  "1Y": 365,
-  "All": 730,
+  "1D": 1, "1W": 7, "1M": 30, "6M": 180, "1Y": 365, "All": 730,
 };
 
 interface PerformanceSectionProps {
   positions: EquityPosition[];
 }
 
-function buildCumulativePnl(positions: EquityPosition[], range: TimeRange) {
+function buildChartData(positions: EquityPosition[], range: TimeRange) {
   const today = new Date();
   today.setHours(23, 59, 59, 0);
 
   const daysBack = DAYS_BACK[range];
-  const start = new Date(today);
-  start.setDate(start.getDate() - daysBack);
-  start.setHours(0, 0, 0, 0);
+  const startDate = new Date(today);
+  startDate.setDate(startDate.getDate() - daysBack);
+  startDate.setHours(0, 0, 0, 0);
 
-  // For "All": find earliest open date and use that as start
-  let earliest = start;
   if (range === "All") {
     for (const p of positions) {
       if (!p.opened_at) continue;
       const d = new Date(p.opened_at);
-      if (d < earliest) earliest = d;
+      if (d < startDate) { startDate.setTime(d.getTime()); startDate.setHours(0,0,0,0); }
     }
-    earliest.setHours(0, 0, 0, 0);
   }
 
-  const startDate = range === "All" ? earliest : start;
-
-  // Build day array
   const days: Date[] = [];
   const cursor = new Date(startDate);
   while (cursor <= today) {
@@ -51,7 +38,6 @@ function buildCumulativePnl(positions: EquityPosition[], range: TimeRange) {
     cursor.setDate(cursor.getDate() + 1);
   }
 
-  // For each day compute cumulative P&L via linear interpolation
   const nowTs = today.getTime();
 
   return days.map((day) => {
@@ -59,35 +45,25 @@ function buildCumulativePnl(positions: EquityPosition[], range: TimeRange) {
     let cumPnl = 0;
 
     for (const pos of positions) {
-      if (!pos.opened_at) continue;
-      const openTs = new Date(pos.opened_at).setHours(0, 0, 0, 0);
+      const openTs = pos.opened_at
+        ? new Date(pos.opened_at).setHours(0, 0, 0, 0)
+        : nowTs - 7 * 86400_000; // live API positions: distribute over last 7 days
       if (dayTs < openTs) continue;
-
-      const totalMs = nowTs - openTs;
-      const elapsedMs = dayTs - openTs;
-      const fraction = totalMs > 0 ? Math.min(elapsedMs / totalMs, 1) : 1;
-      const currentPnl = (pos.unrealized_pnl ?? 0) + (pos.realized_pnl ?? 0);
-      cumPnl += currentPnl * fraction;
+      const totalMs = Math.max(nowTs - openTs, 1);
+      const fraction = Math.min((dayTs - openTs) / totalMs, 1);
+      cumPnl += ((pos.unrealized_pnl ?? 0) + (pos.realized_pnl ?? 0)) * fraction;
     }
 
-    const month = String(day.getMonth() + 1).padStart(2, "0");
+    const mm = String(day.getMonth() + 1).padStart(2, "0");
     const dd = String(day.getDate()).padStart(2, "0");
-    const label =
-      range === "6M" || range === "1Y" || range === "All"
-        ? `${month}/${dd}`
-        : `${month}/${dd}`;
-
-    return { label, value: parseFloat(cumPnl.toFixed(2)) };
+    return { label: `${mm}/${dd}`, value: parseFloat(cumPnl.toFixed(2)) };
   });
 }
 
 export function PerformanceSection({ positions }: PerformanceSectionProps) {
   const [range, setRange] = useState<TimeRange>("1W");
 
-  const chartData = useMemo(
-    () => buildCumulativePnl(positions, range),
-    [positions, range]
-  );
+  const chartData = useMemo(() => buildChartData(positions, range), [positions, range]);
 
   const openPositions = positions.filter((p) => p.status === "open");
   const totalUnrealized = openPositions.reduce((s, p) => s + (p.unrealized_pnl ?? 0), 0);
@@ -101,19 +77,9 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
       ? confPositions.reduce((s, p) => s + p.confidence!, 0) / confPositions.length
       : null;
 
-  const totalPnl = positions.reduce(
-    (s, p) => s + (p.unrealized_pnl ?? 0) + (p.realized_pnl ?? 0),
-    0
-  );
-  const pnlPositive = totalPnl >= 0;
-
   type StatCard = {
-    value: number;
-    label: string;
-    positive: boolean | null;
-    prefix?: string;
-    suffix?: string;
-    decimals?: number;
+    value: number; label: string; positive: boolean | null;
+    prefix?: string; suffix?: string; decimals?: number;
   };
 
   const statCards: StatCard[] = [
@@ -123,17 +89,11 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
       ? [{ value: totalNotional, label: "Notional deployed", positive: null, prefix: "$", decimals: 2 }]
       : []),
     ...(avgConfidence != null
-      ? [
-          {
-            value: Math.round(avgConfidence * 1000) / 10,
-            label: "Avg confidence",
-            positive: avgConfidence > 0.5,
-            suffix: "%",
-            decimals: 1,
-          },
-        ]
+      ? [{ value: Math.round(avgConfidence * 1000) / 10, label: "Avg confidence", positive: avgConfidence > 0.5, suffix: "%", decimals: 1 }]
       : []),
   ];
+
+  const pnlPositive = totalUnrealized >= 0;
 
   return (
     <section id="performance" className="py-24 px-6 bg-[#0B0B0D]">
@@ -143,47 +103,73 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
           <p className="text-[10px] font-mono tracking-widest uppercase text-[#0b7bff] mb-3">
             Alpaca Paper Trading
           </p>
-          <h2
-            className="text-4xl font-black text-[#F3F2EE]"
-            style={{ fontFamily: "Poppins, sans-serif" }}
-          >
+          <h2 className="text-4xl font-black text-[#F3F2EE]" style={{ fontFamily: "Poppins, sans-serif" }}>
             Portfolio Performance
           </h2>
         </div>
 
-        {/* P&L hero + chart */}
-        <div className="mb-10 rounded-[16px] border border-[rgba(243,242,238,0.07)] bg-[#1A1A1E] p-8">
-          {/* Top row: P&L + time filters */}
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
-            <div>
-              <p className="text-[10px] font-mono tracking-widest uppercase text-[#8B8D91] mb-2">
-                Cumulative P&amp;L
-              </p>
-              <div className={cn(pnlPositive ? "text-[#0b7bff]" : "text-red-400")}>
-                <AnimateNumber
-                  value={Math.abs(totalPnl)}
-                  prefix={totalPnl < 0 ? "-$" : "+$"}
-                  format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
-                  className="text-5xl font-semibold tracking-tight"
-                  style={{ fontFamily: "Poppins, sans-serif" }}
-                  duration={600}
-                />
-              </div>
-              {totalNotional > 0 && (
-                <p className="text-[#8B8D91] text-sm font-mono mt-1">
-                  on ${totalNotional.toFixed(2)} notional
-                </p>
-              )}
-            </div>
+        {/* Big unrealized P&L */}
+        <div className="mb-10 rounded-[16px] border border-[rgba(243,242,238,0.07)] bg-[#1A1A1E] p-8 flex flex-col gap-1">
+          <p className="text-[10px] font-mono tracking-widest uppercase text-[#8B8D91] mb-3">
+            Unrealized P&amp;L
+          </p>
+          <div className={cn(pnlPositive ? "text-emerald-400" : "text-red-400")}>
+            <AnimateNumber
+              value={Math.abs(totalUnrealized)}
+              prefix={totalUnrealized < 0 ? "-$" : "+$"}
+              format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
+              className="text-6xl font-semibold tracking-tight"
+              duration={600}
+            />
+          </div>
+          {totalNotional > 0 && (
+            <p className="text-[#8B8D91] text-sm font-mono mt-2">
+              on ${totalNotional.toFixed(2)} notional deployed
+            </p>
+          )}
+        </div>
 
+        {/* Stat cards */}
+        {statCards.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
+            {statCards.map((s) => (
+              <div key={s.label} className="rounded-[12px] border border-[rgba(243,242,238,0.06)] bg-[#1A1A1E] p-5">
+                <div
+                  className={cn(
+                    "text-2xl font-black mb-1",
+                    s.positive === true ? "text-emerald-400" : s.positive === false ? "text-red-400" : "text-[#F3F2EE]"
+                  )}
+                  style={{ fontFamily: "Poppins, sans-serif" }}
+                >
+                  <AnimateNumber
+                    value={Math.abs(s.decimals != null ? s.value : Math.round(s.value))}
+                    prefix={s.prefix ? (s.value < 0 ? `-${s.prefix}` : s.prefix) : undefined}
+                    suffix={s.suffix}
+                    format={s.decimals != null ? { minimumFractionDigits: s.decimals, maximumFractionDigits: s.decimals } : undefined}
+                    className="text-2xl font-black"
+                  />
+                </div>
+                <span className="text-xs text-[#8B8D91] font-mono uppercase tracking-wider">{s.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Chart with time filters */}
+        <div className="w-full rounded-none border-[3px] border-[rgba(243,242,238,0.12)] bg-[#0B0B0D] p-4 text-[#F3F2EE] shadow-[4px_4px_0_0_#0b7bff]">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-widest text-[#8B8D91] font-mono">Portfolio P&amp;L</p>
+              <h3 className="mt-1 text-sm font-bold font-mono">Cumulative unrealized + realized</h3>
+            </div>
             {/* Time range filters */}
-            <div className="flex items-center gap-1 bg-[rgba(243,242,238,0.04)] rounded-[8px] p-1">
+            <div className="flex items-center gap-1 bg-[rgba(243,242,238,0.04)] rounded-[6px] p-1">
               {RANGES.map((r) => (
                 <button
                   key={r}
                   onClick={() => setRange(r)}
                   className={cn(
-                    "px-3 py-1.5 rounded-[6px] text-xs font-mono transition-all",
+                    "px-2.5 py-1 rounded-[4px] text-[10px] font-mono transition-all",
                     r === range
                       ? "bg-[#0b7bff] text-white"
                       : "text-[#8B8D91] hover:text-[#F3F2EE] hover:bg-[rgba(243,242,238,0.06)]"
@@ -194,49 +180,8 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
               ))}
             </div>
           </div>
-
-          {/* Chart */}
           <ChartAreaSmooth data={chartData} positive={pnlPositive} />
         </div>
-
-        {/* Stat cards */}
-        {statCards.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {statCards.map((s) => (
-              <div
-                key={s.label}
-                className="rounded-[12px] border border-[rgba(243,242,238,0.06)] bg-[#1A1A1E] p-5"
-              >
-                <div
-                  className={cn(
-                    "text-2xl font-black mb-1",
-                    s.positive === true
-                      ? "text-emerald-400"
-                      : s.positive === false
-                      ? "text-red-400"
-                      : "text-[#F3F2EE]"
-                  )}
-                  style={{ fontFamily: "Poppins, sans-serif" }}
-                >
-                  <AnimateNumber
-                    value={Math.abs(s.decimals != null ? s.value : Math.round(s.value))}
-                    prefix={s.prefix ? (s.value < 0 ? `-${s.prefix}` : s.prefix) : undefined}
-                    suffix={s.suffix}
-                    format={
-                      s.decimals != null
-                        ? { minimumFractionDigits: s.decimals, maximumFractionDigits: s.decimals }
-                        : undefined
-                    }
-                    className="text-2xl font-black"
-                  />
-                </div>
-                <span className="text-xs text-[#8B8D91] font-mono uppercase tracking-wider">
-                  {s.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </section>
   );
