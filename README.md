@@ -1,3 +1,5 @@
+<p align="center"><img src="frontend/public/sac-capital.png" width="320" /></p>
+
 # SAC Capital
 
 > AI trading decisions are exported as deterministic `bytes32` commitments and anchored on Mantle — anyone can verify agent behavior and outcomes.
