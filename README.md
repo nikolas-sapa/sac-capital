@@ -408,7 +408,7 @@ See [docs/equities-hardening.md](docs/equities-hardening.md) for the operator ha
 | Name | Role |
 |---|---|
 | **Nikolas Sapalidis** | Lead Developer — architecture, Mantle integration, AI pipeline, frontend |
-| Team | Investing strategy design and signal research |
+| Team | Assisted with trading principles |
 
 **Website:** [nikolas.helpmarq.com](https://nikolas.helpmarq.com)
 

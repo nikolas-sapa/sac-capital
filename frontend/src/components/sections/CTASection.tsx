@@ -31,14 +31,6 @@ export function CTASection() {
         </div>
 
         <div className="relative z-10 text-center px-6 max-w-3xl mx-auto flex flex-col items-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[rgba(11,123,255,0.2)] bg-[rgba(11,123,255,0.06)] px-4 py-1.5 text-[10px] font-mono text-[#0b7bff] uppercase tracking-widest">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0b7bff] opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#0b7bff]" />
-            </span>
-            Deployed on Mantle Mainnet
-          </div>
-
           <h2
             className="text-4xl md:text-6xl font-black text-[#F3F2EE] leading-tight mb-6"
             style={{ fontFamily: "Poppins, sans-serif" }}
