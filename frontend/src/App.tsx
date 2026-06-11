@@ -107,9 +107,17 @@ export default function App() {
       <VerifySection selected={selected} verifiedHash={verifiedHash} />
       <CTASection />
       <footer className="border-t border-[rgba(243,242,238,0.06)] py-8 px-6 text-center">
-        <p className="text-xs font-mono text-[rgba(243,242,238,0.2)]">
-          Mantle-Verifiable AI Prediction Agent · DoraHacks AI Alpha &amp; Data ·
-          Paper-trading only — no live custody
+        <p className="text-xs font-mono text-[rgba(243,242,238,0.3)]">
+          Developed by{" "}
+          <a
+            href="https://nikolas.helpmarq.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#E55A1C] hover:text-[#C94A12] transition-colors"
+          >
+            Nikolas Sapalidis
+          </a>
+          {" "}· Mantle-Verifiable AI Trading Agent · DoraHacks AI Alpha &amp; Data
         </p>
       </footer>
     </div>

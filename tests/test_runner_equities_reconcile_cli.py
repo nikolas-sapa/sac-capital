@@ -3,9 +3,12 @@ from __future__ import annotations
 import sys
 import time
 import types
+from datetime import date
 from types import SimpleNamespace
 
 import pytest
+
+from core.assets.bar import Bar, PriceSeries
 
 
 def test_reconcile_only_cli_calls_reconcile_hook(monkeypatch):
@@ -86,6 +89,40 @@ def test_news_provider_failure_logs_counts_and_continues(capsys):
     assert provider.headlines("MSFT") == ["headline"]
     assert failures == 1
     assert "source=FailingNews ticker=MSFT error=slow provider" in capsys.readouterr().out
+
+
+def test_latest_price_adapter_falls_back_to_longer_history_periods(capsys):
+    import runner_equities
+
+    class FakeFeed:
+        def __init__(self):
+            self.calls: list[str] = []
+
+        def history(self, ticker: str, period: str = "1y", interval: str = "1d") -> PriceSeries:
+            self.calls.append(period)
+            if period == "5d":
+                return PriceSeries(ticker=ticker, bars=[])
+            return PriceSeries(
+                ticker=ticker,
+                bars=[
+                    Bar(
+                        day=date(2026, 1, 2),
+                        open=10.0,
+                        high=11.0,
+                        low=9.5,
+                        close=10.5,
+                        volume=1000,
+                    )
+                ],
+            )
+
+    adapter = runner_equities._PriceAdapter(FakeFeed())
+
+    assert adapter.latest_close("AMAT") == 10.5
+    assert adapter.latest_close("AMAT") == 10.5
+    assert adapter._feed.calls == ["5d", "1mo"]
+    out = capsys.readouterr().out
+    assert "fallback_period=1mo" in out
 
 
 @pytest.mark.parametrize(

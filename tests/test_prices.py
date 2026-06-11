@@ -25,13 +25,14 @@ def test_yfinance_feed_maps_dataframe_to_priceseries(monkeypatch):
         index=pd.to_datetime(["2026-01-02", "2026-01-03"]),
     )
 
-    class FakeTicker:
-        def __init__(self, symbol):
-            self.symbol = symbol
-        def history(self, period, interval):
-            return df
+    def fake_download(**kwargs):
+        assert kwargs["tickers"] == "ACME"
+        assert kwargs["period"] == "5d"
+        assert kwargs["interval"] == "1d"
+        assert kwargs["timeout"] == 10
+        return df
 
-    monkeypatch.setattr("equities.data.prices.yf.Ticker", FakeTicker)
+    monkeypatch.setattr("equities.data.prices.yf.download", fake_download)
 
     feed = YFinancePriceFeed()
     ps = feed.history("ACME", period="5d", interval="1d")
@@ -42,23 +43,16 @@ def test_yfinance_feed_maps_dataframe_to_priceseries(monkeypatch):
 
 
 def test_yfinance_feed_empty_df_returns_empty_series(monkeypatch):
-    class FakeTicker:
-        def __init__(self, symbol):
-            pass
-        def history(self, period, interval):
-            return pd.DataFrame()
-    monkeypatch.setattr("equities.data.prices.yf.Ticker", FakeTicker)
+    monkeypatch.setattr("equities.data.prices.yf.download", lambda **kwargs: pd.DataFrame())
     ps = YFinancePriceFeed().history("BADTICKER")
     assert ps.bars == []
 
 
 def test_yfinance_feed_exception_returns_empty_series(monkeypatch):
-    class FakeTicker:
-        def __init__(self, symbol):
-            pass
-        def history(self, period, interval, timeout=None):
-            raise RuntimeError("network failed")
-    monkeypatch.setattr("equities.data.prices.yf.Ticker", FakeTicker)
+    def fake_download(**kwargs):
+        raise RuntimeError("network failed")
+
+    monkeypatch.setattr("equities.data.prices.yf.download", fake_download)
     ps = YFinancePriceFeed(retries=0).history("BADTICKER")
     assert ps.bars == []
 
@@ -66,12 +60,10 @@ def test_yfinance_feed_exception_returns_empty_series(monkeypatch):
 def test_yfinance_feed_passes_timeout_when_supported(monkeypatch):
     seen = {}
 
-    class FakeTicker:
-        def __init__(self, symbol):
-            pass
-        def history(self, period, interval, timeout=None):
-            seen["timeout"] = timeout
-            return pd.DataFrame()
-    monkeypatch.setattr("equities.data.prices.yf.Ticker", FakeTicker)
+    def fake_download(**kwargs):
+        seen["timeout"] = kwargs.get("timeout")
+        return pd.DataFrame()
+
+    monkeypatch.setattr("equities.data.prices.yf.download", fake_download)
     YFinancePriceFeed(timeout=7).history("ACME")
     assert seen["timeout"] == 7

@@ -14,7 +14,7 @@ const steps: Step[] = [
     num: "01",
     icon: Bot,
     title: "AI Makes a Decision",
-    body: "The prediction agent runs LLM analysis on Polymarket markets and US equities, producing structured decisions with confidence scores, strategies, and reasoning.",
+    body: "The AI agent runs a multi-stage LLM analysis pipeline on US equities and financial markets, producing structured decisions with confidence scores, strategies, and reasoning.",
   },
   {
     num: "02",

@@ -1,18 +1,19 @@
-# Mantle-Verifiable AI Prediction Agent
+# Mantle-Verifiable AI Trading Agent
 
-One-line pitch: AI prediction-market decisions are exported as deterministic `bytes32` commitments and anchored on Mantle so judges can verify agent behavior and outcomes.
+One-line pitch: AI trading decisions are exported as deterministic `bytes32` commitments and anchored on Mantle so judges can verify agent behavior and outcomes.
 
 Hackathon track: `AI Alpha & Data`
 
-Submission placeholders:
+Submission:
 
+- GitHub: `https://github.com/nikolas-sapa/sapa-fund`
 - Public demo: `https://sapa-fund.vercel.app`
 - Demo video: `TODO`
 - Mantle contract address: `0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
-- Mantle contract explorer: `https://explorer.sepolia.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
-- Mantle deployment transaction: `https://explorer.sepolia.mantle.xyz/tx/0x62b7b9ce6c469768fc979f2d00610a7aba39b71c48a55a0081fdca424e4efe4b`
-- Mantle decision transaction: `https://explorer.sepolia.mantle.xyz/tx/0x94ac5787a23f472a9d97e3ca435b9dc4818b734e0b3efad9ad2d2fd1251c6076`
-- Mantle Explorer verification link: `https://explorer.sepolia.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887#code`
+- Mantle contract explorer: `https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
+- Mantle deployment transaction: `https://explorer.mantle.xyz/tx/0x62b7b9ce6c469768fc979f2d00610a7aba39b71c48a55a0081fdca424e4efe4b`
+- Mantle decision transaction: `https://explorer.mantle.xyz/tx/0x94ac5787a23f472a9d97e3ca435b9dc4818b734e0b3efad9ad2d2fd1251c6076`
+- Mantle Explorer verification link: `https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887#code`
 
 Architecture:
 
@@ -56,7 +57,7 @@ Run a dry-run Mantle submission:
 ./.venv/bin/python scripts/submit_mantle_decisions.py \
   --commitments data/mantle_commitments.jsonl \
   --contract 0x0000000000000000000000000000000000000001 \
-  --agent-id mantle-verifiable-polymarket-agent \
+  --agent-id mantle-verifiable-ai-agent \
   --limit 1
 ```
 
@@ -76,7 +77,7 @@ Submit one decision only after setting the real registry address:
 
 ```sh
 export AGENT_REGISTRY_ADDRESS=0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887
-export AGENT_ID=mantle-verifiable-polymarket-agent
+export AGENT_ID=mantle-verifiable-ai-agent
 
 ./.venv/bin/python scripts/submit_mantle_decisions.py \
   --commitments data/mantle_commitments.jsonl \
@@ -111,27 +112,27 @@ VITE_MANTLE_EXPLORER_BASE=https://sepolia.mantlescan.xyz
 
 Vercel deployment: use `frontend/` as the project root, build command `npm run build`, and output directory `dist`.
 
-# Polymarket Bot
+# AI Trading Agent
 
-Paper-trading research system for prediction markets and US equities.
+Paper-trading research system for US equities.
 
 The repo is built to test research ideas, log evidence, replay outcomes, and keep execution behind paper-only fuses. It does not contain a live-trading implementation path.
 
 Suggested GitHub description:
 
 ```text
-Paper-trading research system for Polymarket and US equities with LLM analysis, risk fuses, auditable artifacts, Alpaca paper execution, and replay evaluation.
+Paper-trading research system for US equities with LLM analysis, risk fuses, auditable artifacts, Alpaca paper execution, replay evaluation, and Mantle-verifiable decision anchoring.
 ```
 
 Suggested GitHub topics:
 
 ```text
-polymarket, prediction-markets, equities, paper-trading, algorithmic-trading, llm, risk-management, alpaca, backtesting, python
+equities, paper-trading, algorithmic-trading, llm, risk-management, alpaca, backtesting, python, mantle, blockchain
 ```
 
 ## What It Does
 
-- Scans Polymarket markets and US equities for paper-trading opportunities.
+- Scans US equities for paper-trading opportunities.
 - Uses deterministic screens before any LLM call.
 - Runs LLM analysis with typed validation and rejection paths.
 - Stores research artifacts so every analysed equity candidate can be audited.
@@ -155,7 +156,6 @@ This project is paper-only.
 ## Main Entry Points
 
 ```text
-runner.py             Polymarket paper runner
 runner_equities.py    US equities paper runner
 runner_research.py    Offline research runner
 scripts/run_nightly.py Nightly maintenance wrapper
@@ -164,8 +164,8 @@ scripts/run_nightly.py Nightly maintenance wrapper
 ## Repository Layout
 
 ```text
-core/                 Shared config, ledgers, CLOB clients, alerts, LLM adapters
-strategies/           Polymarket, weather, crypto, and LLM probability strategies
+core/                 Shared config, ledgers, alerts, LLM adapters
+strategies/           LLM probability strategies
 orchestrator/         Strategy allocation, performance, reconciliation, risk
 harness/              Approval, calibration, retuning, nightly self-improvement
 equities/
@@ -402,6 +402,15 @@ tail -f data/nightly.log
 ```
 
 See [docs/equities-hardening.md](docs/equities-hardening.md) for the operator hardening runbook.
+
+## Team
+
+| Name | Role |
+|---|---|
+| **Nikolas Sapalidis** | Lead Developer — architecture, Mantle integration, AI pipeline, frontend |
+| Team | Investing strategy design and signal research |
+
+**Website:** [nikolas.helpmarq.com](https://nikolas.helpmarq.com)
 
 ## Before Any Live Trading Design
 

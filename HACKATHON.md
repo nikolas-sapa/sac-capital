@@ -121,7 +121,7 @@ print("0x" + hashlib.sha256(canonical.encode()).hexdigest())
 ## 7. Reproduce Locally
 
 ```bash
-git clone <repo>
+git clone https://github.com/nikolas-sapa/sapa-fund
 uv sync
 
 # Export decision commitments from the paper ledger
@@ -131,7 +131,7 @@ python scripts/export_mantle_commitments.py --out data/out.jsonl
 python scripts/submit_mantle_decisions.py \
   --commitments data/out.jsonl \
   --contract 0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887 \
-  --agent-id mantle-verifiable-polymarket-agent \
+  --agent-id mantle-verifiable-ai-agent \
   --dry-run --limit 3
 
 # Run tests
@@ -157,3 +157,14 @@ forge script contracts/script/DeployAgentDecisionRegistry.s.sol \
 The agent runs a nightly self-improvement harness: it reads its own performance data (Brier scores, win rates by strategy) and proposes prompt edits — but only promotes changes that pass an evidence gate (improvement must be statistically significant, not noise).
 
 This loop is bounded and auditable: proposed changes are logged as research artifacts that are themselves anchored on Mantle. The agent cannot silently rewrite its own strategy; every proposed change leaves an immutable trail.
+
+---
+
+## 9. Team
+
+| Name | Role |
+|---|---|
+| **Nikolas Sapalidis** | Lead Developer — architecture, Mantle integration, AI pipeline, frontend verifier |
+| Team | Investing strategy design and signal research |
+
+**Site:** [nikolas.helpmarq.com](https://nikolas.helpmarq.com)

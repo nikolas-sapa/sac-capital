@@ -190,10 +190,13 @@ DEFAULT_CORE_UNIVERSE: list[Instrument] = [
 # ---------------------------------------------------------------------------
 
 class _PriceAdapter:
-    def __init__(self, feed: YFinancePriceFeed, failure_callback=None) -> None:
+    _LATEST_SERIES_PERIODS = ("5d", "1mo", "3mo", "1y")
+
+    def __init__(self, feed: YFinancePriceFeed, failure_callback=None, price_fallback=None) -> None:
         self._feed = feed
         self._cache = {}
         self._failure_callback = failure_callback
+        self._price_fallback = price_fallback
 
     def latest_close(self, ticker: str) -> float | None:
         started = time.monotonic()
@@ -201,10 +204,23 @@ class _PriceAdapter:
             series = self._latest_series(ticker)
             bar = series.latest
             duration = time.monotonic() - started
+            if bar is not None:
+                print(f"  [PROVIDER] source=yfinance_price ticker={ticker} ok duration_s={duration:.2f}")
+                return bar.close
+
+            if self._price_fallback is not None:
+                fallback_price = self._price_fallback(ticker)
+                if fallback_price is not None:
+                    print(
+                        f"  [PROVIDER] source=yfinance_price ticker={ticker} "
+                        f"fallback=ledger duration_s={duration:.2f}"
+                    )
+                    return fallback_price
+
             print(f"  [PROVIDER] source=yfinance_price ticker={ticker} ok duration_s={duration:.2f}")
-            if bar is None and self._failure_callback is not None:
+            if self._failure_callback is not None:
                 self._failure_callback()
-            return bar.close if bar is not None else None
+            return None
         except Exception as exc:
             duration = time.monotonic() - started
             print(
@@ -231,7 +247,20 @@ class _PriceAdapter:
 
     def _latest_series(self, ticker: str):
         if ticker not in self._cache:
-            self._cache[ticker] = self._feed.history(ticker, period="5d")
+            series = None
+            for period in self._LATEST_SERIES_PERIODS:
+                candidate = self._feed.history(ticker, period=period)
+                if candidate.bars:
+                    series = candidate
+                    if period != "5d":
+                        print(
+                            f"  [PROVIDER] source=yfinance_price ticker={ticker} "
+                            f"fallback_period={period}"
+                        )
+                    break
+                if series is None:
+                    series = candidate
+            self._cache[ticker] = series if series is not None else self._feed.history(ticker, period="5d")
         return self._cache[ticker]
 
 
@@ -486,19 +515,6 @@ async def run_once(
     def record_provider_failure() -> None:
         stats.record_provider_failure()
 
-    price_feed = YFinancePriceFeed(
-        timeout=settings.equity_provider_timeout_seconds,
-        retries=settings.equity_provider_retries,
-    )
-    prices = _PriceAdapter(price_feed, failure_callback=record_provider_failure)
-    news = CompositeNewsProvider([
-        YFinanceNewsProvider(),
-        TiingoNewsProvider(),   # no-op if TIINGO_API_KEY absent
-    ], failure_callback=record_provider_failure, registry=provider_registry)
-    filings_client = SECEdgarFilings()
-    filings_summary = _FilingsSummaryAdapter(filings_client, failure_callback=record_provider_failure)
-    llm_client = _LLMFailureCountingClient(ClaudeCodeClient(), stats)
-
     def fallback_mark_price(ticker: str) -> float | None:
         for pos in equity_ledger.open_positions():
             if pos.get("ticker") != ticker:
@@ -510,6 +526,23 @@ async def run_once(
             if entry_price is not None:
                 return float(entry_price)
         return None
+
+    price_feed = YFinancePriceFeed(
+        timeout=settings.equity_provider_timeout_seconds,
+        retries=settings.equity_provider_retries,
+    )
+    prices = _PriceAdapter(
+        price_feed,
+        failure_callback=record_provider_failure,
+        price_fallback=fallback_mark_price,
+    )
+    news = CompositeNewsProvider([
+        YFinanceNewsProvider(),
+        TiingoNewsProvider(),   # no-op if TIINGO_API_KEY absent
+    ], failure_callback=record_provider_failure, registry=provider_registry)
+    filings_client = SECEdgarFilings()
+    filings_summary = _FilingsSummaryAdapter(filings_client, failure_callback=record_provider_failure)
+    llm_client = _LLMFailureCountingClient(ClaudeCodeClient(), stats)
 
     paper = EquityPaperTracker(
         equity_ledger,
