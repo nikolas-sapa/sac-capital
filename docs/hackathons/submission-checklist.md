@@ -2,18 +2,18 @@
 
 ## DoraHacks Fields
 
-- Project title: `Mantle-Verifiable AI Prediction Agent Benchmark`
-- One-line pitch: `AI prediction-market decisions are exported as deterministic bytes32 commitments and anchored on Mantle for public verification and reputation.`
-- Description: explain the paper-trading agent, deterministic payload exporter, Mantle `AgentDecisionRegistry`, frontend verification panel, and outcome/reputation loop.
+- Project title: `Mantle-Verifiable AI Trading Agent`
+- One-line pitch: `AI trading decisions are exported as deterministic bytes32 commitments and anchored on Mantle so anyone can verify agent behavior and outcomes.`
+- Description: explain the multi-stage LLM equities pipeline, deterministic payload exporter, Mantle `AgentDecisionRegistry`, frontend verification panel, and outcome/reputation loop.
 - Repo URL: `https://github.com/nikolas-sapa/sapa_fund`
 - Demo URL: `https://sapa-fund.vercel.app`
 - Video URL: `TODO`
 - Contract address: `0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
-- Contract explorer URL: `https://explorer.sepolia.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
-- Deployment transaction: `https://explorer.sepolia.mantle.xyz/tx/0x62b7b9ce6c469768fc979f2d00610a7aba39b71c48a55a0081fdca424e4efe4b`
-- Decision transaction: `https://explorer.sepolia.mantle.xyz/tx/0x94ac5787a23f472a9d97e3ca435b9dc4818b734e0b3efad9ad2d2fd1251c6076`
-- Explorer verification URL: `https://explorer.sepolia.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887#code`
-- Team info: `TODO`
+- Contract explorer URL: `https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
+- Deployment transaction: `https://explorer.mantle.xyz/tx/0x46bbaa02a9e7fd1025f00896c70405978cc3596e04d0559e07c5c1b0cac1222b`
+- Decision transaction: `https://explorer.mantle.xyz/tx/0x94ac5787a23f472a9d97e3ca435b9dc4818b734e0b3efad9ad2d2fd1251c6076`
+- Explorer verification URL: `https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887#code`
+- Team: Nikolas Sapalidis (Lead Developer), Team (Assisted with trading principles)
 
 ## Deployment Award Checklist
 

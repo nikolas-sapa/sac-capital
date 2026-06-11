@@ -6,7 +6,9 @@
 - `recordOutcome(uint256 id, bytes32 outcomeHash, string uri)` anchors the later result.
 - `uri` should point to the public JSONL payload exported by `scripts/export_mantle_commitments.py`.
 
-This is not deployed yet. To qualify for the deployment award, deploy this contract to Mantle testnet or mainnet, verify it on Mantle Explorer, and include the address in the DoraHacks submission.
+**Deployed on Mantle Mainnet:** `0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
+Deploy tx: `0x46bbaa02a9e7fd1025f00896c70405978cc3596e04d0559e07c5c1b0cac1222b`
+Explorer: https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887
 
 ## Local Contract Tests
 
@@ -23,7 +25,7 @@ The tests cover decision recording, event emission, zero-value rejections, outco
 Set a dedicated deployer key in `.env` or the shell. Do not use a wallet that holds unrelated funds.
 
 ```sh
-export MANTLE_RPC_URL=https://rpc.sepolia.mantle.xyz
+export MANTLE_RPC_URL=https://rpc.mantle.xyz
 export MANTLE_PRIVATE_KEY=0x...
 
 forge script contracts/script/DeployAgentDecisionRegistry.s.sol \
@@ -44,9 +46,9 @@ Use the matching Mantle Explorer verifier for the network you deployed to:
 ```sh
 forge verify-contract "$AGENT_REGISTRY_ADDRESS" \
   contracts/AgentDecisionRegistry.sol:AgentDecisionRegistry \
-  --chain-id 5003 \
+  --chain-id 5000 \
   --verifier blockscout \
-  --verifier-url https://explorer.sepolia.mantle.xyz/api
+  --verifier-url https://explorer.mantle.xyz/api
 ```
 
 If the explorer URL changes, use the current Mantle Explorer verification endpoint and record the final verification link in the DoraHacks submission.

@@ -1,5 +1,93 @@
 [
   {
+    "bytes32": "0x53ca032c0d24db3d344ae6d2836e2a6d14ce8d716fe984981816269ec34ed251",
+    "hash_algorithm": "sha256",
+    "kind": "equity_trade_decision",
+    "payload": {
+      "kind": "equity_trade_decision",
+      "ticker": "META",
+      "strategy": "equity_analyst",
+      "side": "buy",
+      "entry_price": 587.0361938476562,
+      "shares": 0.020442,
+      "confidence": 0.8577,
+      "stop_loss": null,
+      "take_profit": null,
+      "mode": "paper",
+      "status": "submitted",
+      "opened_at": "2026-06-08T17:55:30.993678+00:00"
+    },
+    "schema_version": "mantle-agent-decision-v1",
+    "source": "equity_positions",
+    "canonical_json": "{\"kind\":\"equity_trade_decision\",\"payload\":{\"confidence\":0.8577,\"entry_price\":587.0361938476562,\"kind\":\"equity_trade_decision\",\"mode\":\"paper\",\"opened_at\":\"2026-06-08T17:55:30.993678+00:00\",\"shares\":0.020442,\"side\":\"buy\",\"status\":\"submitted\",\"stop_loss\":null,\"strategy\":\"equity_analyst\",\"take_profit\":null,\"ticker\":\"META\"},\"schema_version\":\"mantle-agent-decision-v1\",\"source\":\"equity_positions\"}"
+  },
+  {
+    "bytes32": "0xa318910abc338f577d592ee2d65843931dc2cf360434bbb2d7c3eb89f39276a7",
+    "hash_algorithm": "sha256",
+    "kind": "equity_trade_decision",
+    "payload": {
+      "kind": "equity_trade_decision",
+      "ticker": "NVDA",
+      "strategy": "equity_analyst",
+      "side": "buy",
+      "entry_price": 209.11000061035156,
+      "shares": 0.057386,
+      "confidence": 0.7865,
+      "stop_loss": null,
+      "take_profit": null,
+      "mode": "paper",
+      "status": "submitted",
+      "opened_at": "2026-06-08T17:55:31.328962+00:00"
+    },
+    "schema_version": "mantle-agent-decision-v1",
+    "source": "equity_positions",
+    "canonical_json": "{\"kind\":\"equity_trade_decision\",\"payload\":{\"confidence\":0.7865,\"entry_price\":209.11000061035156,\"kind\":\"equity_trade_decision\",\"mode\":\"paper\",\"opened_at\":\"2026-06-08T17:55:31.328962+00:00\",\"shares\":0.057386,\"side\":\"buy\",\"status\":\"submitted\",\"stop_loss\":null,\"strategy\":\"equity_analyst\",\"take_profit\":null,\"ticker\":\"NVDA\"},\"schema_version\":\"mantle-agent-decision-v1\",\"source\":\"equity_positions\"}"
+  },
+  {
+    "bytes32": "0x142f7cf8bfa1db90387e9c85c5cc539bd0a6f89562b979bda51090add77ff6b9",
+    "hash_algorithm": "sha256",
+    "kind": "equity_trade_decision",
+    "payload": {
+      "kind": "equity_trade_decision",
+      "ticker": "LLY",
+      "strategy": "equity_analyst",
+      "side": "buy",
+      "entry_price": 1160.050048828125,
+      "shares": 0.00862,
+      "confidence": 0.7251,
+      "stop_loss": null,
+      "take_profit": null,
+      "mode": "paper",
+      "status": "submitted",
+      "opened_at": "2026-06-08T17:55:32.051008+00:00"
+    },
+    "schema_version": "mantle-agent-decision-v1",
+    "source": "equity_positions",
+    "canonical_json": "{\"kind\":\"equity_trade_decision\",\"payload\":{\"confidence\":0.7251,\"entry_price\":1160.050048828125,\"kind\":\"equity_trade_decision\",\"mode\":\"paper\",\"opened_at\":\"2026-06-08T17:55:32.051008+00:00\",\"shares\":0.00862,\"side\":\"buy\",\"status\":\"submitted\",\"stop_loss\":null,\"strategy\":\"equity_analyst\",\"take_profit\":null,\"ticker\":\"LLY\"},\"schema_version\":\"mantle-agent-decision-v1\",\"source\":\"equity_positions\"}"
+  },
+  {
+    "bytes32": "0x6e4460fe2e741fb43abe9732840973d8d4b8bd5c4e1c534909dbc01a0803aca3",
+    "hash_algorithm": "sha256",
+    "kind": "equity_trade_decision",
+    "payload": {
+      "kind": "equity_trade_decision",
+      "ticker": "MSFT",
+      "strategy": "equity_analyst",
+      "side": "buy",
+      "entry_price": 410.4599914550781,
+      "shares": 0.292355,
+      "confidence": 0.7017,
+      "stop_loss": null,
+      "take_profit": null,
+      "mode": "paper",
+      "status": "submitted",
+      "opened_at": "2026-06-09T13:48:57.860127+00:00"
+    },
+    "schema_version": "mantle-agent-decision-v1",
+    "source": "equity_positions",
+    "canonical_json": "{\"kind\":\"equity_trade_decision\",\"payload\":{\"confidence\":0.7017,\"entry_price\":410.4599914550781,\"kind\":\"equity_trade_decision\",\"mode\":\"paper\",\"opened_at\":\"2026-06-09T13:48:57.860127+00:00\",\"shares\":0.292355,\"side\":\"buy\",\"status\":\"submitted\",\"stop_loss\":null,\"strategy\":\"equity_analyst\",\"take_profit\":null,\"ticker\":\"MSFT\"},\"schema_version\":\"mantle-agent-decision-v1\",\"source\":\"equity_positions\"}"
+  },
+  {
     "bytes32": "0x5505684141f5969ddac29a264fa972584abeb3bfce559ee96d87ea1d3389b5d9",
     "hash_algorithm": "sha256",
     "kind": "equity_research_artifact",
