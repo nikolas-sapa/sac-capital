@@ -40,24 +40,31 @@ function buildChartData(positions: EquityPosition[], range: TimeRange) {
 
   const nowTs = today.getTime();
 
-  const todayDate = new Date(today);
-  todayDate.setHours(0, 0, 0, 0);
+  // Historical points use a stable flat line at current P&L from each position's
+  // open date. This prevents the chart from rescaling on every live-data refresh.
+  // Only today's point tracks the live P&L exactly.
+  const todayStr = new Date().toDateString();
+  const totalCurrentPnl = positions.reduce(
+    (s, p) => s + (p.unrealized_pnl ?? 0) + (p.realized_pnl ?? 0), 0
+  );
 
   return days.map((day) => {
     const dayTs = day.getTime();
-    const isToday = day.toDateString() === todayDate.toDateString();
+    const isToday = day.toDateString() === todayStr;
     let cumPnl = 0;
 
-    for (const pos of positions) {
-      const openTs = pos.opened_at
-        ? new Date(pos.opened_at).setHours(0, 0, 0, 0)
-        : nowTs - 7 * 86400_000;
-      if (dayTs < openTs) continue;
-      // always use fraction=1 for today so current P&L is exact
-      const fraction = isToday
-        ? 1
-        : Math.min((dayTs - openTs) / Math.max(nowTs - openTs, 1), 1);
-      cumPnl += ((pos.unrealized_pnl ?? 0) + (pos.realized_pnl ?? 0)) * fraction;
+    if (isToday) {
+      cumPnl = totalCurrentPnl;
+    } else {
+      // Sum contributions from positions that were open on this day
+      for (const pos of positions) {
+        const openTs = pos.opened_at
+          ? new Date(pos.opened_at).setHours(0, 0, 0, 0)
+          : nowTs - 7 * 86400_000;
+        if (dayTs < openTs) continue;
+        // Stable: use current P&L for all past days once position was open
+        cumPnl += (pos.unrealized_pnl ?? 0) + (pos.realized_pnl ?? 0);
+      }
     }
 
     const mm = String(day.getMonth() + 1).padStart(2, "0");
