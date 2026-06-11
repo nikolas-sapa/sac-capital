@@ -1,49 +1,54 @@
 # Mantle-Verifiable AI Trading Agent
 
-One-line pitch: AI trading decisions are exported as deterministic `bytes32` commitments and anchored on Mantle so judges can verify agent behavior and outcomes.
+> AI trading decisions are exported as deterministic `bytes32` commitments and anchored on Mantle — anyone can verify agent behavior and outcomes.
 
-Hackathon track: `AI Alpha & Data`
+**Track:** AI Alpha & Data · Turing Test Hackathon 2026
 
-Submission:
+| | |
+|---|---|
+| Demo | [sapa-fund.vercel.app](https://sapa-fund.vercel.app) |
+| Contract | [`0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`](https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887) |
+| Deploy tx | [`0x46bbaa...`](https://explorer.mantle.xyz/tx/0x46bbaa02a9e7fd1025f00896c70405978cc3596e04d0559e07c5c1b0cac1222b) |
+| Decision tx | [`0x94ac57...`](https://explorer.mantle.xyz/tx/0x94ac5787a23f472a9d97e3ca435b9dc4818b734e0b3efad9ad2d2fd1251c6076) |
 
-- GitHub: `https://github.com/nikolas-sapa/sapa_fund`
-- Public demo: `https://sapa-fund.vercel.app`
-- Demo video: `TODO`
-- Mantle contract address: `0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
-- Mantle contract explorer: `https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`
-- Mantle deployment transaction: `https://explorer.mantle.xyz/tx/0x62b7b9ce6c469768fc979f2d00610a7aba39b71c48a55a0081fdca424e4efe4b`
-- Mantle decision transaction: `https://explorer.mantle.xyz/tx/0x94ac5787a23f472a9d97e3ca435b9dc4818b734e0b3efad9ad2d2fd1251c6076`
-- Mantle Explorer verification link: `https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887#code`
+---
 
-Architecture:
+## How It Works
 
-```text
-Bot / LLM strategies
-  -> paper ledger + research artifacts
-  -> deterministic commitment exporter
-  -> AgentDecisionRegistry on Mantle
-  -> frontend verification and reputation demo
+```
+US Equity Event Screen
+  → Haiku pre-filter
+  → Sonnet bull thesis
+  → Sonnet challenger
+  → Auditor
+  → Risk Kernel (fractional Kelly, 2% per-trade cap, 35% sector cap)
+  → Alpaca paper order + local ledger entry
+  → Deterministic canonical JSON exporter
+  → AgentDecisionRegistry on Mantle (bytes32 SHA-256 commitment)
+  → Frontend verification panel
 ```
 
-Mantle is the immutable benchmark layer: the bot keeps rich off-chain payloads public, hashes them with canonical JSON, records decision hashes on Mantle, and can later record outcome hashes against the original decision IDs. The frontend shows both the payload and the recomputed hash so reviewers can verify that the on-chain record matches the AI decision.
+Mantle is the immutable benchmark layer. The agent hashes each decision payload with canonical JSON → SHA-256 → `bytes32`, records it on-chain, and can later anchor outcome hashes against the same decision ID. The frontend recomputes the hash client-side so reviewers can confirm the on-chain record matches the AI output.
 
-Safety boundary: this remains paper-only. On-chain records are verifiability anchors for decisions and outcomes; they are not custody, brokerage, or live-trading instructions.
+**Safety boundary:** paper-only. On-chain records are verifiability anchors — not custody, brokerage, or live-trading instructions.
 
-## Hackathon Repro Steps
+---
 
-Install Python dependencies:
+## Reproduce Locally
+
+**Dependencies**
 
 ```sh
 uv sync
 ```
 
-Run tests:
+**Tests**
 
 ```sh
 ./.venv/bin/python -m pytest
 ```
 
-Export decision commitments:
+**Export decision commitments**
 
 ```sh
 ./.venv/bin/python scripts/export_mantle_commitments.py \
@@ -51,20 +56,20 @@ Export decision commitments:
   --out data/mantle_commitments.jsonl
 ```
 
-Run a dry-run Mantle submission:
+**Dry-run Mantle submission**
 
 ```sh
 ./.venv/bin/python scripts/submit_mantle_decisions.py \
   --commitments data/mantle_commitments.jsonl \
-  --contract 0x0000000000000000000000000000000000000001 \
+  --contract 0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887 \
   --agent-id mantle-verifiable-ai-agent \
   --limit 1
 ```
 
-Deploy the contract after installing Foundry and funding a dedicated Mantle deployer wallet:
+**Deploy contract** (Foundry required, funded Mantle wallet)
 
 ```sh
-export MANTLE_RPC_URL=https://rpc.sepolia.mantle.xyz
+export MANTLE_RPC_URL=https://rpc.mantle.xyz
 export MANTLE_PRIVATE_KEY=0x...
 
 forge test
@@ -73,28 +78,7 @@ forge script contracts/script/DeployAgentDecisionRegistry.s.sol \
   --broadcast
 ```
 
-Submit one decision only after setting the real registry address:
-
-```sh
-export AGENT_REGISTRY_ADDRESS=0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887
-export AGENT_ID=mantle-verifiable-ai-agent
-
-./.venv/bin/python scripts/submit_mantle_decisions.py \
-  --commitments data/mantle_commitments.jsonl \
-  --contract "$AGENT_REGISTRY_ADDRESS" \
-  --agent-id "$AGENT_ID" \
-  --limit 1 \
-  --send
-```
-
-Submitted Mantle Sepolia decision:
-
-```text
-decisionHash: 0x0457fade4e4ab5b4141986b5651f601362d9784a96a92417ee8e31b60bb9431e
-transaction: 0x94ac5787a23f472a9d97e3ca435b9dc4818b734e0b3efad9ad2d2fd1251c6076
-```
-
-Run the frontend locally:
+**Frontend**
 
 ```sh
 cd frontend
@@ -102,306 +86,73 @@ npm install
 npm run dev
 ```
 
-For live Mantle event reads, set these before building or deploying the frontend:
-
-```sh
-VITE_MANTLE_RPC_URL=https://rpc.sepolia.mantle.xyz
-VITE_AGENT_REGISTRY_ADDRESS=0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887
-VITE_MANTLE_EXPLORER_BASE=https://sepolia.mantlescan.xyz
-```
-
-Vercel deployment: use `frontend/` as the project root, build command `npm run build`, and output directory `dist`.
-
-# AI Trading Agent
-
-Paper-trading research system for US equities.
-
-The repo is built to test research ideas, log evidence, replay outcomes, and keep execution behind paper-only fuses. It does not contain a live-trading implementation path.
-
-Suggested GitHub description:
-
-```text
-Paper-trading research system for US equities with LLM analysis, risk fuses, auditable artifacts, Alpaca paper execution, replay evaluation, and Mantle-verifiable decision anchoring.
-```
-
-Suggested GitHub topics:
-
-```text
-equities, paper-trading, algorithmic-trading, llm, risk-management, alpaca, backtesting, python, mantle, blockchain
-```
-
-## What It Does
-
-- Scans US equities for paper-trading opportunities.
-- Uses deterministic screens before any LLM call.
-- Runs LLM analysis with typed validation and rejection paths.
-- Stores research artifacts so every analysed equity candidate can be audited.
-- Applies portfolio risk fuses before paper orders.
-- Supports internal paper fills and Alpaca paper brokerage orders.
-- Reconciles Alpaca paper order state back into the local ledger.
-- Replays stored equity research artifacts against historical prices.
-- Runs locally via CLI or macOS `launchd`.
-
-## Safety Boundary
-
-This project is paper-only.
-
-- `LIVE_TRADING_ENABLED` must remain false.
-- `EXECUTION_PROVIDER=internal_paper` is the default.
-- `EXECUTION_PROVIDER=alpaca_paper` is restricted to Alpaca paper URLs.
-- Alpaca live URLs are rejected by the executor.
-- Submitted broker orders are not treated as filled positions.
-- Forward-paper entries are only recorded after actual broker fills or internal paper fills.
-
-## Main Entry Points
-
-```text
-runner_equities.py    US equities paper runner
-runner_research.py    Offline research runner
-scripts/run_nightly.py Nightly maintenance wrapper
-```
+---
 
 ## Repository Layout
 
-```text
-core/                 Shared config, ledgers, alerts, LLM adapters
-strategies/           LLM probability strategies
-orchestrator/         Strategy allocation, performance, reconciliation, risk
-harness/              Approval, calibration, retuning, nightly self-improvement
-equities/
-  analysis/           Equity analyst, prompts, typed LLM schemas, budget controls
-  data/               Prices, fundamentals, calendar, filings, news, macro, VIX
-  eval/               Research artifact replay and report command
-  execution/          Alpaca paper execution and reconciliation
-  killgate/           Forward-paper tracker and promotion gates
-  research/           Artifact store and offline research modules
-  risk/               Sizing, exits, risk kernel
-  screen/             Event, quality, inflection, thematic, relative-strength screens
-docs/                 Plans and operator runbooks
-deploy/               macOS launchd plists
-tests/                Regression suite
 ```
+core/             Config, ledgers, alerts, LLM adapters
+equities/
+  analysis/       Equity analyst, typed LLM schemas, budget controls
+  data/           Prices, fundamentals, calendar, filings, news, macro, VIX
+  eval/           Research artifact replay and report
+  execution/      Alpaca paper execution and reconciliation
+  killgate/       Forward-paper tracker and promotion gates
+  research/       Artifact store and offline research modules
+  risk/           Sizing, exits, risk kernel
+  screen/         Event, quality, inflection, thematic, relative-strength
+contracts/        AgentDecisionRegistry.sol (Mantle)
+scripts/          Commitment exporter, Mantle submission, nightly maintenance
+frontend/         React/Vite verification dashboard
+tests/            481-test regression suite
+docs/             Operator runbooks
+deploy/           macOS launchd plists
+```
+
+---
 
 ## Equities Pipeline
 
-`runner_equities.py` runs the equity loop:
+`runner_equities.py` runs the full loop:
 
-1. Mark open positions and check exits.
-2. Classify macro regime.
-3. Check thesis health on open swing positions.
-4. Check thematic concentration.
-5. Run event screen for earnings and recent 8-K catalysts.
-6. Add relative-strength, trend, base, breakout-volume, and do-not-chase evidence.
-7. Run core quality screen.
-8. Run inflection screen.
-9. Stop here when `--no-analyse` is used.
-10. Apply VIX entry gate.
-11. Run LLM prefilter, analyst, challenger, and auditor.
-12. Validate LLM output with Pydantic.
-13. Write research artifacts for accepted and rejected analysed candidates.
-14. Pass recommendations through risk kernel.
-15. Open internal paper positions or submit Alpaca paper orders.
-16. Print a run summary with stages, runtime, failures, and budget.
+1. Mark open positions and check exits
+2. Classify macro regime
+3. Check thesis health on open swing positions
+4. Check thematic concentration
+5. Run event screen (earnings + recent 8-K catalysts)
+6. Add relative-strength, trend, base, breakout-volume evidence
+7. Run quality and inflection screens
+8. Apply VIX entry gate
+9. Run LLM pre-filter → analyst → challenger → auditor
+10. Validate with Pydantic; reject malformed outputs
+11. Write research artifacts for all analysed candidates
+12. Pass through risk kernel
+13. Submit Alpaca paper orders or internal paper fills
 
-## Equity Risk Controls
+---
 
-The runner passes live ledger state into `RiskKernel.approve()`:
-
-- current equity
-- same-day realized PnL
-- open positions
-- sector lookup
-- configured max positions
-- configured daily-loss halt
-- configured drawdown halt
-- configured sector cap
-- configured name cap
-- configured per-trade risk
-
-Bad market data rejects before an analyst prompt is built:
-
-- missing price
-- zero price
-- NaN or non-finite price
-- stale latest bar
-
-Invalid LLM output rejects before a `Recommendation` exists:
-
-- malformed JSON
-- missing required buy fields
-- `entry <= 0`
-- `stop_loss >= entry`
-- `take_profit <= entry`
-- confidence outside `[0, 1]`
-- empty catalyst or thesis
-- missing structured memo fields
-- missing evidence citations
-
-## Alpaca Paper Discipline
-
-Alpaca execution is paper-only and guarded:
-
-- rejects non-paper Alpaca settings
-- rejects non-paper Alpaca base URLs
-- checks account buying power before buy orders
-- enforces local max notional
-- uses deterministic `client_order_id`
-- skips duplicate active client order IDs on rerun
-- submits buy orders as day limit orders at the recommendation entry
-- records broker orders as `submitted`, `partially_filled`, `open`, `canceled`, `expired`, or `rejected`
-- reconciles `filled_avg_price` and filled quantity from broker state
-- does not record a forward-paper trade for unfilled submitted orders
-
-## Research Artifacts
-
-Analysed equity candidates are appended to:
-
-```text
-data/research_artifacts.jsonl
-```
-
-Artifacts include:
-
-- as-of timestamp
-- ticker
-- candidate evidence
-- source hashes
-- LLM model
-- prompt hash
-- raw output
-- parsed output
-- confidence
-- accepted/rejected/error decision
-- rejection reason
-
-Replay reports use these artifacts to evaluate strategy changes before they affect paper order flow.
-
-## Commands
-
-Install dependencies:
+## Key Configuration
 
 ```sh
-uv sync
-```
-
-Run all tests:
-
-```sh
-./.venv/bin/python -m pytest
-```
-
-Run equity-focused tests:
-
-```sh
-./.venv/bin/python -m pytest tests/equities tests/test_equity_ledger.py tests/test_runner_equities_reconcile_cli.py tests/test_prices.py tests/test_fundamentals_enriched.py tests/test_macro_regime.py
-```
-
-Screen equities without LLM analysis:
-
-```sh
-./.venv/bin/python runner_equities.py --no-analyse
-```
-
-Mark positions and exits only:
-
-```sh
-./.venv/bin/python runner_equities.py --mark-only
-```
-
-Run broker reconciliation only:
-
-```sh
-./.venv/bin/python runner_equities.py --reconcile-only
-```
-
-Run a no-write equity pass:
-
-```sh
-./.venv/bin/python runner_equities.py --dry-run
-```
-
-Replay research artifacts:
-
-```sh
-./.venv/bin/python -m equities.eval.report --validation-start 2026-01-01
-```
-
-## Configuration
-
-Settings are loaded from `.env` through `core/config.py`.
-
-Important equity settings:
-
-```text
-EXECUTION_PROVIDER=internal_paper
+EXECUTION_PROVIDER=internal_paper   # never alpaca_live
 LIVE_TRADING_ENABLED=false
-EQUITY_LEDGER_PATH=data/equity.db
 EQUITY_RISK_PCT=0.02
 EQUITY_MAX_POSITIONS=4
-EQUITY_MAX_NAME_PCT=0.25
 EQUITY_MAX_SECTOR_PCT=0.35
 EQUITY_DAILY_LOSS_LIMIT_PCT=0.05
-EQUITY_DRAWDOWN_LIMIT_PCT=0.15
-EQUITY_MAX_PRICE_AGE_DAYS=7
-EQUITY_PROVIDER_TIMEOUT_SECONDS=10
-EQUITY_PROVIDER_RETRIES=1
-EQUITY_RUNNER_MAX_RUNTIME_SECONDS=600
-EQUITY_RUNNER_MAX_PROVIDER_FAILURES=20
-EQUITY_RUNNER_MAX_LLM_FAILURES=5
-EQUITY_RUNNER_DRY_RUN=false
-MAX_ORDER_USD=25
-MAX_DAILY_ORDER_COUNT=3
-```
 
-Alpaca paper settings:
-
-```text
-EXECUTION_PROVIDER=alpaca_paper
+# Alpaca paper
 ALPACA_PAPER=true
 ALPACA_BASE_URL=https://paper-api.alpaca.markets
 ALPACA_API_KEY_ID=...
 ALPACA_SECRET_KEY=...
+
+# LLM
+ANTHROPIC_FAST_MODEL=claude-haiku-4-5-20251001
+ANTHROPIC_STRONG_MODEL=claude-sonnet-4-6
 ```
 
-## LLM Routing
-
-The project can route LLM calls through:
-
-- local Codex CLI / ChatGPT login first
-- Anthropic SDK as the programmatic fallback when the primary path is exhausted or fails
-- OpenAI API when explicitly selected with `LLM_PROVIDER=openai`
-- Anthropic SDK when explicitly selected with `LLM_PROVIDER=anthropic`
-- Claude CLI when explicitly selected with `LLM_PROVIDER=claude`
-
-If `ANTHROPIC_API_KEY` is set, the default Codex path can fall back to the
-Anthropic API when the primary provider hits a quota-style failure.
-
-Anthropic uses its own fast/strong model knobs:
-
-- `ANTHROPIC_FAST_MODEL=claude-haiku-4-5-20251001`
-- `ANTHROPIC_STRONG_MODEL=claude-sonnet-4-6`
-
-Model mapping:
-
-- fast tasks use Haiku 4.5
-- reasoning / stronger tasks use Sonnet 4.6
-
-The equity analyst still treats LLM output as untrusted. Parsed outputs must pass typed schema checks before becoming recommendations.
-
-## Operations
-
-macOS `launchd` plists live in `deploy/`.
-
-Useful logs:
-
-```sh
-tail -f data/equities_mark.log
-tail -f data/equities_scan.log
-tail -f data/alpaca_reconcile.log
-tail -f data/nightly.log
-```
-
-See [docs/equities-hardening.md](docs/equities-hardening.md) for the operator hardening runbook.
+---
 
 ## Team
 
@@ -410,17 +161,4 @@ See [docs/equities-hardening.md](docs/equities-hardening.md) for the operator ha
 | **Nikolas Sapalidis** | Lead Developer — architecture, Mantle integration, AI pipeline, frontend |
 | Team | Assisted with trading principles |
 
-**Website:** [nikolas.helpmarq.com](https://nikolas.helpmarq.com)
-
-## Before Any Live Trading Design
-
-Live trading is out of scope. Before a separate live design is even considered:
-
-- paper Alpaca reconciliation must be clean over a meaningful sample
-- replay reports must show enough validation trades
-- expectancy must be positive after costs
-- max drawdown and concentration must be acceptable
-- every analysed candidate must have an artifact
-- runbooks must be current
-- a separate risk guardian process must exist outside strategy code
-- `LIVE_TRADING_ENABLED` must remain disabled until a reviewed live implementation exists
+[nikolas.helpmarq.com](https://nikolas.helpmarq.com)
