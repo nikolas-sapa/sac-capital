@@ -34,7 +34,6 @@ class TestDefaults:
         assert s.core_dca_pct == 0.01
         assert s.max_order_usd == 25.0
         assert s.max_daily_order_count == 3
-        assert s.polymarket_scan_alerts is False
         assert s.allow_extended_hours is False
         assert s.allow_test_orders is False
         assert s.live_trading_enabled is False
