@@ -21,21 +21,24 @@ export const registryAbi = [
   },
 ] as const;
 
-export const mantleSepolia = defineChain({
-  id: 5003,
-  name: "Mantle Sepolia",
+export const mantleMainnet = defineChain({
+  id: 5000,
+  name: "Mantle",
   nativeCurrency: { decimals: 18, name: "MNT", symbol: "MNT" },
-  rpcUrls: { default: { http: ["https://rpc.sepolia.mantle.xyz"] } },
+  rpcUrls: { default: { http: ["https://rpc.mantle.xyz"] } },
   blockExplorers: {
-    default: { name: "Mantle Explorer", url: "https://sepolia.mantlescan.xyz" },
+    default: { name: "Mantle Explorer", url: "https://explorer.mantle.xyz" },
   },
 });
 
-export const registryAddress = import.meta.env.VITE_AGENT_REGISTRY_ADDRESS as Hex | undefined;
-export const rpcUrl = import.meta.env.VITE_MANTLE_RPC_URL as string | undefined;
-export const explorerBase =
-  (import.meta.env.VITE_MANTLE_EXPLORER_BASE as string | undefined) ||
-  "https://explorer.mantle.xyz";
+export const registryAddress = (
+  import.meta.env.VITE_AGENT_REGISTRY_ADDRESS ||
+  "0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887"
+) as Hex;
+export const rpcUrl: string =
+  import.meta.env.VITE_MANTLE_RPC_URL || "https://rpc.mantle.xyz";
+export const explorerBase: string =
+  import.meta.env.VITE_MANTLE_EXPLORER_BASE || "https://explorer.mantle.xyz";
 
 export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -66,7 +69,7 @@ export function formatPct(value?: number) {
 }
 
 export function createMantleClient(url: string) {
-  return createPublicClient({ chain: mantleSepolia, transport: http(url) });
+  return createPublicClient({ chain: mantleMainnet, transport: http(url) });
 }
 
 export function createRegistryContract(address: Hex, client: ReturnType<typeof createMantleClient>) {
