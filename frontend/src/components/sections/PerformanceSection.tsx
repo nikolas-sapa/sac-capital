@@ -1,83 +1,35 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ChartAreaStep from "@/components/ui/chart-area-step";
 import { AnimateNumber } from "@/components/ui/animated-blur-number";
-import type { EquityPosition } from "@/types";
+import type { EquityPosition, PortfolioHistoryPoint } from "@/types";
 import { cn } from "@/lib/utils";
 
 type TimeRange = "1D" | "1W" | "1M" | "6M" | "1Y" | "All";
 const RANGES: TimeRange[] = ["1D", "1W", "1M", "6M", "1Y", "All"];
-const DAYS_BACK: Record<TimeRange, number> = {
-  "1D": 1, "1W": 7, "1M": 30, "6M": 180, "1Y": 365, "All": 730,
-};
 
 interface PerformanceSectionProps {
   positions: EquityPosition[];
 }
 
-function buildChartData(positions: EquityPosition[], range: TimeRange) {
-  const today = new Date();
-  today.setHours(23, 59, 59, 0);
-
-  const daysBack = DAYS_BACK[range];
-  const startDate = new Date(today);
-  startDate.setDate(startDate.getDate() - daysBack);
-  startDate.setHours(0, 0, 0, 0);
-
-  if (range === "All") {
-    for (const p of positions) {
-      if (!p.opened_at) continue;
-      const d = new Date(p.opened_at);
-      if (d < startDate) { startDate.setTime(d.getTime()); startDate.setHours(0,0,0,0); }
-    }
-  }
-
-  const days: Date[] = [];
-  const cursor = new Date(startDate);
-  while (cursor <= today) {
-    days.push(new Date(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-
-  const nowTs = today.getTime();
-
-  // Historical points use a stable flat line at current P&L from each position's
-  // open date. This prevents the chart from rescaling on every live-data refresh.
-  // Only today's point tracks the live P&L exactly.
-  const todayStr = new Date().toDateString();
-  const totalCurrentPnl = positions.reduce(
-    (s, p) => s + (p.unrealized_pnl ?? 0) + (p.realized_pnl ?? 0), 0
-  );
-
-  return days.map((day) => {
-    const dayTs = day.getTime();
-    const isToday = day.toDateString() === todayStr;
-    let cumPnl = 0;
-
-    if (isToday) {
-      cumPnl = totalCurrentPnl;
-    } else {
-      // Sum contributions from positions that were open on this day
-      for (const pos of positions) {
-        const openTs = pos.opened_at
-          ? new Date(pos.opened_at).setHours(0, 0, 0, 0)
-          : nowTs - 7 * 86400_000;
-        if (dayTs < openTs) continue;
-        // Stable: use current P&L for all past days once position was open
-        cumPnl += (pos.unrealized_pnl ?? 0) + (pos.realized_pnl ?? 0);
-      }
-    }
-
-    const mm = String(day.getMonth() + 1).padStart(2, "0");
-    const dd = String(day.getDate()).padStart(2, "0");
-    return { label: `${mm}/${dd}`, value: parseFloat(cumPnl.toFixed(2)) };
-  });
-}
-
 export function PerformanceSection({ positions }: PerformanceSectionProps) {
   const [range, setRange] = useState<TimeRange>("1W");
+  const [historyPoints, setHistoryPoints] = useState<PortfolioHistoryPoint[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
-  const chartData = useMemo(() => buildChartData(positions, range), [positions, range]);
+  // Fetch real Alpaca portfolio history whenever the range changes
+  useEffect(() => {
+    setHistoryLoading(true);
+    fetch(`/api/portfolio-history?period=${range}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.points?.length) setHistoryPoints(d.points);
+        else setHistoryPoints([]);
+      })
+      .catch(() => setHistoryPoints([]))
+      .finally(() => setHistoryLoading(false));
+  }, [range]);
 
+  // Live total unrealized P&L from positions (for the big number)
   const openPositions = positions.filter((p) => p.status === "open");
   const totalUnrealized = openPositions.reduce((s, p) => s + (p.unrealized_pnl ?? 0), 0);
   const totalNotional = positions
@@ -89,6 +41,31 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
     confPositions.length > 0
       ? confPositions.reduce((s, p) => s + p.confidence!, 0) / confPositions.length
       : null;
+
+  // Period P&L = last point in history (what the portfolio gained/lost over the period)
+  const periodPnl =
+    historyPoints.length > 0 ? historyPoints[historyPoints.length - 1].value : totalUnrealized;
+  const pnlPositive = periodPnl >= 0;
+
+  // Fallback chart when API unavailable: flat line from position open dates
+  const fallbackPoints = useMemo<PortfolioHistoryPoint[]>(() => {
+    const today = new Date();
+    const days: PortfolioHistoryPoint[] = [];
+    const totalPnl = positions.reduce(
+      (s, p) => s + (p.unrealized_pnl ?? 0) + (p.realized_pnl ?? 0), 0
+    );
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      days.push({ label: `${mm}/${dd}`, value: i === 0 ? totalPnl : 0 });
+    }
+    return days;
+  }, [positions]);
+
+  const chartData =
+    historyPoints.length > 0 ? historyPoints : fallbackPoints;
 
   type StatCard = {
     value: number; label: string; positive: boolean | null;
@@ -106,8 +83,6 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
       : []),
   ];
 
-  const pnlPositive = totalUnrealized >= 0;
-
   return (
     <section id="performance" className="py-24 px-6 bg-[#0B0B0D]">
       <div className="max-w-6xl mx-auto">
@@ -121,25 +96,47 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
           </h2>
         </div>
 
-        {/* Big unrealized P&L */}
-        <div className="mb-10 rounded-[16px] border border-[rgba(243,242,238,0.07)] bg-[#1A1A1E] p-8 flex flex-col gap-1">
-          <p className="text-[10px] font-mono tracking-widest uppercase text-[#8B8D91] mb-3">
-            Unrealized P&amp;L
-          </p>
-          <div className={cn(pnlPositive ? "text-emerald-400" : "text-red-400")}>
-            <AnimateNumber
-              value={Math.abs(totalUnrealized)}
-              prefix={totalUnrealized < 0 ? "-$" : "+$"}
-              format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
-              className="text-6xl font-semibold tracking-tight"
-              duration={600}
-            />
+        {/* Big P&L card — period selector lives here */}
+        <div className="mb-10 rounded-[16px] border border-[rgba(243,242,238,0.07)] bg-[#1A1A1E] p-8">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
+            <div>
+              <p className="text-[10px] font-mono tracking-widest uppercase text-[#8B8D91] mb-3">
+                {range === "1D" ? "Today's P&L" : `${range} P&L`}
+              </p>
+              <div className={cn(pnlPositive ? "text-emerald-400" : "text-red-400")}>
+                <AnimateNumber
+                  value={Math.abs(periodPnl)}
+                  prefix={periodPnl < 0 ? "-$" : "+$"}
+                  format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
+                  className="text-6xl font-semibold tracking-tight"
+                  duration={600}
+                />
+              </div>
+              {totalNotional > 0 && (
+                <p className="text-[#8B8D91] text-sm font-mono mt-2">
+                  on ${totalNotional.toFixed(2)} notional deployed
+                </p>
+              )}
+            </div>
+
+            {/* Period selector */}
+            <div className="flex flex-wrap items-center gap-1 bg-[rgba(243,242,238,0.04)] rounded-[8px] p-1 self-start">
+              {RANGES.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRange(r)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-[6px] text-xs font-mono transition-all",
+                    r === range
+                      ? "bg-[#0b7bff] text-white"
+                      : "text-[#8B8D91] hover:text-[#F3F2EE] hover:bg-[rgba(243,242,238,0.06)]"
+                  )}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
           </div>
-          {totalNotional > 0 && (
-            <p className="text-[#8B8D91] text-sm font-mono mt-2">
-              on ${totalNotional.toFixed(2)} notional deployed
-            </p>
-          )}
         </div>
 
         {/* Stat cards */}
@@ -168,32 +165,13 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
           </div>
         )}
 
-        {/* Chart with time filters */}
-        <div className="w-full rounded-none border-[3px] border-[rgba(243,242,238,0.12)] bg-[#0B0B0D] p-4 text-[#F3F2EE] shadow-[4px_4px_0_0_#0b7bff]">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-widest text-[#8B8D91] font-mono">Portfolio P&amp;L</p>
-              <h3 className="mt-1 text-sm font-bold font-mono">Cumulative unrealized + realized</h3>
-            </div>
-            {/* Time range filters */}
-            <div className="flex items-center gap-1 bg-[rgba(243,242,238,0.04)] rounded-[6px] p-1">
-              {RANGES.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRange(r)}
-                  className={cn(
-                    "px-2.5 py-1 rounded-[4px] text-[10px] font-mono transition-all",
-                    r === range
-                      ? "bg-[#0b7bff] text-white"
-                      : "text-[#8B8D91] hover:text-[#F3F2EE] hover:bg-[rgba(243,242,238,0.06)]"
-                  )}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
-          <ChartAreaStep data={chartData} />
+        {/* Chart */}
+        <div className={cn("transition-opacity duration-200", historyLoading && "opacity-50")}>
+          <ChartAreaStep
+            data={chartData}
+            title="Portfolio P&L"
+            subtitle={`${range} · Alpaca portfolio history`}
+          />
         </div>
       </div>
     </section>

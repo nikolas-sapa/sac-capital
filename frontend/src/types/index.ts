@@ -60,6 +60,9 @@ export type EquityPosition = {
   closed_at: string | null;
 };
 
+export type PortfolioHistoryPoint = { label: string; value: number };
+export type PortfolioHistory = { points: PortfolioHistoryPoint[]; base_value?: number };
+
 export type PerformanceSummary = {
   generated_at: string;
   total_commitments: number;
