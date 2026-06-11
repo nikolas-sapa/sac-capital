@@ -6,7 +6,7 @@ Hackathon track: `AI Alpha & Data`
 
 Submission:
 
-- GitHub: `https://github.com/nikolas-sapa/sapa-fund`
+- GitHub: `https://github.com/nikolas-sapa/sapa_fund`
 - Public demo: `https://sapa-fund.vercel.app`
 - Demo video: `TODO`
 - Mantle contract address: `0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`

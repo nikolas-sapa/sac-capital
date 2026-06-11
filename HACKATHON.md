@@ -121,7 +121,7 @@ print("0x" + hashlib.sha256(canonical.encode()).hexdigest())
 ## 7. Reproduce Locally
 
 ```bash
-git clone https://github.com/nikolas-sapa/sapa-fund
+git clone https://github.com/nikolas-sapa/sapa_fund
 uv sync
 
 # Export decision commitments from the paper ledger

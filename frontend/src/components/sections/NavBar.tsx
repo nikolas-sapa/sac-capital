@@ -9,7 +9,7 @@ const navLinks = [
   { label: "Decisions", href: "#decisions" },
   { label: "Performance", href: "#performance" },
   { label: "Verify", href: "#verify" },
-  { label: "GitHub", href: "https://github.com/nikolas-sapa/sapa-fund", external: true },
+  { label: "GitHub", href: "https://github.com/nikolas-sapa/sapa_fund", external: true },
 ];
 
 export function NavBar() {
