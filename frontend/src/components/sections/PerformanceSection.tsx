@@ -1,42 +1,93 @@
-import { useMemo } from "react";
-import ChartAreaStep from "@/components/ui/chart-area-step";
+import { useMemo, useState } from "react";
+import ChartAreaSmooth from "@/components/ui/chart-area-smooth";
 import { AnimateNumber } from "@/components/ui/animated-blur-number";
 import type { EquityPosition } from "@/types";
 import { cn } from "@/lib/utils";
+
+type TimeRange = "1D" | "1W" | "1M" | "6M" | "1Y" | "All";
+
+const RANGES: TimeRange[] = ["1D", "1W", "1M", "6M", "1Y", "All"];
+
+const DAYS_BACK: Record<TimeRange, number> = {
+  "1D": 1,
+  "1W": 7,
+  "1M": 30,
+  "6M": 180,
+  "1Y": 365,
+  "All": 730,
+};
 
 interface PerformanceSectionProps {
   positions: EquityPosition[];
 }
 
-export function PerformanceSection({ positions }: PerformanceSectionProps) {
-  const chartData = useMemo(() => {
-    const byDate: Record<string, number> = {};
+function buildCumulativePnl(positions: EquityPosition[], range: TimeRange) {
+  const today = new Date();
+  today.setHours(23, 59, 59, 0);
+
+  const daysBack = DAYS_BACK[range];
+  const start = new Date(today);
+  start.setDate(start.getDate() - daysBack);
+  start.setHours(0, 0, 0, 0);
+
+  // For "All": find earliest open date and use that as start
+  let earliest = start;
+  if (range === "All") {
     for (const p of positions) {
-      const ts = p.opened_at;
-      if (!ts) continue;
-      const date = ts.slice(5, 10);
-      const pnl = (p.unrealized_pnl ?? 0) + (p.realized_pnl ?? 0);
-      byDate[date] = (byDate[date] ?? 0) + pnl;
+      if (!p.opened_at) continue;
+      const d = new Date(p.opened_at);
+      if (d < earliest) earliest = d;
+    }
+    earliest.setHours(0, 0, 0, 0);
+  }
+
+  const startDate = range === "All" ? earliest : start;
+
+  // Build day array
+  const days: Date[] = [];
+  const cursor = new Date(startDate);
+  while (cursor <= today) {
+    days.push(new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  // For each day compute cumulative P&L via linear interpolation
+  const nowTs = today.getTime();
+
+  return days.map((day) => {
+    const dayTs = day.getTime();
+    let cumPnl = 0;
+
+    for (const pos of positions) {
+      if (!pos.opened_at) continue;
+      const openTs = new Date(pos.opened_at).setHours(0, 0, 0, 0);
+      if (dayTs < openTs) continue;
+
+      const totalMs = nowTs - openTs;
+      const elapsedMs = dayTs - openTs;
+      const fraction = totalMs > 0 ? Math.min(elapsedMs / totalMs, 1) : 1;
+      const currentPnl = (pos.unrealized_pnl ?? 0) + (pos.realized_pnl ?? 0);
+      cumPnl += currentPnl * fraction;
     }
 
-    const real = Object.entries(byDate)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .slice(-8)
-      .map(([label, value]) => ({ label, value: parseFloat(value.toFixed(2)) }));
+    const month = String(day.getMonth() + 1).padStart(2, "0");
+    const dd = String(day.getDate()).padStart(2, "0");
+    const label =
+      range === "6M" || range === "1Y" || range === "All"
+        ? `${month}/${dd}`
+        : `${month}/${dd}`;
 
-    if (real.length < 2) {
-      const pad: { label: string; value: number }[] = [];
-      for (let i = 7; i >= 1; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const mm = String(d.getMonth() + 1).padStart(2, "0");
-        const dd = String(d.getDate()).padStart(2, "0");
-        pad.push({ label: `${mm}-${dd}`, value: 0 });
-      }
-      return [...pad, ...real];
-    }
-    return real;
-  }, [positions]);
+    return { label, value: parseFloat(cumPnl.toFixed(2)) };
+  });
+}
+
+export function PerformanceSection({ positions }: PerformanceSectionProps) {
+  const [range, setRange] = useState<TimeRange>("1W");
+
+  const chartData = useMemo(
+    () => buildCumulativePnl(positions, range),
+    [positions, range]
+  );
 
   const openPositions = positions.filter((p) => p.status === "open");
   const totalUnrealized = openPositions.reduce((s, p) => s + (p.unrealized_pnl ?? 0), 0);
@@ -50,7 +101,20 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
       ? confPositions.reduce((s, p) => s + p.confidence!, 0) / confPositions.length
       : null;
 
-  type StatCard = { value: number; label: string; positive: boolean | null; prefix?: string; suffix?: string; decimals?: number };
+  const totalPnl = positions.reduce(
+    (s, p) => s + (p.unrealized_pnl ?? 0) + (p.realized_pnl ?? 0),
+    0
+  );
+  const pnlPositive = totalPnl >= 0;
+
+  type StatCard = {
+    value: number;
+    label: string;
+    positive: boolean | null;
+    prefix?: string;
+    suffix?: string;
+    decimals?: number;
+  };
 
   const statCards: StatCard[] = [
     { value: positions.length, label: "Total positions", positive: null },
@@ -59,11 +123,17 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
       ? [{ value: totalNotional, label: "Notional deployed", positive: null, prefix: "$", decimals: 2 }]
       : []),
     ...(avgConfidence != null
-      ? [{ value: Math.round(avgConfidence * 1000) / 10, label: "Avg confidence", positive: avgConfidence > 0.5, suffix: "%", decimals: 1 }]
+      ? [
+          {
+            value: Math.round(avgConfidence * 1000) / 10,
+            label: "Avg confidence",
+            positive: avgConfidence > 0.5,
+            suffix: "%",
+            decimals: 1,
+          },
+        ]
       : []),
   ];
-
-  const pnlPositive = totalUnrealized >= 0;
 
   return (
     <section id="performance" className="py-24 px-6 bg-[#0B0B0D]">
@@ -81,30 +151,57 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
           </h2>
         </div>
 
-        {/* Big animated P&L — above the chart */}
-        <div className="mb-10 rounded-[16px] border border-[rgba(243,242,238,0.07)] bg-[#1A1A1E] p-8 flex flex-col gap-1">
-          <p className="text-[10px] font-mono tracking-widest uppercase text-[#8B8D91] mb-3">
-            Unrealized P&amp;L
-          </p>
-          <div className={cn(pnlPositive ? "text-emerald-400" : "text-red-400")}>
-            <AnimateNumber
-              value={Math.abs(totalUnrealized)}
-              prefix={totalUnrealized < 0 ? "-$" : "+$"}
-              format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
-              className="text-6xl font-semibold tracking-tight"
-              duration={600}
-            />
+        {/* P&L hero + chart */}
+        <div className="mb-10 rounded-[16px] border border-[rgba(243,242,238,0.07)] bg-[#1A1A1E] p-8">
+          {/* Top row: P&L + time filters */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+            <div>
+              <p className="text-[10px] font-mono tracking-widest uppercase text-[#8B8D91] mb-2">
+                Cumulative P&amp;L
+              </p>
+              <div className={cn(pnlPositive ? "text-[#0b7bff]" : "text-red-400")}>
+                <AnimateNumber
+                  value={Math.abs(totalPnl)}
+                  prefix={totalPnl < 0 ? "-$" : "+$"}
+                  format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
+                  className="text-5xl font-semibold tracking-tight"
+                  style={{ fontFamily: "Poppins, sans-serif" }}
+                  duration={600}
+                />
+              </div>
+              {totalNotional > 0 && (
+                <p className="text-[#8B8D91] text-sm font-mono mt-1">
+                  on ${totalNotional.toFixed(2)} notional
+                </p>
+              )}
+            </div>
+
+            {/* Time range filters */}
+            <div className="flex items-center gap-1 bg-[rgba(243,242,238,0.04)] rounded-[8px] p-1">
+              {RANGES.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRange(r)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-[6px] text-xs font-mono transition-all",
+                    r === range
+                      ? "bg-[#0b7bff] text-white"
+                      : "text-[#8B8D91] hover:text-[#F3F2EE] hover:bg-[rgba(243,242,238,0.06)]"
+                  )}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
           </div>
-          {totalNotional > 0 && (
-            <p className="text-[#8B8D91] text-sm font-mono mt-2">
-              on ${totalNotional.toFixed(2)} notional deployed
-            </p>
-          )}
+
+          {/* Chart */}
+          <ChartAreaSmooth data={chartData} positive={pnlPositive} />
         </div>
 
-        {/* Stat cards — all from live positions */}
+        {/* Stat cards */}
         {statCards.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {statCards.map((s) => (
               <div
                 key={s.label}
@@ -113,7 +210,11 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
                 <div
                   className={cn(
                     "text-2xl font-black mb-1",
-                    s.positive === true ? "text-emerald-400" : s.positive === false ? "text-red-400" : "text-[#F3F2EE]"
+                    s.positive === true
+                      ? "text-emerald-400"
+                      : s.positive === false
+                      ? "text-red-400"
+                      : "text-[#F3F2EE]"
                   )}
                   style={{ fontFamily: "Poppins, sans-serif" }}
                 >
@@ -121,7 +222,11 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
                     value={Math.abs(s.decimals != null ? s.value : Math.round(s.value))}
                     prefix={s.prefix ? (s.value < 0 ? `-${s.prefix}` : s.prefix) : undefined}
                     suffix={s.suffix}
-                    format={s.decimals != null ? { minimumFractionDigits: s.decimals, maximumFractionDigits: s.decimals } : undefined}
+                    format={
+                      s.decimals != null
+                        ? { minimumFractionDigits: s.decimals, maximumFractionDigits: s.decimals }
+                        : undefined
+                    }
                     className="text-2xl font-black"
                   />
                 </div>
@@ -132,13 +237,6 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
             ))}
           </div>
         )}
-
-        {/* P&L chart */}
-        <ChartAreaStep
-          data={chartData}
-          title="Portfolio P&L"
-          subtitle="Daily unrealized + realized PnL"
-        />
       </div>
     </section>
   );
