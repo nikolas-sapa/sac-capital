@@ -33,6 +33,7 @@ from equities.analysis.checkpoint import AnalysisCheckpointStore
 from equities.analysis.core_analyst import CoreDCAAnalyst
 from equities.data.news import YFinanceNewsProvider
 from equities.data.news_composite import CompositeNewsProvider
+from equities.data.news_crawl4ai import Crawl4AINewsProvider
 from equities.data.news_tiingo import TiingoNewsProvider
 from equities.data.registry import ProviderRegistry
 from equities.data.macro_regime import MacroRegimeGate
@@ -538,7 +539,8 @@ async def run_once(
     )
     news = CompositeNewsProvider([
         YFinanceNewsProvider(),
-        TiingoNewsProvider(),   # no-op if TIINGO_API_KEY absent
+        TiingoNewsProvider(),       # no-op if TIINGO_API_KEY absent
+        Crawl4AINewsProvider(),     # no-op if crawl4ai not installed
     ], failure_callback=record_provider_failure, registry=provider_registry)
     filings_client = SECEdgarFilings()
     filings_summary = _FilingsSummaryAdapter(filings_client, failure_callback=record_provider_failure)
