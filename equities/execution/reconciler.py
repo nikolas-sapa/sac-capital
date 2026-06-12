@@ -41,6 +41,7 @@ def reconcile_alpaca(
         open_positions = ledger.open_positions()
         broker_positions = {pos.symbol: pos for pos in executor.list_positions()}
         result.broker_positions = len(broker_positions)
+        local_filled_by_ticker: dict[str, float] = {}
 
         for pos in open_positions:
             if pos.get("execution_provider") != "alpaca_paper":
@@ -65,13 +66,13 @@ def reconcile_alpaca(
                 result.positions_voided += 1
                 continue
 
-            broker_pos = broker_positions.get(pos["ticker"])
-            if order.filled_qty > 0 and broker_pos is None:
-                result.mismatches.append(f"{pos['ticker']}: filled_order_missing_broker_position")
-            elif broker_pos is not None and abs(broker_pos.qty - float(pos["shares"])) > 1e-6:
-                result.mismatches.append(
-                    f"{pos['ticker']}: qty_mismatch local={pos['shares']} broker={broker_pos.qty}"
+            if order.filled_qty > 0:
+                ticker = str(pos["ticker"])
+                local_filled_by_ticker[ticker] = (
+                    local_filled_by_ticker.get(ticker, 0.0) + float(order.filled_qty)
                 )
+
+        _append_position_mismatches(result, local_filled_by_ticker, broker_positions)
 
         _write_reconcile_log(log_path, result)
         print(
@@ -87,6 +88,23 @@ def reconcile_alpaca(
     finally:
         if owns_ledger:
             ledger.close()
+
+
+def _append_position_mismatches(
+    result: ReconcileResult,
+    local_filled_by_ticker: dict[str, float],
+    broker_positions: dict[str, Any],
+) -> None:
+    """Compare aggregate local filled lots with Alpaca's aggregate positions."""
+    for ticker, local_qty in sorted(local_filled_by_ticker.items()):
+        broker_pos = broker_positions.get(ticker)
+        if broker_pos is None:
+            result.mismatches.append(f"{ticker}: filled_order_missing_broker_position")
+            continue
+        if abs(broker_pos.qty - local_qty) > 1e-6:
+            result.mismatches.append(
+                f"{ticker}: qty_mismatch local={local_qty:.6f} broker={broker_pos.qty:.6f}"
+            )
 
 
 def _update_ledger_order(ledger: EquityLedger, position_id: int, order: AlpacaOrder) -> None:

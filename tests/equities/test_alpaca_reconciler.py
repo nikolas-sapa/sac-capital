@@ -158,6 +158,108 @@ def test_reconcile_reports_missing_broker_position_for_filled_order(tmp_path):
     ledger.close()
 
 
+def test_reconcile_compares_aggregate_lots_to_broker_position(tmp_path):
+    settings = _settings(tmp_path)
+    ledger = EquityLedger(settings.equity_ledger_path)
+    first_id = ledger.open_position(
+        _rec("MSFT"),
+        shares=1.0,
+        fill_price=100.0,
+        opened_at=datetime(2026, 1, 2),
+        mode="paper",
+        execution_provider="alpaca_paper",
+        broker_order_id="ord_1",
+        broker_client_order_id="client_1",
+        broker_order_status="accepted",
+        status="submitted",
+    )
+    second_id = ledger.open_position(
+        _rec("MSFT"),
+        shares=2.0,
+        fill_price=101.0,
+        opened_at=datetime(2026, 1, 2),
+        mode="paper",
+        execution_provider="alpaca_paper",
+        broker_order_id="ord_2",
+        broker_client_order_id="client_2",
+        broker_order_status="accepted",
+        status="submitted",
+    )
+    pending_id = ledger.open_position(
+        _rec("MSFT"),
+        shares=3.0,
+        fill_price=102.0,
+        opened_at=datetime(2026, 1, 2),
+        mode="paper",
+        execution_provider="alpaca_paper",
+        broker_order_id="ord_3",
+        broker_client_order_id="client_3",
+        broker_order_status="accepted",
+        status="submitted",
+    )
+
+    executor = FakeExecutor(
+        {
+            "ord_1": AlpacaOrder(
+                id="ord_1",
+                client_order_id="client_1",
+                symbol="MSFT",
+                side="buy",
+                qty=1.0,
+                status="filled",
+                type="market",
+                time_in_force="day",
+                filled_qty=1.0,
+                filled_avg_price=100.0,
+            ),
+            "ord_2": AlpacaOrder(
+                id="ord_2",
+                client_order_id="client_2",
+                symbol="MSFT",
+                side="buy",
+                qty=2.0,
+                status="filled",
+                type="market",
+                time_in_force="day",
+                filled_qty=2.0,
+                filled_avg_price=101.0,
+            ),
+            "ord_3": AlpacaOrder(
+                id="ord_3",
+                client_order_id="client_3",
+                symbol="MSFT",
+                side="buy",
+                qty=3.0,
+                status="new",
+                type="limit",
+                time_in_force="day",
+                filled_qty=0.0,
+                filled_avg_price=None,
+            ),
+        },
+        positions=[
+            AlpacaPosition(
+                asset_id="asset_1",
+                symbol="MSFT",
+                qty=3.0,
+                side="long",
+                market_value=303.0,
+                avg_entry_price=101.0,
+            )
+        ],
+    )
+
+    result = reconcile_alpaca(settings, executor=executor, ledger=ledger, log_path=tmp_path / "r.log")
+
+    assert result.orders_checked == 3
+    assert result.mismatches == []
+    assert ledger.open_positions()[0]["id"] == first_id
+    assert ledger.open_positions()[1]["id"] == second_id
+    assert ledger.open_positions()[2]["id"] == pending_id
+    assert ledger.position_by_broker_order_id("ord_3")["status"] == "submitted"
+    ledger.close()
+
+
 def test_reconcile_keeps_partially_filled_order_active(tmp_path):
     settings = _settings(tmp_path)
     ledger = EquityLedger(settings.equity_ledger_path)
