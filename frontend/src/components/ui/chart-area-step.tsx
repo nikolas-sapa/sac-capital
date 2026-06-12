@@ -70,6 +70,11 @@ export default function ChartAreaStep({
   subtitle = "Step Area Chart",
 }: ChartAreaStepProps) {
   const [activeIndex, setActiveIndex] = React.useState(data.length - 1);
+
+  React.useEffect(() => {
+    setActiveIndex(data.length - 1);
+  }, [data.length]);
+
   const scale = makeScale(data);
   const active = data[activeIndex];
   const activePoint = active ? pt(activeIndex, active.value, data, scale) : null;
@@ -185,16 +190,22 @@ export default function ChartAreaStep({
           );
         })}
 
-        {/* X labels */}
-        {data.map((item, index) => {
-          const p = pt(index, item.value, data, scale);
-          return (
-            <text key={item.label} x={p.x} y={HEIGHT - 16}
-              textAnchor="middle" fontSize="9" fill="#8B8D91">
-              {item.label}
-            </text>
-          );
-        })}
+        {/* X labels — thin out when many points to avoid crowding */}
+        {(() => {
+          const step = data.length <= 10 ? 1
+            : data.length <= 30 ? Math.ceil(data.length / 8)
+            : Math.ceil(data.length / 6);
+          return data.map((item, index) => {
+            if (index % step !== 0 && index !== data.length - 1) return null;
+            const p = pt(index, item.value, data, scale);
+            return (
+              <text key={item.label} x={p.x} y={HEIGHT - 16}
+                textAnchor="middle" fontSize="9" fill="#8B8D91">
+                {item.label}
+              </text>
+            );
+          });
+        })()}
 
         {/* Tooltip */}
         {activePoint && active && (

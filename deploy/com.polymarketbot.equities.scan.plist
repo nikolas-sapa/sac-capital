@@ -15,7 +15,7 @@
     <key>WorkingDirectory</key>
     <string>/Users/nikolassapalidis/polymarket-bot</string>
 
-    <!-- Daily scan/analysis after US market open, evaluated in local Mac timezone. -->
+    <!-- Run three daily scans in the local Mac timezone. -->
     <key>StartCalendarInterval</key>
     <dict>
         <key>Hour</key>

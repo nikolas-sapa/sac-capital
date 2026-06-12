@@ -25,10 +25,10 @@
     <true/>
 
     <key>StandardOutPath</key>
-    <string>/Users/nikolassapalidis/polymarket-bot/data/runner.log</string>
+    <string>/Users/nikolassapalidis/sapa_fund/data/runner.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/nikolassapalidis/polymarket-bot/data/runner.err.log</string>
+    <string>/Users/nikolassapalidis/sapa_fund/data/runner.err.log</string>
 
     <key>EnvironmentVariables</key>
     <dict>

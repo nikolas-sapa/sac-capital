@@ -10,7 +10,7 @@ const PERIOD_MAP: Record<string, { period: string; timeframe: string }> = {
   "1M": { period: "1M", timeframe: "1D" },
   "6M": { period: "6M", timeframe: "1D" },
   "1Y": { period: "1A", timeframe: "1D" },
-  "All": { period: "all", timeframe: "1D" },
+  "All": { period: "1A", timeframe: "1D" },
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
