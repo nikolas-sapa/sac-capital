@@ -139,6 +139,37 @@ class TelegramAlerts:
             )
         return "\n".join(lines)
 
+    def format_run_summary(
+        self,
+        stats: Any,
+        budget: Any | None = None,
+        provider_registry: Any | None = None,
+    ) -> str:
+        is_ok = stats.exit_reason == "complete"
+        status_icon = "✅" if is_ok else "🚨"
+        elapsed = int(stats.elapsed())
+        lines = [
+            f"{status_icon} RUN {'COMPLETE' if is_ok else 'FAILED'} — {elapsed}s",
+            f"{'─' * 26}",
+        ]
+        if not is_ok:
+            lines.append(f"Reason: {stats.exit_reason}")
+        for name, status, dur in stats.stages:
+            icon = "✓" if status == "done" else "✗"
+            lines.append(f"  {icon} {name:<28} {dur:.1f}s")
+        lines.append(f"{'─' * 26}")
+        lines.append(f"Provider failures: {stats.provider_failures}")
+        lines.append(f"LLM failures:      {stats.llm_failures}")
+        if budget is not None:
+            lines.append(f"Budget spent:      ${budget.spent_today():.4f}")
+        if provider_registry is not None:
+            failures = provider_registry.failures()
+            if failures:
+                lines.append("Failed providers:")
+                for h in failures:
+                    lines.append(f"  • {h.name} ({h.failure_count}x) — {str(h.last_error)[:60]}")
+        return "\n".join(lines)
+
     def format_equity_portfolio(self, stats: dict[str, Any]) -> str:
         s = stats
         total_pnl = s["realized_pnl"] + s["unrealized_pnl"]

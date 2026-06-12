@@ -928,6 +928,8 @@ async def run_once(
             await _send_alert(alerts.format_equity_portfolio(equity_ledger.portfolio_stats()))
     finally:
         _print_run_summary(stats, budget, provider_registry=provider_registry)
+        if alerts is not None:
+            await _send_alert(alerts.format_run_summary(stats, budget, provider_registry))
         equity_ledger.close()
         fp_tracker.close()
 
