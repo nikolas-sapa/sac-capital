@@ -60,13 +60,13 @@ function PositionCard({ pos, index }: { pos: EquityPosition; index: number }) {
           <div className="min-w-0">
             <p
               className="text-2xl font-black text-[#F3F2EE] leading-none tracking-tight"
-              style={{ fontFamily: "Sora, sans-serif" }}
+              style={{ fontFamily: "Poppins, sans-serif" }}
             >
               {pos.ticker}
             </p>
             {strategy && (
               <p className="text-[11px] text-[#8B8D91] mt-1 capitalize leading-tight"
-                style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                style={{ fontFamily: "DM Sans, sans-serif" }}>
                 {strategy}
               </p>
             )}
@@ -83,7 +83,7 @@ function PositionCard({ pos, index }: { pos: EquityPosition; index: number }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <p className="text-[10px] font-mono text-[#8B8D91] uppercase tracking-wider mb-1">Entry</p>
-            <p className="text-sm font-semibold text-[#F3F2EE]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            <p className="text-sm font-semibold text-[#F3F2EE]" style={{ fontFamily: "DM Sans, sans-serif" }}>
               {pos.entry_price != null ? `$${pos.entry_price.toFixed(2)}` : "—"}
             </p>
           </div>
@@ -91,7 +91,7 @@ function PositionCard({ pos, index }: { pos: EquityPosition; index: number }) {
             <p className="text-[10px] font-mono text-[#8B8D91] uppercase tracking-wider mb-1">
               {pos.status === "closed" ? "Exit" : "Current"}
             </p>
-            <p className="text-sm font-semibold text-[#F3F2EE]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            <p className="text-sm font-semibold text-[#F3F2EE]" style={{ fontFamily: "DM Sans, sans-serif" }}>
               {markPrice != null ? `$${markPrice.toFixed(2)}` : "—"}
             </p>
           </div>
@@ -110,7 +110,7 @@ function PositionCard({ pos, index }: { pos: EquityPosition; index: number }) {
                   prefix={activePnl < 0 ? "-$" : "+$"}
                   format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
                   className="text-xl font-bold"
-                  style={{ fontFamily: "Sora, sans-serif" }}
+                  style={{ fontFamily: "Poppins, sans-serif" }}
                 />
               ) : (
                 <span className="text-[#8B8D91] text-xl">—</span>
@@ -120,7 +120,7 @@ function PositionCard({ pos, index }: { pos: EquityPosition; index: number }) {
           <div className="text-right flex flex-col items-end gap-1">
             {pnlPct != null && (
               <span className={cn("text-sm font-semibold", pnlColor(activePnl))}
-                style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                style={{ fontFamily: "DM Sans, sans-serif" }}>
                 {activePnl! >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
               </span>
             )}
@@ -169,6 +169,7 @@ function PositionCard({ pos, index }: { pos: EquityPosition; index: number }) {
                   ticker={pos.ticker}
                   entryPrice={pos.entry_price}
                   entryDate={pos.opened_at}
+                  markPrice={markPrice}
                   period="1M"
                 />
                 <p className="text-[9px] font-mono text-[#8B8D91] mt-1.5 text-center">

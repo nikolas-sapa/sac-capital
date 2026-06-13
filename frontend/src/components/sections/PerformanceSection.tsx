@@ -14,18 +14,23 @@ interface PerformanceSectionProps {
 export function PerformanceSection({ positions }: PerformanceSectionProps) {
   const [range, setRange] = useState<TimeRange>("1W");
   const [historyPoints, setHistoryPoints] = useState<PortfolioHistoryPoint[]>([]);
+  const [apiTotalPnl, setApiTotalPnl] = useState<number | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // Fetch real Alpaca portfolio history whenever the range changes
   useEffect(() => {
     setHistoryLoading(true);
     fetch(`/api/portfolio-history?period=${range}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d?.points?.length) setHistoryPoints(d.points);
-        else setHistoryPoints([]);
+        if (d?.points?.length) {
+          setHistoryPoints(d.points);
+          setApiTotalPnl(d.totalPnl ?? null);
+        } else {
+          setHistoryPoints([]);
+          setApiTotalPnl(null);
+        }
       })
-      .catch(() => setHistoryPoints([]))
+      .catch(() => { setHistoryPoints([]); setApiTotalPnl(null); })
       .finally(() => setHistoryLoading(false));
   }, [range]);
 
@@ -42,9 +47,11 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
       ? confPositions.reduce((s, p) => s + p.confidence!, 0) / confPositions.length
       : null;
 
-  // Period P&L = last point in history (what the portfolio gained/lost over the period)
-  const periodPnl =
-    historyPoints.length > 0 ? historyPoints[historyPoints.length - 1].value : totalUnrealized;
+  // Period P&L: use API-provided totalPnl when available (sum of daily bars for multi-day,
+  // or last intraday point for 1D). Falls back to live unrealized when no API data.
+  const periodPnl = apiTotalPnl ?? (historyPoints.length > 0
+    ? historyPoints[historyPoints.length - 1].value
+    : totalUnrealized);
   const pnlPositive = periodPnl >= 0;
 
   // Fallback chart when API unavailable: flat line from position open dates

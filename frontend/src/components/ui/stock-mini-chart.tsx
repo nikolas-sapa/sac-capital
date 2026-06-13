@@ -62,14 +62,84 @@ function closestBarIndex(bars: Bar[], date: string): number {
   return best;
 }
 
+// Fallback SVG chart when API data is unavailable — shows entry → current price as a 2-point line
+function FallbackChart({ entryPrice, markPrice, ticker }: { entryPrice: number; markPrice: number; ticker: string }) {
+  const isUp = markPrice >= entryPrice;
+  const lineColor = isUp ? "#34d399" : "#f87171";
+  const pad = Math.abs(markPrice - entryPrice) * 0.2 || entryPrice * 0.02;
+  const scaleMin = Math.min(entryPrice, markPrice) - pad;
+  const scaleMax = Math.max(entryPrice, markPrice) + pad;
+  const scaleRange = scaleMax - scaleMin;
+
+  const yEntry = PAD.top + (H - PAD.top - PAD.bottom) * (1 - (entryPrice - scaleMin) / scaleRange);
+  const yMark = PAD.top + (H - PAD.top - PAD.bottom) * (1 - (markPrice - scaleMin) / scaleRange);
+  const xEntry = xOf(0, 2);
+  const xMark = xOf(1, 2);
+  const baseY = H - PAD.bottom;
+  const gradId = `fg-${ticker}`;
+
+  return (
+    <div className="rounded-[8px] border border-[rgba(243,242,238,0.06)] bg-[rgba(243,242,238,0.02)] overflow-hidden">
+      <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
+        <span className="text-[10px] font-mono font-bold text-[#F3F2EE] tracking-wider">{ticker}</span>
+        <span className={`text-[10px] font-mono font-bold ${isUp ? "text-emerald-400" : "text-red-400"}`}>
+          {fmtPrice(markPrice)}
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" style={{ display: "block" }}>
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={lineColor} stopOpacity="0.18" />
+            <stop offset="100%" stopColor={lineColor} stopOpacity="0.01" />
+          </linearGradient>
+        </defs>
+        {/* Y ticks */}
+        {[entryPrice, markPrice].map((v) => {
+          const y = PAD.top + (H - PAD.top - PAD.bottom) * (1 - (v - scaleMin) / scaleRange);
+          return (
+            <g key={v}>
+              <line x1={PAD.left} x2={W - PAD.right} y1={y} y2={y}
+                stroke="rgba(243,242,238,0.05)" strokeDasharray="4 4" />
+              <text x={PAD.left - 4} y={y + 3.5} textAnchor="end" fontSize="8" fill="#8B8D91" fontFamily="monospace">
+                {fmtPrice(v)}
+              </text>
+            </g>
+          );
+        })}
+        {/* Entry price dashed line */}
+        <line x1={PAD.left} x2={W - PAD.right} y1={yEntry} y2={yEntry}
+          stroke="#E55A1C" strokeWidth="1" strokeDasharray="4 3" opacity="0.7" />
+        {/* Area */}
+        <path
+          d={`M ${xEntry.toFixed(1)} ${yEntry.toFixed(1)} L ${xMark.toFixed(1)} ${yMark.toFixed(1)} L ${xMark.toFixed(1)} ${baseY} H ${xEntry.toFixed(1)} Z`}
+          fill={`url(#${gradId})`}
+        />
+        {/* Line */}
+        <path
+          d={`M ${xEntry.toFixed(1)} ${yEntry.toFixed(1)} L ${xMark.toFixed(1)} ${yMark.toFixed(1)}`}
+          fill="none" stroke={lineColor} strokeWidth="1.5" strokeLinecap="round"
+        />
+        {/* Entry dot */}
+        <circle cx={xEntry} cy={yEntry} r="5" fill="#E55A1C" stroke="#0B0B0D" strokeWidth="2" />
+        {/* Current dot */}
+        <circle cx={xMark} cy={yMark} r="5" fill={lineColor} stroke="#0B0B0D" strokeWidth="2" />
+        {/* X labels */}
+        <text x={xEntry} y={H - 6} textAnchor="middle" fontSize="8" fill="#8B8D91" fontFamily="monospace">Entry</text>
+        <text x={xMark} y={H - 6} textAnchor="middle" fontSize="8" fill="#8B8D91" fontFamily="monospace">Now</text>
+      </svg>
+    </div>
+  );
+}
+
 interface StockMiniChartProps {
   ticker: string;
   entryPrice: number | null;
   entryDate: string | null;
+  markPrice?: number | null;
   period?: string;
 }
 
-export function StockMiniChart({ ticker, entryPrice, entryDate, period = "1M" }: StockMiniChartProps) {
+export function StockMiniChart({ ticker, entryPrice, entryDate, markPrice, period = "1M" }: StockMiniChartProps) {
   const [bars, setBars] = React.useState<Bar[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(false);
@@ -93,10 +163,14 @@ export function StockMiniChart({ ticker, entryPrice, entryDate, period = "1M" }:
     );
   }
 
+  // When API fails or returns no bars, show fallback 2-point chart if we have enough data
   if (error || bars.length === 0) {
+    if (entryPrice != null && markPrice != null) {
+      return <FallbackChart entryPrice={entryPrice} markPrice={markPrice} ticker={ticker} />;
+    }
     return (
       <div className="h-[160px] rounded-[8px] bg-[rgba(243,242,238,0.03)] border border-[rgba(243,242,238,0.06)] flex items-center justify-center">
-        <span className="text-[10px] font-mono text-[#8B8D91]">Chart unavailable</span>
+        <span className="text-[10px] font-mono text-[#8B8D91]">No market data</span>
       </div>
     );
   }
@@ -124,11 +198,7 @@ export function StockMiniChart({ ticker, entryPrice, entryDate, period = "1M" }:
           {fmtPrice(last.c)}
         </span>
       </div>
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        className="w-full h-auto"
-        style={{ display: "block" }}
-      >
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" style={{ display: "block" }}>
         <defs>
           <linearGradient id={`sg-${ticker}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={fillColor} stopOpacity="0.18" />
@@ -155,11 +225,8 @@ export function StockMiniChart({ ticker, entryPrice, entryDate, period = "1M" }:
 
         {/* Entry price horizontal line */}
         {entryPrice != null && entryY != null && (
-          <line
-            x1={PAD.left} x2={W - PAD.right}
-            y1={entryY} y2={entryY}
-            stroke="#E55A1C" strokeWidth="1" strokeDasharray="4 3" opacity="0.7"
-          />
+          <line x1={PAD.left} x2={W - PAD.right} y1={entryY} y2={entryY}
+            stroke="#E55A1C" strokeWidth="1" strokeDasharray="4 3" opacity="0.7" />
         )}
 
         {/* Area + line */}
