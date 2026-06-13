@@ -11,9 +11,9 @@ interface DecisionsSectionProps {
 }
 
 const STATUS_CONFIG = {
-  open:      { label: "Open",    dot: "bg-emerald-400", text: "text-emerald-400", stripe: "bg-emerald-400" },
-  closed:    { label: "Closed",  dot: "bg-neutral-500", text: "text-neutral-400", stripe: "bg-neutral-600" },
-  submitted: { label: "Pending", dot: "bg-[#0b7bff]",   text: "text-[#0b7bff]",  stripe: "bg-[#0b7bff]" },
+  open:      { label: "Open",    dot: "bg-emerald-400", text: "text-emerald-400" },
+  closed:    { label: "Closed",  dot: "bg-neutral-500", text: "text-neutral-400" },
+  submitted: { label: "Pending", dot: "bg-[#0b7bff]",   text: "text-[#0b7bff]"  },
 };
 
 function pnlColor(v: number | null) {
@@ -49,12 +49,9 @@ function PositionCard({ pos, index }: { pos: EquityPosition; index: number }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 280, damping: 28, delay: index * 0.05 }}
-      className="rounded-[12px] border border-[rgba(243,242,238,0.07)] bg-[#1A1A1E] overflow-hidden hover:border-[rgba(243,242,238,0.12)] transition-colors flex"
+      className="rounded-[12px] border border-[rgba(243,242,238,0.07)] bg-[#1A1A1E] overflow-hidden hover:border-[rgba(243,242,238,0.12)] transition-colors"
     >
-      {/* Left status stripe */}
-      <div className={cn("w-[3px] shrink-0", cfg.stripe)} />
-
-      <div className="flex-1 p-5 flex flex-col gap-4 min-w-0">
+      <div className="p-5 flex flex-col gap-4">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
