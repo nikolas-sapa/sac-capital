@@ -54,13 +54,13 @@ function StackedCard({ step, index }: { step: Step; index: number }) {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-100px" }}
         transition={{ type: "spring", stiffness: 200, damping: 25, delay: 0.05 }}
-        className="relative mx-auto max-w-4xl rounded-[20px] border border-[rgba(243,242,238,0.08)] bg-[#1A1A1E] p-8 md:p-12 overflow-hidden"
+        className="relative mx-auto max-w-4xl rounded-[20px] border border-[rgba(243,242,238,0.08)] bg-[#1A1A1E] p-5 sm:p-8 md:p-12 overflow-hidden"
         style={{ zIndex: index + 1 }}
       >
         {/* Top edge glow */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-px bg-gradient-to-r from-transparent via-[rgba(11,123,255,0.4)] to-transparent" />
 
-        <div className="flex items-start gap-6">
+        <div className="flex items-start gap-3 sm:gap-6">
           {/* Icon block */}
           <div className="shrink-0 flex flex-col items-center gap-3">
             <div className="w-12 h-12 rounded-[12px] border border-[rgba(11,123,255,0.2)] bg-[rgba(11,123,255,0.06)] flex items-center justify-center">
@@ -82,9 +82,9 @@ function StackedCard({ step, index }: { step: Step; index: number }) {
             <p className="text-[#8B8D91] leading-relaxed text-base max-w-2xl">{step.body}</p>
           </div>
 
-          {/* Ghost number */}
+          {/* Ghost number — hidden on mobile to avoid squishing text */}
           <div
-            className="ml-auto shrink-0 text-[rgba(243,242,238,0.04)] text-7xl font-black leading-none select-none"
+            className="ml-auto shrink-0 text-[rgba(243,242,238,0.04)] text-7xl font-black leading-none select-none hidden sm:block"
             style={{ fontFamily: "Sora, sans-serif" }}
           >
             {step.num}

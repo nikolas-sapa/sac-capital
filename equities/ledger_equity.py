@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -40,7 +41,8 @@ CREATE TABLE IF NOT EXISTS positions (
     broker_submitted_at TEXT NOT NULL DEFAULT '',
     broker_filled_at TEXT NOT NULL DEFAULT '',
     broker_canceled_at TEXT NOT NULL DEFAULT '',
-    broker_raw_json TEXT NOT NULL DEFAULT ''
+    broker_raw_json TEXT NOT NULL DEFAULT '',
+    analysis_json  TEXT NOT NULL DEFAULT '{}'
 )
 """
 
@@ -52,6 +54,7 @@ _CSV_HEADERS = [
     "execution_provider", "broker_order_id", "broker_order_status",
     "broker_client_order_id", "broker_filled_qty", "broker_avg_fill_price",
     "broker_submitted_at", "broker_filled_at", "broker_canceled_at", "broker_raw_json",
+    "analysis_json",
 ]
 
 _BROKER_COLUMNS = {
@@ -66,6 +69,7 @@ _BROKER_COLUMNS = {
     "broker_filled_at": "TEXT NOT NULL DEFAULT ''",
     "broker_canceled_at": "TEXT NOT NULL DEFAULT ''",
     "broker_raw_json": "TEXT NOT NULL DEFAULT ''",
+    "analysis_json": "TEXT NOT NULL DEFAULT '{}'",
 }
 
 
@@ -90,19 +94,22 @@ class EquityLedger:
                       broker_order_status: str = "",
                       sector: str = "",
                       status: str = "open") -> int:
+        analysis_json = json.dumps(rec.analysis or {}, ensure_ascii=False)
         row = (
             rec.instrument.ticker, sector, rec.sleeve.value, rec.side, shares, fill_price,
             rec.stop_loss, rec.take_profit, fill_price, 0.0,
             status, rec.confidence, rec.thesis, mode, opened_at.isoformat(), strategy,
             execution_provider, broker_order_id, broker_client_order_id, broker_order_status,
+            analysis_json,
         )
         cur = self._con.execute(
             """
             INSERT INTO positions
                 (ticker, sector, sleeve, side, shares, entry_price, stop_loss, take_profit,
                  mark_price, unrealized_pnl, status, confidence, thesis, mode, opened_at, strategy,
-                 execution_provider, broker_order_id, broker_client_order_id, broker_order_status)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 execution_provider, broker_order_id, broker_client_order_id, broker_order_status,
+                 analysis_json)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             row,
         )
@@ -296,4 +303,6 @@ class EquityLedger:
             w = csv.DictWriter(f, fieldnames=_CSV_HEADERS)
             w.writeheader()
             for row in rows:
-                w.writerow(dict(row))
+                d = dict(row)
+                # Only write known CSV columns
+                w.writerow({k: d.get(k, "") for k in _CSV_HEADERS})

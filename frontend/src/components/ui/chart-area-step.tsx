@@ -48,6 +48,7 @@ function stepPath(data: ChartPoint[], scale: Scale) {
 }
 
 function areaPath(data: ChartPoint[], scale: Scale) {
+  if (data.length === 0) return "";
   const points = data.map((item, i) => pt(i, item.value, data, scale));
   const baseY = zeroY(scale);
   return `${stepPath(data, scale)} L ${points[points.length - 1].x} ${baseY} H ${points[0].x} Z`;
@@ -207,10 +208,17 @@ export default function ChartAreaStep({
           });
         })()}
 
-        {/* Tooltip */}
-        {activePoint && active && (
-          <g transform={`translate(${Math.min(activePoint.x + 12, WIDTH - 155)},${Math.max(activePoint.y - 52, PAD.top)})`}>
-            <rect width="148" height="42" rx="2" fill="#0B0B0D"
+        {/* Tooltip — flips below the point when near the top */}
+        {activePoint && active && (() => {
+          const tipH = 42;
+          const chartMidY = PAD.top + (HEIGHT - PAD.top - PAD.bottom) / 2;
+          const tipY = activePoint.y < chartMidY
+            ? activePoint.y + 10          // point in upper half → tooltip below
+            : Math.max(activePoint.y - tipH - 10, PAD.top); // lower half → above
+          const tipX = Math.min(Math.max(activePoint.x - 74, PAD.left), WIDTH - PAD.right - 148);
+          return (
+          <g transform={`translate(${tipX},${tipY})`}>
+            <rect width="148" height={tipH} rx="2" fill="#0B0B0D"
               stroke="rgba(243,242,238,0.2)" strokeWidth="1.5" />
             <text x="10" y="16" fontSize="10" fill="#8B8D91" fontFamily="monospace">{active.label}</text>
             <text x="10" y="30" fontSize="10" fontFamily="monospace"
@@ -218,7 +226,8 @@ export default function ChartAreaStep({
               P&L: {active.value >= 0 ? "+" : ""}${active.value.toFixed(2)}
             </text>
           </g>
-        )}
+          );
+        })()}
       </svg>
     </div>
   );

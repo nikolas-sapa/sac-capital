@@ -26,6 +26,8 @@ class Recommendation:
     thesis: str
     horizon: str
     memo: dict[str, Any] | None = None
+    # Full structured analysis from the LLM pipeline (analyst + challenger + auditor)
+    analysis: dict[str, Any] | None = None
 
 
 @runtime_checkable

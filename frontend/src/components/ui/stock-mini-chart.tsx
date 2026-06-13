@@ -1,0 +1,199 @@
+import * as React from "react";
+
+type Bar = { t: string; o: number; h: number; l: number; c: number };
+
+const W = 480;
+const H = 160;
+const PAD = { top: 12, right: 12, bottom: 28, left: 44 };
+
+function makeScale(bars: Bar[]) {
+  if (bars.length === 0) return { min: 0, max: 1, range: 1 };
+  const prices = bars.flatMap((b) => [b.l, b.h]);
+  const rawMin = Math.min(...prices);
+  const rawMax = Math.max(...prices);
+  const pad = (rawMax - rawMin) * 0.08 || 1;
+  return { min: rawMin - pad, max: rawMax + pad, range: rawMax - rawMin + 2 * pad };
+}
+
+function xOf(i: number, total: number) {
+  const iw = W - PAD.left - PAD.right;
+  return PAD.left + (iw / Math.max(total - 1, 1)) * i;
+}
+
+function yOf(price: number, scale: ReturnType<typeof makeScale>) {
+  const ih = H - PAD.top - PAD.bottom;
+  return PAD.top + ih * (1 - (price - scale.min) / scale.range);
+}
+
+function closePath(bars: Bar[], scale: ReturnType<typeof makeScale>) {
+  if (bars.length === 0) return "";
+  return bars
+    .map((b, i) => {
+      const x = xOf(i, bars.length);
+      const y = yOf(b.c, scale);
+      return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+}
+
+function areaPath(bars: Bar[], scale: ReturnType<typeof makeScale>) {
+  if (bars.length === 0) return "";
+  const line = closePath(bars, scale);
+  const lastX = xOf(bars.length - 1, bars.length).toFixed(1);
+  const firstX = xOf(0, bars.length).toFixed(1);
+  const baseY = (H - PAD.bottom).toFixed(1);
+  return `${line} L ${lastX} ${baseY} H ${firstX} Z`;
+}
+
+function fmtPrice(v: number) {
+  if (v >= 1000) return `$${(v / 1000).toFixed(2)}k`;
+  return `$${v.toFixed(2)}`;
+}
+
+function closestBarIndex(bars: Bar[], date: string): number {
+  if (!date || bars.length === 0) return -1;
+  const target = new Date(date).getTime();
+  let best = 0;
+  let bestDiff = Infinity;
+  bars.forEach((b, i) => {
+    const diff = Math.abs(new Date(b.t).getTime() - target);
+    if (diff < bestDiff) { bestDiff = diff; best = i; }
+  });
+  return best;
+}
+
+interface StockMiniChartProps {
+  ticker: string;
+  entryPrice: number | null;
+  entryDate: string | null;
+  period?: string;
+}
+
+export function StockMiniChart({ ticker, entryPrice, entryDate, period = "1M" }: StockMiniChartProps) {
+  const [bars, setBars] = React.useState<Bar[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(false);
+    fetch(`/api/stock-bars?ticker=${encodeURIComponent(ticker)}&period=${period}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((d) => { if (!cancelled) { setBars(d.points ?? []); setLoading(false); } })
+      .catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [ticker, period]);
+
+  if (loading) {
+    return (
+      <div className="h-[160px] rounded-[8px] bg-[rgba(243,242,238,0.03)] border border-[rgba(243,242,238,0.06)] flex items-center justify-center">
+        <div className="w-4 h-4 rounded-full border-2 border-[#0b7bff] border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (error || bars.length === 0) {
+    return (
+      <div className="h-[160px] rounded-[8px] bg-[rgba(243,242,238,0.03)] border border-[rgba(243,242,238,0.06)] flex items-center justify-center">
+        <span className="text-[10px] font-mono text-[#8B8D91]">Chart unavailable</span>
+      </div>
+    );
+  }
+
+  const scale = makeScale(bars);
+  const last = bars[bars.length - 1];
+  const first = bars[0];
+  const isUp = last.c >= first.c;
+  const lineColor = isUp ? "#34d399" : "#f87171";
+  const fillColor = isUp ? "#34d399" : "#f87171";
+
+  const entryBarIdx = entryDate ? closestBarIndex(bars, entryDate) : -1;
+  const entryY = entryPrice != null ? yOf(entryPrice, scale) : null;
+  const entryX = entryBarIdx >= 0 ? xOf(entryBarIdx, bars.length) : null;
+
+  const yTicks = [scale.min + scale.range * 0.25, scale.min + scale.range * 0.5, scale.min + scale.range * 0.75].map(
+    (v) => Math.round(v * 100) / 100
+  );
+
+  return (
+    <div className="rounded-[8px] border border-[rgba(243,242,238,0.06)] bg-[rgba(243,242,238,0.02)] overflow-hidden">
+      <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
+        <span className="text-[10px] font-mono font-bold text-[#F3F2EE] tracking-wider">{ticker}</span>
+        <span className={`text-[10px] font-mono font-bold ${isUp ? "text-emerald-400" : "text-red-400"}`}>
+          {fmtPrice(last.c)}
+        </span>
+      </div>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full h-auto"
+        style={{ display: "block" }}
+      >
+        <defs>
+          <linearGradient id={`sg-${ticker}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={fillColor} stopOpacity="0.18" />
+            <stop offset="100%" stopColor={fillColor} stopOpacity="0.01" />
+          </linearGradient>
+          <clipPath id={`clip-${ticker}`}>
+            <rect x={PAD.left} y={PAD.top} width={W - PAD.left - PAD.right} height={H - PAD.top - PAD.bottom} />
+          </clipPath>
+        </defs>
+
+        {/* Y ticks */}
+        {yTicks.map((tick) => {
+          const y = yOf(tick, scale);
+          return (
+            <g key={tick}>
+              <line x1={PAD.left} x2={W - PAD.right} y1={y} y2={y}
+                stroke="rgba(243,242,238,0.05)" strokeDasharray="4 4" />
+              <text x={PAD.left - 4} y={y + 3.5} textAnchor="end" fontSize="8" fill="#8B8D91" fontFamily="monospace">
+                {fmtPrice(tick)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Entry price horizontal line */}
+        {entryPrice != null && entryY != null && (
+          <line
+            x1={PAD.left} x2={W - PAD.right}
+            y1={entryY} y2={entryY}
+            stroke="#E55A1C" strokeWidth="1" strokeDasharray="4 3" opacity="0.7"
+          />
+        )}
+
+        {/* Area + line */}
+        <g clipPath={`url(#clip-${ticker})`}>
+          <path d={areaPath(bars, scale)} fill={`url(#sg-${ticker})`} />
+          <path d={closePath(bars, scale)} fill="none" stroke={lineColor} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+        </g>
+
+        {/* Entry point marker */}
+        {entryBarIdx >= 0 && entryX != null && entryY != null && (
+          <g>
+            <circle cx={entryX} cy={entryY} r="5" fill="#E55A1C" stroke="#0B0B0D" strokeWidth="2" />
+            <circle cx={entryX} cy={entryY} r="9" fill="none" stroke="#E55A1C" strokeWidth="1" opacity="0.4" />
+          </g>
+        )}
+
+        {/* X axis labels — first and last */}
+        {bars.length > 0 && (() => {
+          const fmtDate = (iso: string) => {
+            const d = new Date(iso);
+            return `${d.getMonth() + 1}/${d.getDate()}`;
+          };
+          return (
+            <>
+              <text x={xOf(0, bars.length)} y={H - 6} textAnchor="middle" fontSize="8" fill="#8B8D91" fontFamily="monospace">
+                {fmtDate(bars[0].t)}
+              </text>
+              <text x={xOf(bars.length - 1, bars.length)} y={H - 6} textAnchor="middle" fontSize="8" fill="#8B8D91" fontFamily="monospace">
+                {fmtDate(bars[bars.length - 1].t)}
+              </text>
+            </>
+          );
+        })()}
+      </svg>
+    </div>
+  );
+}

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { TrendingUp, TrendingDown, Clock, CheckCircle, Circle, ChevronDown } from "lucide-react";
+import { TrendingUp, CheckCircle, Clock, Circle, ChevronDown, ChevronUp, BarChart2 } from "lucide-react";
 import type { EquityPosition } from "@/types";
 import { AnimateNumber } from "@/components/ui/animated-blur-number";
+import { StockMiniChart } from "@/components/ui/stock-mini-chart";
 import { cn } from "@/lib/utils";
 
 interface DecisionsSectionProps {
@@ -10,9 +11,9 @@ interface DecisionsSectionProps {
 }
 
 const STATUS_CONFIG = {
-  open:      { label: "Open",      color: "text-emerald-400", border: "border-emerald-400/30", bg: "bg-emerald-400/10",  Icon: TrendingUp },
-  closed:    { label: "Closed",    color: "text-neutral-400", border: "border-neutral-400/30", bg: "bg-neutral-400/10",  Icon: CheckCircle },
-  submitted: { label: "Pending",   color: "text-[#0b7bff]",   border: "border-[#0b7bff]/30",  bg: "bg-[#0b7bff]/10",    Icon: Clock },
+  open:      { label: "Open",    color: "text-emerald-400", border: "border-emerald-400/30", bg: "bg-emerald-400/10", Icon: TrendingUp },
+  closed:    { label: "Closed",  color: "text-neutral-400", border: "border-neutral-400/30", bg: "bg-neutral-400/10", Icon: CheckCircle },
+  submitted: { label: "Pending", color: "text-[#0b7bff]",   border: "border-[#0b7bff]/30",  bg: "bg-[#0b7bff]/10",   Icon: Clock },
 };
 
 function pnlColor(v: number | null) {
@@ -20,104 +21,209 @@ function pnlColor(v: number | null) {
   return v > 0 ? "text-emerald-400" : "text-red-400";
 }
 
+function AnalysisRow({ label, value }: { label: string; value: string | undefined }) {
+  if (!value) return null;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[9px] font-mono uppercase tracking-widest text-[#8B8D91]">{label}</span>
+      <p className="text-[11px] text-[rgba(243,242,238,0.75)] leading-relaxed">{value}</p>
+    </div>
+  );
+}
+
 function PositionCard({ pos, index }: { pos: EquityPosition; index: number }) {
+  const [expanded, setExpanded] = useState(false);
+
   const cfg = STATUS_CONFIG[pos.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.submitted;
   const { Icon } = cfg;
   const activePnl = pos.status === "closed" ? pos.realized_pnl : pos.unrealized_pnl;
   const entryVal = pos.entry_price != null && pos.shares != null ? pos.entry_price * pos.shares : null;
   const pnlPct = activePnl != null && entryVal ? (activePnl / Math.abs(entryVal)) * 100 : null;
+  const strategy = pos.strategy?.replace(/_/g, " ") ?? "";
+  const analysis = pos.analysis ?? null;
+  const hasAnalysis = analysis != null && (analysis.thesis || analysis.catalyst || analysis.reason);
 
   return (
     <motion.article
+      layout
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ type: "spring" as const, stiffness: 280, damping: 28, delay: index * 0.05 }}
-      className="rounded-[12px] border border-[rgba(243,242,238,0.07)] bg-[#1A1A1E] p-5 flex flex-col gap-4 hover:border-[rgba(243,242,238,0.14)] transition-colors"
+      transition={{ type: "spring", stiffness: 280, damping: 28, delay: index * 0.05 }}
+      className="rounded-[12px] border border-[rgba(243,242,238,0.07)] bg-[#1A1A1E] overflow-hidden hover:border-[rgba(243,242,238,0.14)] transition-colors"
     >
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-[8px] bg-[rgba(11,123,255,0.12)] border border-[rgba(11,123,255,0.2)] flex items-center justify-center">
-            <span className="font-mono font-bold text-[#92dbe0] text-xs">{pos.ticker}</span>
+      <div className="p-5 flex flex-col gap-4">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-[8px] bg-[rgba(11,123,255,0.12)] border border-[rgba(11,123,255,0.2)] flex items-center justify-center shrink-0">
+              <span className="font-mono font-bold text-[#92dbe0] text-xs">{pos.ticker}</span>
+            </div>
+            <div>
+              <p className="font-bold text-[#F3F2EE] text-sm leading-tight">{pos.ticker}</p>
+              <p className="text-[10px] font-mono text-[#8B8D91] uppercase tracking-wider mt-0.5">{strategy}</p>
+            </div>
+          </div>
+          <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider border shrink-0", cfg.color, cfg.border, cfg.bg)}>
+            <Icon className="size-3" />
+            {cfg.label}
+          </span>
+        </div>
+
+        {/* Price row */}
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <p className="text-[#8B8D91] font-mono mb-1 text-[10px] uppercase tracking-wider">Entry</p>
+            <p className="text-[#F3F2EE] font-mono font-medium">
+              {pos.entry_price != null ? `$${pos.entry_price.toFixed(2)}` : "—"}
+            </p>
           </div>
           <div>
-            <p className="font-bold text-[#F3F2EE] text-sm leading-tight">{pos.ticker}</p>
-            <p className="text-[10px] font-mono text-[#8B8D91] uppercase tracking-wider mt-0.5">{pos.strategy.replace(/_/g, " ")}</p>
+            <p className="text-[#8B8D91] font-mono mb-1 text-[10px] uppercase tracking-wider">
+              {pos.status === "closed" ? "Exit" : "Mark"}
+            </p>
+            <p className="text-[#F3F2EE] font-mono font-medium">
+              {(pos.status === "closed" ? pos.exit_price : pos.mark_price) != null
+                ? `$${(pos.status === "closed" ? pos.exit_price! : pos.mark_price!).toFixed(2)}`
+                : "—"}
+            </p>
           </div>
         </div>
-        <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider border", cfg.color, cfg.border, cfg.bg)}>
-          <Icon className="size-3" />
-          {cfg.label}
-        </span>
-      </div>
 
-      {/* Price row */}
-      <div className="grid grid-cols-2 gap-3 text-xs">
-        <div>
-          <p className="text-[#8B8D91] font-mono mb-1 text-[10px] uppercase tracking-wider">Entry</p>
-          <p className="text-[#F3F2EE] font-mono font-medium">
-            {pos.entry_price != null ? `$${pos.entry_price.toFixed(2)}` : "—"}
-          </p>
-        </div>
-        <div>
-          <p className="text-[#8B8D91] font-mono mb-1 text-[10px] uppercase tracking-wider">
-            {pos.status === "closed" ? "Exit" : "Mark"}
-          </p>
-          <p className="text-[#F3F2EE] font-mono font-medium">
-            {(pos.status === "closed" ? pos.exit_price : pos.mark_price) != null
-              ? `$${(pos.status === "closed" ? pos.exit_price! : pos.mark_price!).toFixed(2)}`
-              : "—"}
-          </p>
-        </div>
-      </div>
-
-      {/* PnL */}
-      <div className="flex items-center justify-between pt-3 border-t border-[rgba(243,242,238,0.05)]">
-        <div>
-          <p className="text-[10px] font-mono text-[#8B8D91] uppercase tracking-wider mb-1">
-            {pos.status === "closed" ? "Realized P&L" : "Unrealized P&L"}
-          </p>
-          <div className={cn("text-lg font-bold font-mono", pnlColor(activePnl))}>
-            {activePnl != null ? (
-              <AnimateNumber
-                value={Math.abs(activePnl)}
-                prefix={activePnl < 0 ? "-$" : "+$"}
-                format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
-                className="text-lg font-bold"
-              />
-            ) : (
-              <span className="text-[#8B8D91]">—</span>
+        {/* PnL */}
+        <div className="flex items-center justify-between pt-3 border-t border-[rgba(243,242,238,0.05)]">
+          <div>
+            <p className="text-[10px] font-mono text-[#8B8D91] uppercase tracking-wider mb-1">
+              {pos.status === "closed" ? "Realized P&L" : "Unrealized P&L"}
+            </p>
+            <div className={cn("text-lg font-bold font-mono", pnlColor(activePnl))}>
+              {activePnl != null ? (
+                <AnimateNumber
+                  value={Math.abs(activePnl)}
+                  prefix={activePnl < 0 ? "-$" : "+$"}
+                  format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
+                  className="text-lg font-bold"
+                />
+              ) : (
+                <span className="text-[#8B8D91]">—</span>
+              )}
+            </div>
+          </div>
+          <div className="text-right">
+            {pnlPct != null && (
+              <span className={cn("text-sm font-mono font-bold", pnlColor(activePnl))}>
+                {activePnl! >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
+              </span>
+            )}
+            {pos.confidence != null && (
+              <p className="text-[10px] font-mono text-[#8B8D91] mt-1">
+                {Math.round(pos.confidence * 100)}% conf
+              </p>
             )}
           </div>
         </div>
-        <div className="text-right">
-          {pnlPct != null && (
-            <span className={cn("text-sm font-mono font-bold", pnlColor(activePnl))}>
-              {activePnl! >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
-            </span>
-          )}
-          {pos.confidence != null && (
-            <p className="text-[10px] font-mono text-[#8B8D91] mt-1">
-              {Math.round(pos.confidence * 100)}% conf
-            </p>
+
+        {/* Shares / value */}
+        <div className="flex items-center gap-2 text-[10px] font-mono text-[#8B8D91]">
+          <Circle className="size-2.5 fill-current" />
+          <span>{pos.shares != null ? `${pos.shares.toFixed(4)} shares` : "—"}</span>
+          {entryVal != null && (
+            <span className="ml-auto">${entryVal.toFixed(2)} notional</span>
           )}
         </div>
+
+        {/* Expand toggle */}
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-[6px] border border-[rgba(243,242,238,0.06)] text-[10px] font-mono uppercase tracking-wider text-[#8B8D91] hover:text-[#F3F2EE] hover:border-[rgba(11,123,255,0.3)] transition-all"
+        >
+          <BarChart2 className="size-3 text-[#0b7bff]" />
+          {expanded ? "Hide" : "Chart & Analysis"}
+          {expanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+        </button>
       </div>
 
-      {/* Shares / value */}
-      <div className="flex items-center gap-2 text-[10px] font-mono text-[#8B8D91]">
-        <Circle className="size-2.5 fill-current" />
-        <span>{pos.shares != null ? `${pos.shares.toFixed(4)} shares` : "—"}</span>
-        {entryVal != null && (
-          <span className="ml-auto">${entryVal.toFixed(2)} notional</span>
+      {/* Expanded: chart + analysis */}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            key="expanded"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="overflow-hidden"
+          >
+            <div className="px-5 pb-5 flex flex-col gap-4 border-t border-[rgba(243,242,238,0.05)]">
+              {/* Stock chart */}
+              <div className="pt-4">
+                <StockMiniChart
+                  ticker={pos.ticker}
+                  entryPrice={pos.entry_price}
+                  entryDate={pos.opened_at}
+                  period="1M"
+                />
+                <p className="text-[9px] font-mono text-[#8B8D91] mt-1.5 text-center">
+                  Orange dot = bot entry · Dashed line = entry price
+                </p>
+              </div>
+
+              {/* Analysis */}
+              {hasAnalysis && (
+                <div className="flex flex-col gap-3 pt-1">
+                  <p className="text-[9px] font-mono uppercase tracking-widest text-[#0b7bff]">Bot Reasoning</p>
+                  <AnalysisRow label="Thesis" value={analysis?.thesis} />
+                  <AnalysisRow label="Catalyst" value={analysis?.catalyst} />
+                  <AnalysisRow label="Reason" value={analysis?.reason} />
+                  <AnalysisRow label="Business quality" value={analysis?.business_quality} />
+                  <AnalysisRow label="Valuation" value={analysis?.valuation} />
+                  <AnalysisRow label="Balance sheet risk" value={analysis?.balance_sheet_risk} />
+                  <AnalysisRow label="Market expectation gap" value={analysis?.market_expectation_gap} />
+                  <AnalysisRow label="Invalidation" value={analysis?.invalidation} />
+                  {analysis?.evidence_citations && analysis.evidence_citations.length > 0 && (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[9px] font-mono uppercase tracking-widest text-[#8B8D91]">Evidence</span>
+                      <ul className="flex flex-col gap-0.5">
+                        {analysis.evidence_citations.map((c, i) => (
+                          <li key={i} className="text-[11px] text-[rgba(243,242,238,0.6)] font-mono leading-relaxed">
+                            · {c}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {analysis?.challenger_verdict && (
+                    <div className="rounded-[6px] border border-[rgba(243,242,238,0.06)] bg-[rgba(243,242,238,0.02)] px-3 py-2">
+                      <p className="text-[9px] font-mono uppercase tracking-widest text-[#8B8D91] mb-1">
+                        Challenger verdict
+                      </p>
+                      <p className={cn("text-[11px] font-mono font-bold",
+                        analysis.challenger_verdict === "pass" ? "text-emerald-400" :
+                        analysis.challenger_verdict === "reject" ? "text-red-400" : "text-amber-400"
+                      )}>
+                        {analysis.challenger_verdict.toUpperCase()}
+                      </p>
+                      {analysis.challenger_objections?.map((o, i) => (
+                        <p key={i} className="text-[10px] text-[rgba(243,242,238,0.5)] mt-1 leading-relaxed">· {o}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!hasAnalysis && (
+                <p className="text-[10px] font-mono text-[#8B8D91] text-center py-2">
+                  No analysis recorded — run the bot with the latest version to capture reasoning.
+                </p>
+              )}
+            </div>
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
     </motion.article>
   );
 }
 
-const FILTERS = ["all", "open", "submitted", "closed"] as const;
+const FILTERS = ["all", "open", "closed"] as const;
 type Filter = typeof FILTERS[number];
 const INITIAL_COUNT = 6;
 
@@ -154,7 +260,7 @@ export function DecisionsSection({ positions }: DecisionsSectionProps) {
             return (
               <button
                 key={f}
-                onClick={() => setFilter(f)}
+                onClick={() => { setFilter(f); setShowAll(false); }}
                 className={cn(
                   "px-4 py-1.5 rounded-full text-xs font-mono uppercase tracking-wider transition-colors border",
                   filter === f
@@ -169,42 +275,50 @@ export function DecisionsSection({ positions }: DecisionsSectionProps) {
         </div>
 
         {/* Grid */}
-        <AnimatePresence mode="popLayout">
-          {visible.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {visible.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <AnimatePresence mode="popLayout">
               {displayed.map((pos, i) => (
                 <PositionCard key={pos.id} pos={pos} index={i} />
               ))}
-            </div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="rounded-[12px] border border-[rgba(243,242,238,0.06)] bg-[#1A1A1E] p-8 text-center"
-            >
-              <p className="text-[#8B8D91] text-sm font-mono">No {filter} positions.</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </AnimatePresence>
+          </div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="rounded-[12px] border border-[rgba(243,242,238,0.06)] bg-[#1A1A1E] p-8 text-center"
+          >
+            <p className="text-[#8B8D91] text-sm font-mono">No {filter} positions.</p>
+          </motion.div>
+        )}
 
         {/* Show more / less */}
-        {hiddenCount > 0 && (
+        {!showAll && hiddenCount > 0 && (
           <div className="mt-6 flex justify-center">
             <motion.button
-              onClick={() => setShowAll((v) => !v)}
+              onClick={() => setShowAll(true)}
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
               transition={{ type: "spring", stiffness: 400, damping: 20 }}
-              className="group relative flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-mono uppercase tracking-wider border border-[rgba(243,242,238,0.12)] text-[#8B8D91] hover:text-[#F3F2EE] hover:border-[rgba(11,123,255,0.4)] hover:shadow-[0_0_16px_rgba(11,123,255,0.15)] transition-all duration-200"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-mono uppercase tracking-wider border border-[rgba(243,242,238,0.12)] text-[#8B8D91] hover:text-[#F3F2EE] hover:border-[rgba(11,123,255,0.4)] hover:shadow-[0_0_16px_rgba(11,123,255,0.15)] transition-all duration-200"
             >
-              <span>{showAll ? "Show less" : `Show ${hiddenCount} more`}</span>
-              <motion.span
-                animate={{ rotate: showAll ? 180 : 0 }}
-                transition={{ type: "spring", stiffness: 300, damping: 22 }}
-                className="inline-flex"
-              >
-                <ChevronDown className="size-3.5 text-[#0b7bff]" />
-              </motion.span>
+              <span>Show {hiddenCount} more</span>
+              <ChevronDown className="size-3.5 text-[#0b7bff]" />
+            </motion.button>
+          </div>
+        )}
+        {showAll && visible.length > INITIAL_COUNT && (
+          <div className="mt-6 flex justify-center">
+            <motion.button
+              onClick={() => setShowAll(false)}
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
+              transition={{ type: "spring", stiffness: 400, damping: 20 }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-mono uppercase tracking-wider border border-[rgba(243,242,238,0.12)] text-[#8B8D91] hover:text-[#F3F2EE] hover:border-[rgba(11,123,255,0.4)] transition-all duration-200"
+            >
+              <span>Show less</span>
+              <ChevronUp className="size-3.5 text-[#0b7bff]" />
             </motion.button>
           </div>
         )}

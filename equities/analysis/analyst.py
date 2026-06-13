@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace as dc_replace
 from datetime import date, datetime, timezone
 from typing import Any, Callable, Protocol, TypeVar
 
@@ -254,20 +254,7 @@ class EquityAnalyst:
             )
             if size_pct == 0.0:
                 continue  # WAIT — skip
-            final = Recommendation(
-                instrument=audited.instrument,
-                sleeve=audited.sleeve,
-                side=audited.side,
-                entry=audited.entry,
-                stop_loss=audited.stop_loss,
-                take_profit=audited.take_profit,
-                size_pct=size_pct,
-                confidence=audited.confidence,
-                catalyst=audited.catalyst,
-                thesis=audited.thesis,
-                horizon=audited.horizon,
-                memo=audited.memo,
-            )
+            final = dc_replace(audited, size_pct=size_pct)
             self._record_recommendation_artifact(
                 final,
                 stage="final",
@@ -476,6 +463,17 @@ class EquityAnalyst:
             thesis=data.thesis,
             horizon=data.horizon or "1-2 weeks",
             memo=data.memo(),
+            analysis={
+                "thesis": data.thesis,
+                "catalyst": data.catalyst,
+                "reason": data.reason,
+                "business_quality": data.business_quality,
+                "valuation": data.valuation,
+                "balance_sheet_risk": data.balance_sheet_risk,
+                "market_expectation_gap": data.market_expectation_gap,
+                "invalidation": data.invalidation,
+                "evidence_citations": list(data.evidence_citations),
+            },
         )
 
     def _validated_price(self, ticker: str) -> float | None:
@@ -807,23 +805,18 @@ class EquityAnalyst:
         if verdict == "weaken":
             adj = float(data.confidence_adjustment)
             new_confidence = max(0.1, rec.confidence + adj)
-            weakened = Recommendation(
-                instrument=rec.instrument,
-                sleeve=rec.sleeve,
-                side=rec.side,
-                entry=rec.entry,
-                stop_loss=rec.stop_loss,
-                take_profit=rec.take_profit,
-                size_pct=rec.size_pct,
+            weakened = dc_replace(
+                rec,
                 confidence=round(new_confidence, 3),
-                catalyst=rec.catalyst,
-                thesis=rec.thesis,
-                horizon=rec.horizon,
-                memo=rec.memo,
+                analysis={**(rec.analysis or {}), "challenger_verdict": "weaken", "challenger_objections": objections},
             )
             return weakened, objections
 
-        return rec, objections
+        # "pass" — annotate analysis with challenger approval
+        return dc_replace(
+            rec,
+            analysis={**(rec.analysis or {}), "challenger_verdict": "pass", "challenger_objections": objections},
+        ), objections
 
     def _audit(
         self,
@@ -881,19 +874,14 @@ class EquityAnalyst:
         consistency_penalty = float(data.consistency_penalty)
         new_confidence = round(max(0.05, rec.confidence - consistency_penalty), 3)
 
-        return Recommendation(
-            instrument=rec.instrument,
-            sleeve=rec.sleeve,
-            side=rec.side,
-            entry=rec.entry,
-            stop_loss=rec.stop_loss,
-            take_profit=rec.take_profit,
-            size_pct=rec.size_pct,
+        return dc_replace(
+            rec,
             confidence=new_confidence,
-            catalyst=rec.catalyst,
-            thesis=rec.thesis,
-            horizon=rec.horizon,
-            memo=rec.memo,
+            analysis={
+                **(rec.analysis or {}),
+                "auditor_verdict": "pass",
+                "auditor_consistency_penalty": consistency_penalty,
+            },
         )
 
 

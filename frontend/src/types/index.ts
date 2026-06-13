@@ -39,6 +39,22 @@ export type RegistryEvent = {
   uri: string;
 };
 
+export type PositionAnalysis = {
+  thesis?: string;
+  catalyst?: string;
+  reason?: string;
+  business_quality?: string;
+  valuation?: string;
+  balance_sheet_risk?: string;
+  market_expectation_gap?: string;
+  invalidation?: string;
+  evidence_citations?: string[];
+  challenger_verdict?: string;
+  challenger_objections?: string[];
+  auditor_verdict?: string;
+  prefilter_score?: number;
+};
+
 export type EquityPosition = {
   id: string;
   ticker: string;
@@ -58,6 +74,7 @@ export type EquityPosition = {
   mode: string;
   opened_at: string;
   closed_at: string | null;
+  analysis?: PositionAnalysis | null;
 };
 
 export type PortfolioHistoryPoint = { label: string; value: number };

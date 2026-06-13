@@ -14,6 +14,7 @@ Usage:
 import argparse
 import csv
 import json
+import sqlite3
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,6 +33,11 @@ def parse_args():
         "--equity-csv",
         default="data/equity.csv",
         help="Path to equity trades CSV (relative to repo root)",
+    )
+    p.add_argument(
+        "--equity-db",
+        default="data/equity.db",
+        help="Path to equity SQLite DB (relative to repo root)",
     )
     p.add_argument(
         "--out-dir",
@@ -125,11 +131,53 @@ def compute_equity_stats(csv_path: Path) -> dict:
     }, strategies
 
 
+def export_equity_positions(db_path: Path) -> list[dict]:
+    """Read positions from SQLite and return as frontend-compatible dicts."""
+    if not db_path.exists():
+        return []
+    con = sqlite3.connect(str(db_path))
+    con.row_factory = sqlite3.Row
+    rows = con.execute("SELECT * FROM positions ORDER BY id").fetchall()
+    con.close()
+    positions = []
+    for r in rows:
+        d = dict(r)
+        analysis_raw = d.get("analysis_json", "{}")
+        try:
+            analysis = json.loads(analysis_raw) if analysis_raw else {}
+        except (json.JSONDecodeError, TypeError):
+            analysis = {}
+        pos = {
+            "id": str(d.get("id", "")),
+            "ticker": d.get("ticker", ""),
+            "side": d.get("side", "buy"),
+            "status": d.get("status", "open"),
+            "shares": d.get("shares"),
+            "entry_price": d.get("entry_price"),
+            "mark_price": d.get("mark_price"),
+            "stop_loss": d.get("stop_loss"),
+            "take_profit": d.get("take_profit"),
+            "unrealized_pnl": d.get("unrealized_pnl"),
+            "realized_pnl": d.get("realized_pnl"),
+            "exit_price": d.get("exit_price"),
+            "exit_reason": d.get("exit_reason"),
+            "confidence": d.get("confidence"),
+            "strategy": d.get("strategy", ""),
+            "mode": d.get("mode", "paper"),
+            "opened_at": d.get("opened_at", ""),
+            "closed_at": d.get("closed_at"),
+            "analysis": analysis if analysis else None,
+        }
+        positions.append(pos)
+    return positions
+
+
 def main():
     args = parse_args()
 
     ledger_path = REPO_ROOT / args.ledger
     equity_path = REPO_ROOT / args.equity_csv
+    equity_db_path = REPO_ROOT / args.equity_db
     out_dir = REPO_ROOT / args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -154,6 +202,17 @@ def main():
         json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8"
     )
     summary_size = summary_out.stat().st_size
+
+    # --- Output C: equity_positions.json (from SQLite with full analysis) ---
+    positions = export_equity_positions(equity_db_path)
+    if positions:
+        positions_out = out_dir / "equity_positions.json"
+        positions_out.write_text(
+            json.dumps(positions, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        print(f"Wrote {positions_out.relative_to(REPO_ROOT)}  ({positions_out.stat().st_size:,} bytes, {len(positions)} positions)")
+    else:
+        print("Skipped equity_positions.json — no DB or empty")
 
     print(f"Wrote {commitments_out.relative_to(REPO_ROOT)}  ({commitments_size:,} bytes, {len(commitments)} records)")
     print(f"Wrote {summary_out.relative_to(REPO_ROOT)}  ({summary_size:,} bytes)")
