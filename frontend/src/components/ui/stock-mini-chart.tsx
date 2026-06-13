@@ -190,18 +190,16 @@ export function StockMiniChart({ ticker, entryPrice, entryDate, markPrice, perio
   const fillColor = isUp ? "#34d399" : "#f87171";
 
   // Build entry markers — one per fill if entries array provided, else single fallback
-  const resolvedEntries: Array<{ x: number; y: number; isAdd: boolean }> = React.useMemo(() => {
-    const fills = entries && entries.length > 0
-      ? entries
-      : entryPrice != null ? [{ price: entryPrice, date: entryDate, shares: null }] : [];
-    return fills
-      .map((e, i) => {
-        const idx = e.date ? closestBarIndex(bars, e.date) : -1;
-        if (idx < 0) return null;
-        return { x: xOf(idx, bars.length), y: yOf(e.price, scale), isAdd: i > 0 };
-      })
-      .filter((m): m is NonNullable<typeof m> => m !== null);
-  }, [bars, entries, entryPrice, entryDate, scale]);
+  const entryFills = entries && entries.length > 0
+    ? entries
+    : entryPrice != null ? [{ price: entryPrice, date: entryDate, shares: null }] : [];
+  const resolvedEntries = entryFills
+    .map((e, i) => {
+      const idx = e.date ? closestBarIndex(bars, e.date) : -1;
+      if (idx < 0) return null;
+      return { x: xOf(idx, bars.length), y: yOf(e.price, scale), isAdd: i > 0 };
+    })
+    .filter((m): m is NonNullable<typeof m> => m !== null);
 
   // Dashed horizontal line at VWAP entry price (entryPrice is already VWAP when entries provided)
   const entryY = entryPrice != null ? yOf(entryPrice, scale) : null;
