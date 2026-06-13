@@ -220,11 +220,6 @@ function PositionCard({ pos, index }: { pos: EquityPosition; index: number }) {
                 </div>
               )}
 
-              {!hasAnalysis && (
-                <p className="text-[10px] font-mono text-[#8B8D91] text-center py-2">
-                  No analysis recorded — run the bot with the latest version to capture reasoning.
-                </p>
-              )}
             </div>
           </motion.div>
         )}
