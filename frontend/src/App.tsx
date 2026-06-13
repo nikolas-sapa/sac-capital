@@ -35,22 +35,38 @@ export default function App() {
       .catch(() => {});
   }, []);
 
-  // Alpaca equity positions — live API with static fallback
+  // Alpaca equity positions — live prices merged with static analysis metadata
   useEffect(() => {
     async function loadPositions() {
+      // Always load static snapshot first for analysis/strategy/confidence fields
+      let staticByTicker: Record<string, EquityPosition> = {};
+      try {
+        const r = await fetch("/equity_positions.json");
+        if (r.ok) {
+          const data: EquityPosition[] = await r.json();
+          for (const p of data) staticByTicker[p.ticker] = p;
+        }
+      } catch {}
+
+      // Try live Alpaca for fresh prices/pnl; merge analysis from static
       try {
         const r = await fetch("/api/positions");
         if (r.ok) {
-          const data: EquityPosition[] = await r.json();
-          setPositions(data);
+          const live: EquityPosition[] = await r.json();
+          const merged = live.map((p) => {
+            const meta = staticByTicker[p.ticker];
+            return meta
+              ? { ...p, analysis: meta.analysis, strategy: meta.strategy || p.strategy, confidence: meta.confidence ?? p.confidence, entries: meta.entries }
+              : p;
+          });
+          setPositions(merged);
           return;
         }
       } catch {}
-      // fallback to static snapshot
-      try {
-        const r = await fetch("/equity_positions.json");
-        if (r.ok) setPositions(await r.json());
-      } catch {}
+
+      // Alpaca unavailable — use static snapshot directly
+      const staticList = Object.values(staticByTicker);
+      if (staticList.length > 0) setPositions(staticList);
     }
 
     loadPositions();
