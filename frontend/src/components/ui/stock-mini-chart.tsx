@@ -62,6 +62,17 @@ function closestBarIndex(bars: Bar[], date: string): number {
   return best;
 }
 
+function closestBarByPrice(bars: Bar[], price: number): number {
+  if (bars.length === 0) return -1;
+  let best = 0;
+  let bestDiff = Infinity;
+  bars.forEach((b, i) => {
+    const diff = Math.abs(b.c - price);
+    if (diff < bestDiff) { bestDiff = diff; best = i; }
+  });
+  return best;
+}
+
 // Fallback SVG chart when API data is unavailable — shows entry → current price as a 2-point line
 function FallbackChart({ entryPrice, markPrice, ticker }: { entryPrice: number; markPrice: number; ticker: string }) {
   const isUp = markPrice >= entryPrice;
@@ -195,7 +206,9 @@ export function StockMiniChart({ ticker, entryPrice, entryDate, markPrice, perio
     : entryPrice != null ? [{ price: entryPrice, date: entryDate, shares: null }] : [];
   const resolvedEntries = entryFills
     .map((e, i) => {
-      const idx = e.date ? closestBarIndex(bars, e.date) : -1;
+      const idx = e.date
+        ? closestBarIndex(bars, e.date)
+        : closestBarByPrice(bars, e.price);
       if (idx < 0) return null;
       return { x: xOf(idx, bars.length), y: yOf(e.price, scale), isAdd: i > 0 };
     })
