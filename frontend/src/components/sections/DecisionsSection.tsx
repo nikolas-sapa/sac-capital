@@ -168,9 +168,12 @@ function PositionCard({ pos, index }: { pos: EquityPosition; index: number }) {
                   entryDate={pos.opened_at}
                   markPrice={markPrice}
                   period="1M"
+                  entries={pos.entries}
                 />
                 <p className="text-[9px] font-mono text-[#8B8D91] mt-1.5 text-center">
-                  Orange dot = bot entry · Dashed line = entry price
+                  {pos.entries && pos.entries.length > 1
+                    ? `${pos.entries.length} entries · Dashed = avg entry price`
+                    : "Orange dot = bot entry · Dashed = entry price"}
                 </p>
               </div>
 

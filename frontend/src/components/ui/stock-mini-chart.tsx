@@ -131,15 +131,22 @@ function FallbackChart({ entryPrice, markPrice, ticker }: { entryPrice: number; 
   );
 }
 
+interface EntryFill {
+  price: number;
+  date: string | null;
+  shares?: number | null;
+}
+
 interface StockMiniChartProps {
   ticker: string;
   entryPrice: number | null;
   entryDate: string | null;
   markPrice?: number | null;
   period?: string;
+  entries?: EntryFill[];
 }
 
-export function StockMiniChart({ ticker, entryPrice, entryDate, markPrice, period = "1M" }: StockMiniChartProps) {
+export function StockMiniChart({ ticker, entryPrice, entryDate, markPrice, period = "1M", entries }: StockMiniChartProps) {
   const [bars, setBars] = React.useState<Bar[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(false);
@@ -182,9 +189,22 @@ export function StockMiniChart({ ticker, entryPrice, entryDate, markPrice, perio
   const lineColor = isUp ? "#34d399" : "#f87171";
   const fillColor = isUp ? "#34d399" : "#f87171";
 
-  const entryBarIdx = entryDate ? closestBarIndex(bars, entryDate) : -1;
+  // Build entry markers — one per fill if entries array provided, else single fallback
+  const resolvedEntries: Array<{ x: number; y: number; isAdd: boolean }> = React.useMemo(() => {
+    const fills = entries && entries.length > 0
+      ? entries
+      : entryPrice != null ? [{ price: entryPrice, date: entryDate, shares: null }] : [];
+    return fills
+      .map((e, i) => {
+        const idx = e.date ? closestBarIndex(bars, e.date) : -1;
+        if (idx < 0) return null;
+        return { x: xOf(idx, bars.length), y: yOf(e.price, scale), isAdd: i > 0 };
+      })
+      .filter((m): m is NonNullable<typeof m> => m !== null);
+  }, [bars, entries, entryPrice, entryDate, scale]);
+
+  // Dashed horizontal line at VWAP entry price (entryPrice is already VWAP when entries provided)
   const entryY = entryPrice != null ? yOf(entryPrice, scale) : null;
-  const entryX = entryBarIdx >= 0 ? xOf(entryBarIdx, bars.length) : null;
 
   const yTicks = [scale.min + scale.range * 0.25, scale.min + scale.range * 0.5, scale.min + scale.range * 0.75].map(
     (v) => Math.round(v * 100) / 100
@@ -235,13 +255,19 @@ export function StockMiniChart({ ticker, entryPrice, entryDate, markPrice, perio
           <path d={closePath(bars, scale)} fill="none" stroke={lineColor} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
         </g>
 
-        {/* Entry point marker */}
-        {entryBarIdx >= 0 && entryX != null && entryY != null && (
-          <g>
-            <circle cx={entryX} cy={entryY} r="5" fill="#E55A1C" stroke="#0B0B0D" strokeWidth="2" />
-            <circle cx={entryX} cy={entryY} r="9" fill="none" stroke="#E55A1C" strokeWidth="1" opacity="0.4" />
+        {/* Entry point markers — one dot per fill */}
+        {resolvedEntries.map((m, i) => (
+          <g key={i}>
+            {/* outer ring only on first entry; add-ons get a smaller ring */}
+            <circle cx={m.x} cy={m.y} r={m.isAdd ? 7 : 9} fill="none"
+              stroke="#E55A1C" strokeWidth="1" opacity={m.isAdd ? 0.25 : 0.4} />
+            <circle cx={m.x} cy={m.y} r="5" fill="#E55A1C" stroke="#0B0B0D" strokeWidth="2" />
+            {m.isAdd && (
+              <text x={m.x} y={m.y - 12} textAnchor="middle" fontSize="7"
+                fill="#E55A1C" fontFamily="monospace" opacity="0.8">+add</text>
+            )}
           </g>
-        )}
+        ))}
 
         {/* X axis labels — first and last */}
         {bars.length > 0 && (() => {

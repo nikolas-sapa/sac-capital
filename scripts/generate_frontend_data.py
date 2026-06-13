@@ -132,41 +132,74 @@ def compute_equity_stats(csv_path: Path) -> dict:
 
 
 def export_equity_positions(db_path: Path) -> list[dict]:
-    """Read positions from SQLite and return as frontend-compatible dicts."""
+    """Read positions from SQLite, group by (ticker, status), and return frontend-compatible dicts."""
     if not db_path.exists():
         return []
     con = sqlite3.connect(str(db_path))
     con.row_factory = sqlite3.Row
     rows = con.execute("SELECT * FROM positions ORDER BY id").fetchall()
     con.close()
+
+    # Group by (ticker, status) so multiple fills of the same stock merge into one card
+    groups: dict[tuple, list] = defaultdict(list)
+    for row in rows:
+        d = dict(row)
+        key = (d.get("ticker", ""), d.get("status", "open"))
+        groups[key].append(d)
+
     positions = []
-    for r in rows:
-        d = dict(r)
-        analysis_raw = d.get("analysis_json", "{}")
-        try:
-            analysis = json.loads(analysis_raw) if analysis_raw else {}
-        except (json.JSONDecodeError, TypeError):
-            analysis = {}
+    for (ticker, status), group in groups.items():
+        group.sort(key=lambda r: r.get("opened_at") or "")
+
+        # VWAP across all fills
+        total_shares = sum(r.get("shares") or 0.0 for r in group)
+        if total_shares > 0:
+            vwap = sum((r.get("entry_price") or 0.0) * (r.get("shares") or 0.0) for r in group) / total_shares
+        else:
+            vwap = group[0].get("entry_price")
+
+        unrealized_pnl = sum(r.get("unrealized_pnl") or 0.0 for r in group) or None
+        realized_pnl = sum(r.get("realized_pnl") or 0.0 for r in group) or None
+
+        first, last = group[0], group[-1]
+
+        analysis: dict = {}
+        for r in group:
+            try:
+                a = json.loads(r.get("analysis_json") or "null")
+                if a:
+                    analysis = a
+                    break
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        entries = [
+            {"price": r["entry_price"], "date": r.get("opened_at"), "shares": r.get("shares")}
+            for r in group
+            if r.get("entry_price") is not None
+        ]
+
         pos = {
-            "id": str(d.get("id", "")),
-            "ticker": d.get("ticker", ""),
-            "side": d.get("side", "buy"),
-            "status": d.get("status", "open"),
-            "shares": d.get("shares"),
-            "entry_price": d.get("entry_price"),
-            "mark_price": d.get("mark_price"),
-            "stop_loss": d.get("stop_loss"),
-            "take_profit": d.get("take_profit"),
-            "unrealized_pnl": d.get("unrealized_pnl"),
-            "realized_pnl": d.get("realized_pnl"),
-            "exit_price": d.get("exit_price"),
-            "exit_reason": d.get("exit_reason"),
-            "confidence": d.get("confidence"),
-            "strategy": d.get("strategy", ""),
-            "mode": d.get("mode", "paper"),
-            "opened_at": d.get("opened_at", ""),
-            "closed_at": d.get("closed_at"),
+            "id": str(first.get("id", "")),
+            "ticker": ticker,
+            "side": first.get("side", "buy"),
+            "status": status,
+            "shares": round(total_shares, 6) if total_shares else None,
+            "entry_price": round(vwap, 6) if vwap is not None else None,
+            "mark_price": last.get("mark_price"),
+            "stop_loss": first.get("stop_loss"),
+            "take_profit": first.get("take_profit"),
+            "unrealized_pnl": round(unrealized_pnl, 6) if unrealized_pnl is not None else None,
+            "realized_pnl": round(realized_pnl, 6) if realized_pnl is not None else None,
+            "exit_price": last.get("exit_price"),
+            "exit_reason": last.get("exit_reason"),
+            "confidence": first.get("confidence"),
+            "strategy": first.get("strategy", ""),
+            "mode": first.get("mode", "paper"),
+            "opened_at": first.get("opened_at", ""),
+            "closed_at": last.get("closed_at"),
             "analysis": analysis if analysis else None,
+            "entries": entries,
         }
         positions.append(pos)
     return positions

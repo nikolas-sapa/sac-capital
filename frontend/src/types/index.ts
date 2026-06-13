@@ -55,6 +55,12 @@ export type PositionAnalysis = {
   prefilter_score?: number;
 };
 
+export type EntryFill = {
+  price: number;
+  date: string | null;
+  shares?: number | null;
+};
+
 export type EquityPosition = {
   id: string;
   ticker: string;
@@ -75,6 +81,7 @@ export type EquityPosition = {
   opened_at: string;
   closed_at: string | null;
   analysis?: PositionAnalysis | null;
+  entries?: EntryFill[];
 };
 
 export type PortfolioHistoryPoint = { label: string; value: number };
