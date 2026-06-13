@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { TrendingUp, CheckCircle, Clock, Circle, ChevronDown, ChevronUp, BarChart2 } from "lucide-react";
+import { ChevronDown, ChevronUp, BarChart2 } from "lucide-react";
 import type { EquityPosition } from "@/types";
 import { AnimateNumber } from "@/components/ui/animated-blur-number";
 import { StockMiniChart } from "@/components/ui/stock-mini-chart";
@@ -11,9 +11,9 @@ interface DecisionsSectionProps {
 }
 
 const STATUS_CONFIG = {
-  open:      { label: "Open",    color: "text-emerald-400", border: "border-emerald-400/30", bg: "bg-emerald-400/10", Icon: TrendingUp },
-  closed:    { label: "Closed",  color: "text-neutral-400", border: "border-neutral-400/30", bg: "bg-neutral-400/10", Icon: CheckCircle },
-  submitted: { label: "Pending", color: "text-[#0b7bff]",   border: "border-[#0b7bff]/30",  bg: "bg-[#0b7bff]/10",   Icon: Clock },
+  open:      { label: "Open",    dot: "bg-emerald-400", text: "text-emerald-400", stripe: "bg-emerald-400" },
+  closed:    { label: "Closed",  dot: "bg-neutral-500", text: "text-neutral-400", stripe: "bg-neutral-600" },
+  submitted: { label: "Pending", dot: "bg-[#0b7bff]",   text: "text-[#0b7bff]",  stripe: "bg-[#0b7bff]" },
 };
 
 function pnlColor(v: number | null) {
@@ -35,13 +35,13 @@ function PositionCard({ pos, index }: { pos: EquityPosition; index: number }) {
   const [expanded, setExpanded] = useState(false);
 
   const cfg = STATUS_CONFIG[pos.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.submitted;
-  const { Icon } = cfg;
   const activePnl = pos.status === "closed" ? pos.realized_pnl : pos.unrealized_pnl;
   const entryVal = pos.entry_price != null && pos.shares != null ? pos.entry_price * pos.shares : null;
   const pnlPct = activePnl != null && entryVal ? (activePnl / Math.abs(entryVal)) * 100 : null;
   const strategy = pos.strategy?.replace(/_/g, " ") ?? "";
   const analysis = pos.analysis ?? null;
   const hasAnalysis = analysis != null && (analysis.thesis || analysis.catalyst || analysis.reason);
+  const markPrice = pos.status === "closed" ? pos.exit_price : pos.mark_price;
 
   return (
     <motion.article
@@ -49,92 +49,101 @@ function PositionCard({ pos, index }: { pos: EquityPosition; index: number }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 280, damping: 28, delay: index * 0.05 }}
-      className="rounded-[12px] border border-[rgba(243,242,238,0.07)] bg-[#1A1A1E] overflow-hidden hover:border-[rgba(243,242,238,0.14)] transition-colors"
+      className="rounded-[12px] border border-[rgba(243,242,238,0.07)] bg-[#1A1A1E] overflow-hidden hover:border-[rgba(243,242,238,0.12)] transition-colors flex"
     >
-      <div className="p-5 flex flex-col gap-4">
+      {/* Left status stripe */}
+      <div className={cn("w-[3px] shrink-0", cfg.stripe)} />
+
+      <div className="flex-1 p-5 flex flex-col gap-4 min-w-0">
         {/* Header */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-[8px] bg-[rgba(11,123,255,0.12)] border border-[rgba(11,123,255,0.2)] flex items-center justify-center shrink-0">
-              <span className="font-mono font-bold text-[#92dbe0] text-xs">{pos.ticker}</span>
-            </div>
-            <div>
-              <p className="font-bold text-[#F3F2EE] text-sm leading-tight">{pos.ticker}</p>
-              <p className="text-[10px] font-mono text-[#8B8D91] uppercase tracking-wider mt-0.5">{strategy}</p>
-            </div>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p
+              className="text-2xl font-black text-[#F3F2EE] leading-none tracking-tight"
+              style={{ fontFamily: "Sora, sans-serif" }}
+            >
+              {pos.ticker}
+            </p>
+            {strategy && (
+              <p className="text-[11px] text-[#8B8D91] mt-1 capitalize leading-tight"
+                style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                {strategy}
+              </p>
+            )}
           </div>
-          <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider border shrink-0", cfg.color, cfg.border, cfg.bg)}>
-            <Icon className="size-3" />
-            {cfg.label}
+          <span className={cn("inline-flex items-center gap-1.5 shrink-0 mt-0.5")}>
+            <span className={cn("w-1.5 h-1.5 rounded-full", cfg.dot)} />
+            <span className={cn("text-[10px] font-mono uppercase tracking-widest", cfg.text)}>
+              {cfg.label}
+            </span>
           </span>
         </div>
 
         {/* Price row */}
-        <div className="grid grid-cols-2 gap-3 text-xs">
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="text-[#8B8D91] font-mono mb-1 text-[10px] uppercase tracking-wider">Entry</p>
-            <p className="text-[#F3F2EE] font-mono font-medium">
+            <p className="text-[10px] font-mono text-[#8B8D91] uppercase tracking-wider mb-1">Entry</p>
+            <p className="text-sm font-semibold text-[#F3F2EE]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               {pos.entry_price != null ? `$${pos.entry_price.toFixed(2)}` : "—"}
             </p>
           </div>
           <div>
-            <p className="text-[#8B8D91] font-mono mb-1 text-[10px] uppercase tracking-wider">
-              {pos.status === "closed" ? "Exit" : "Mark"}
+            <p className="text-[10px] font-mono text-[#8B8D91] uppercase tracking-wider mb-1">
+              {pos.status === "closed" ? "Exit" : "Current"}
             </p>
-            <p className="text-[#F3F2EE] font-mono font-medium">
-              {(pos.status === "closed" ? pos.exit_price : pos.mark_price) != null
-                ? `$${(pos.status === "closed" ? pos.exit_price! : pos.mark_price!).toFixed(2)}`
-                : "—"}
+            <p className="text-sm font-semibold text-[#F3F2EE]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              {markPrice != null ? `$${markPrice.toFixed(2)}` : "—"}
             </p>
           </div>
         </div>
 
         {/* PnL */}
-        <div className="flex items-center justify-between pt-3 border-t border-[rgba(243,242,238,0.05)]">
+        <div className="flex items-end justify-between pt-3 border-t border-[rgba(243,242,238,0.05)]">
           <div>
             <p className="text-[10px] font-mono text-[#8B8D91] uppercase tracking-wider mb-1">
-              {pos.status === "closed" ? "Realized P&L" : "Unrealized P&L"}
+              {pos.status === "closed" ? "Realized" : "Unrealized"}
             </p>
-            <div className={cn("text-lg font-bold font-mono", pnlColor(activePnl))}>
+            <div className={cn("font-bold", pnlColor(activePnl))}>
               {activePnl != null ? (
                 <AnimateNumber
                   value={Math.abs(activePnl)}
                   prefix={activePnl < 0 ? "-$" : "+$"}
                   format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
-                  className="text-lg font-bold"
+                  className="text-xl font-bold"
+                  style={{ fontFamily: "Sora, sans-serif" }}
                 />
               ) : (
-                <span className="text-[#8B8D91]">—</span>
+                <span className="text-[#8B8D91] text-xl">—</span>
               )}
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right flex flex-col items-end gap-1">
             {pnlPct != null && (
-              <span className={cn("text-sm font-mono font-bold", pnlColor(activePnl))}>
+              <span className={cn("text-sm font-semibold", pnlColor(activePnl))}
+                style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 {activePnl! >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
               </span>
             )}
             {pos.confidence != null && (
-              <p className="text-[10px] font-mono text-[#8B8D91] mt-1">
+              <span className="text-[10px] font-mono text-[#8B8D91]">
                 {Math.round(pos.confidence * 100)}% conf
-              </p>
+              </span>
             )}
           </div>
         </div>
 
-        {/* Shares / value */}
-        <div className="flex items-center gap-2 text-[10px] font-mono text-[#8B8D91]">
-          <Circle className="size-2.5 fill-current" />
-          <span>{pos.shares != null ? `${pos.shares.toFixed(4)} shares` : "—"}</span>
-          {entryVal != null && (
-            <span className="ml-auto">${entryVal.toFixed(2)} notional</span>
-          )}
-        </div>
+        {/* Shares + notional */}
+        {(pos.shares != null || entryVal != null) && (
+          <div className="flex items-center justify-between text-[10px] font-mono text-[#8B8D91]">
+            {pos.shares != null && <span>{pos.shares.toFixed(4)} shares</span>}
+            {entryVal != null && <span>${entryVal.toFixed(2)} notional</span>}
+          </div>
+        )}
 
         {/* Expand toggle */}
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-[6px] border border-[rgba(243,242,238,0.06)] text-[10px] font-mono uppercase tracking-wider text-[#8B8D91] hover:text-[#F3F2EE] hover:border-[rgba(11,123,255,0.3)] transition-all"
+          className="flex items-center justify-center gap-1.5 w-full py-2 rounded-[6px] border border-[rgba(243,242,238,0.06)] text-[10px] font-mono uppercase tracking-wider text-[#8B8D91] hover:text-[#F3F2EE] hover:border-[rgba(11,123,255,0.3)] hover:bg-[rgba(11,123,255,0.04)] transition-all"
         >
           <BarChart2 className="size-3 text-[#0b7bff]" />
           {expanded ? "Hide" : "Chart & Analysis"}
