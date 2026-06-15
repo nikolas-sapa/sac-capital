@@ -82,28 +82,31 @@ export default function App() {
       .catch(() => setPerf(null));
   }, []);
 
-  // Live Mantle registry events
+  // Live Mantle registry events.
+  // Mantle caps eth_getLogs at 10k blocks, so query a bounded recent window
+  // (captures the latest anchored decisions) instead of the full chain.
   useEffect(() => {
     if (!rpcUrl || !registryAddress) return;
     const client = createMantleClient(rpcUrl);
     const contract = createRegistryContract(registryAddress as Hex, client);
-    contract.getEvents
-      .DecisionRecorded()
-      .then((logs) => {
-        setEvents(
-          logs
-            .slice(-8)
-            .reverse()
-            .map((log) => ({
-              id: String(log.args.id ?? ""),
-              agentId: String(log.args.agentId ?? ""),
-              decisionHash: String(log.args.decisionHash ?? ""),
-              reporter: String(log.args.reporter ?? ""),
-              uri: String(log.args.uri ?? ""),
-            }))
-        );
-      })
-      .catch(() => {});
+    (async () => {
+      const latest = await client.getBlockNumber();
+      const fromBlock = latest > 9000n ? latest - 9000n : 0n;
+      const logs = await contract.getEvents.DecisionRecorded({}, { fromBlock, toBlock: latest });
+      // Keep ALL events in the window for the verify-panel membership check;
+      // display components can slice for presentation.
+      setEvents(
+        logs
+          .reverse()
+          .map((log) => ({
+            id: String(log.args.id ?? ""),
+            agentId: String(log.args.agentId ?? ""),
+            decisionHash: String(log.args.decisionHash ?? ""),
+            reporter: String(log.args.reporter ?? ""),
+            uri: String(log.args.uri ?? ""),
+          }))
+      );
+    })().catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -118,7 +121,7 @@ export default function App() {
 <HowItWorksSection />
       <PerformanceSection positions={positions} />
       <DecisionsSection positions={positions} />
-      <VerifySection selected={selected} verifiedHash={verifiedHash} />
+      <VerifySection selected={selected} verifiedHash={verifiedHash} events={events} />
       <CTASection />
       <footer className="border-t border-[rgba(243,242,238,0.06)] py-8 px-6 text-center">
         <p className="text-xs font-mono text-[rgba(243,242,238,0.3)]">

@@ -57,3 +57,61 @@ class EquityResearchArtifact(BaseModel):
     confidence: float | None = None
     decision: Literal["approved", "rejected", "error"]
     rejection_reason: str = ""
+
+
+def risk_decision_artifact(
+    recommendation: Any,
+    *,
+    decision: Literal["approved", "rejected"],
+    rejection_reason: str = "",
+    stage: str = "risk",
+    shares: float | None = None,
+    notional: float | None = None,
+    risk_metrics: dict[str, Any] | None = None,
+) -> EquityResearchArtifact:
+    """Build a decision artifact for the risk/execution stage of the runner.
+
+    Captures *why a recommendation was traded or skipped* after analyst approval —
+    the kernel/notional/daily-cap/broker rejections that previously only printed.
+    Feeds the self-improvement harness and the on-chain commitment exporter.
+    """
+    inst = recommendation.instrument
+    ticker = inst.ticker
+    candidate_payload: dict[str, Any] = {
+        "ticker": ticker,
+        "sleeve": recommendation.sleeve.value,
+        "side": recommendation.side,
+        "entry": recommendation.entry,
+        "stop_loss": recommendation.stop_loss,
+        "take_profit": recommendation.take_profit,
+        "size_pct": recommendation.size_pct,
+        "catalyst": recommendation.catalyst,
+        "horizon": recommendation.horizon,
+    }
+    output_json: dict[str, Any] = {
+        "stage": stage,
+        "decision": decision,
+        "rejection_reason": rejection_reason,
+        "thesis": recommendation.thesis,
+        "shares": shares,
+        "notional": notional,
+        "risk_metrics": risk_metrics or {},
+    }
+    return EquityResearchArtifact(
+        artifact_id=stable_hash({
+            "ticker": ticker,
+            "candidate": candidate_payload,
+            "stage": stage,
+            "decision": decision,
+            "rejection_reason": rejection_reason,
+            "shares": shares,
+        }),
+        ticker=ticker,
+        candidate=candidate_payload,
+        llm_model="",
+        prompt_version=f"risk_stage_{stage}_v1",
+        output_json=output_json,
+        confidence=recommendation.confidence,
+        decision=decision,
+        rejection_reason=rejection_reason,
+    )

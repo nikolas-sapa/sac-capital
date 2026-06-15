@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { CheckCircle, Copy } from "lucide-react";
-import type { Commitment } from "@/types";
+import type { Commitment, RegistryEvent } from "@/types";
 
 interface VerifySectionProps {
   selected: Commitment | undefined;
   verifiedHash: string;
+  events: RegistryEvent[];
 }
 
-export function VerifySection({ selected, verifiedHash }: VerifySectionProps) {
+export function VerifySection({ selected, verifiedHash, events }: VerifySectionProps) {
   const [copied, setCopied] = useState<"json" | "hash" | null>(null);
 
   const copy = async (text: string, which: "json" | "hash") => {
@@ -18,7 +19,13 @@ export function VerifySection({ selected, verifiedHash }: VerifySectionProps) {
   };
 
   const jsonStr = selected?.canonical_json ?? "No payload loaded";
-  const match = Boolean(selected && verifiedHash && verifiedHash === selected.bytes32);
+  // Two independent facts, kept distinct so the badge never overclaims:
+  //  (1) recomputed hash reproduces the stored commitment (payload ↔ bytes32)
+  //  (2) that exact hash is present in the on-chain registry events
+  const reproduced = Boolean(selected && verifiedHash && verifiedHash.toLowerCase() === selected.bytes32.toLowerCase());
+  const onChainHashes = new Set(events.map((e) => e.decisionHash.toLowerCase()));
+  const anchored = Boolean(selected && onChainHashes.has(selected.bytes32.toLowerCase()));
+  const match = reproduced && anchored;
 
   return (
     <section id="verify" className="py-24 px-6 bg-[#0B0B0D]">
@@ -66,6 +73,12 @@ export function VerifySection({ selected, verifiedHash }: VerifySectionProps) {
               <div className="flex items-center gap-2 text-emerald-400 text-xs font-mono bg-[rgba(52,211,153,0.08)] border border-[rgba(52,211,153,0.2)] rounded-[8px] px-3 py-2">
                 <CheckCircle className="size-3.5 shrink-0" />
                 Hash verified — on-chain match confirmed
+              </div>
+            )}
+            {reproduced && !anchored && (
+              <div className="flex items-center gap-2 text-[#E55A1C] text-xs font-mono bg-[rgba(229,90,28,0.08)] border border-[rgba(229,90,28,0.2)] rounded-[8px] px-3 py-2">
+                <CheckCircle className="size-3.5 shrink-0" />
+                Hash reproduced — pending on-chain anchor
               </div>
             )}
 

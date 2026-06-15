@@ -48,6 +48,7 @@ from equities.ledger_equity import EquityLedger
 from equities.paper import EquityPaperTracker, PaperFill
 from equities.risk.kernel import RiskKernel
 from equities.killgate.thesis_health import ThesisHealthChecker
+from equities.research.artifacts import risk_decision_artifact
 from equities.research.store import ResearchArtifactStore
 from equities.screen.inflection_screen import InflectionScanner
 from equities.screen.relative_strength import RelativeStrengthScanner
@@ -804,20 +805,32 @@ async def run_once(
                 )
                 if not sized.approved:
                     print(f"  REJECTED [{rec.instrument.ticker}] ({rec.sleeve.value}): {sized.rejection_reason}")
+                    artifact_store.append(risk_decision_artifact(
+                        rec, decision="rejected", rejection_reason=sized.rejection_reason or "risk_kernel_rejected",
+                        stage="risk", shares=sized.shares,
+                        risk_metrics={"open_positions": len(open_positions), "current_equity": current_equity},
+                    ))
                     continue
 
                 order_notional = sized.shares * rec.entry
                 if order_notional > settings.max_order_usd:
-                    print(
-                        f"  REJECTED [{rec.instrument.ticker}] ({rec.sleeve.value}): "
+                    reason = (
                         f"order_notional=${order_notional:.2f}_exceeds_max_order_usd=${settings.max_order_usd:.2f}"
                     )
+                    print(f"  REJECTED [{rec.instrument.ticker}] ({rec.sleeve.value}): {reason}")
+                    artifact_store.append(risk_decision_artifact(
+                        rec, decision="rejected", rejection_reason=reason, stage="notional",
+                        shares=sized.shares, notional=order_notional,
+                        risk_metrics={"max_order_usd": settings.max_order_usd},
+                    ))
                     continue
                 if alpaca_executor is not None and _todays_alpaca_order_count(equity_ledger) >= settings.max_daily_order_count:
-                    print(
-                        f"  REJECTED [{rec.instrument.ticker}] ({rec.sleeve.value}): "
-                        f"max_daily_order_count={settings.max_daily_order_count}_reached"
-                    )
+                    reason = f"max_daily_order_count={settings.max_daily_order_count}_reached"
+                    print(f"  REJECTED [{rec.instrument.ticker}] ({rec.sleeve.value}): {reason}")
+                    artifact_store.append(risk_decision_artifact(
+                        rec, decision="rejected", rejection_reason=reason, stage="daily_cap",
+                        shares=sized.shares, notional=order_notional,
+                    ))
                     continue
 
                 if dry_run:
@@ -845,6 +858,10 @@ async def run_once(
                         )
                     except Exception as exc:
                         print(f"  ALPACA REJECTED [{rec.instrument.ticker}]: {exc}")
+                        artifact_store.append(risk_decision_artifact(
+                            rec, decision="rejected", rejection_reason=f"alpaca_error: {exc}",
+                            stage="broker", shares=sized.shares, notional=order_notional,
+                        ))
                         continue
                     local_status = "open" if order.status == "filled" else (
                         "partially_filled" if order.status == "partially_filled" else "submitted"
@@ -908,6 +925,10 @@ async def run_once(
                     shares=fill.shares,
                     strategy="equity_analyst",
                 )
+                artifact_store.append(risk_decision_artifact(
+                    rec, decision="approved", stage="risk",
+                    shares=fill.shares, notional=fill.shares * fill.entry_price,
+                ))
                 if rec.sleeve.value == "core":
                     print(
                         f"  DCA OPEN [{rec.instrument.ticker}] "

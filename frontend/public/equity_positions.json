@@ -1,15 +1,43 @@
 [
   {
+    "id": "1",
+    "ticker": "RBRK",
+    "side": "buy",
+    "status": "closed",
+    "shares": 1.90295,
+    "entry_price": 84.5,
+    "mark_price": 73.41000366210938,
+    "stop_loss": 75.5,
+    "take_profit": 98.0,
+    "unrealized_pnl": null,
+    "realized_pnl": -21.103709,
+    "exit_price": 73.41000366210938,
+    "exit_reason": "stop_hit",
+    "confidence": 0.55,
+    "strategy": "equity_analyst",
+    "mode": "paper",
+    "opened_at": "2026-06-02T10:13:28.085024+00:00",
+    "closed_at": "2026-06-06T04:46:39.350584+00:00",
+    "analysis": null,
+    "entries": [
+      {
+        "price": 84.5,
+        "date": "2026-06-02T10:13:28.085024+00:00",
+        "shares": 1.90295
+      }
+    ]
+  },
+  {
     "id": "2",
     "ticker": "AMAT",
     "side": "buy",
     "status": "open",
     "shares": 0.011037,
-    "entry_price": 453.010009765625,
-    "mark_price": 512.0700073242188,
+    "entry_price": 474.88,
+    "mark_price": 474.88,
     "stop_loss": null,
     "take_profit": null,
-    "unrealized_pnl": 0.6518451930541992,
+    "unrealized_pnl": null,
     "realized_pnl": null,
     "exit_price": null,
     "exit_reason": null,
@@ -17,7 +45,15 @@
     "strategy": "research_static",
     "mode": "paper",
     "opened_at": "2026-06-06T06:10:52.786273+00:00",
-    "closed_at": null
+    "closed_at": null,
+    "analysis": null,
+    "entries": [
+      {
+        "price": 474.88,
+        "date": "2026-06-06T06:10:52.786273+00:00",
+        "shares": 0.011037
+      }
+    ]
   },
   {
     "id": "3",
@@ -25,11 +61,11 @@
     "side": "buy",
     "status": "open",
     "shares": 0.016486,
-    "entry_price": 303.2799987792969,
-    "mark_price": 338.1099853515625,
+    "entry_price": 316.74,
+    "mark_price": 316.74,
     "stop_loss": null,
     "take_profit": null,
-    "unrealized_pnl": 0.5742071586303711,
+    "unrealized_pnl": null,
     "realized_pnl": null,
     "exit_price": null,
     "exit_reason": null,
@@ -37,7 +73,15 @@
     "strategy": "research_static",
     "mode": "paper",
     "opened_at": "2026-06-06T06:10:52.968310+00:00",
-    "closed_at": null
+    "closed_at": null,
+    "analysis": null,
+    "entries": [
+      {
+        "price": 316.74,
+        "date": "2026-06-06T06:10:52.968310+00:00",
+        "shares": 0.016486
+      }
+    ]
   },
   {
     "id": "4",
@@ -45,11 +89,11 @@
     "side": "buy",
     "status": "open",
     "shares": 0.039869,
-    "entry_price": 125.41000366210938,
-    "mark_price": 136.64999389648438,
+    "entry_price": 133.08,
+    "mark_price": 133.08,
     "stop_loss": null,
     "take_profit": null,
-    "unrealized_pnl": 0.4481271706542969,
+    "unrealized_pnl": null,
     "realized_pnl": null,
     "exit_price": null,
     "exit_reason": null,
@@ -57,19 +101,27 @@
     "strategy": "research_static",
     "mode": "paper",
     "opened_at": "2026-06-06T06:10:53.140856+00:00",
-    "closed_at": null
+    "closed_at": null,
+    "analysis": null,
+    "entries": [
+      {
+        "price": 133.08,
+        "date": "2026-06-06T06:10:53.140856+00:00",
+        "shares": 0.039869
+      }
+    ]
   },
   {
     "id": "5",
     "ticker": "META",
     "side": "buy",
-    "status": "submitted",
-    "shares": 0.020442,
-    "entry_price": 587.0361938476562,
-    "mark_price": 587.0361938476562,
+    "status": "open",
+    "shares": 4.593977,
+    "entry_price": 568.848298,
+    "mark_price": 587.04,
     "stop_loss": null,
     "take_profit": null,
-    "unrealized_pnl": 0.0,
+    "unrealized_pnl": 83.572259,
     "realized_pnl": null,
     "exit_price": null,
     "exit_reason": null,
@@ -77,19 +129,47 @@
     "strategy": "equity_analyst",
     "mode": "paper",
     "opened_at": "2026-06-08T17:55:30.993678+00:00",
-    "closed_at": null
+    "closed_at": null,
+    "analysis": null,
+    "entries": [
+      {
+        "price": 587.04,
+        "date": "2026-06-08T17:55:30.993678+00:00",
+        "shares": 0.020442
+      },
+      {
+        "price": 595.866,
+        "date": "2026-06-09T13:48:56.289185+00:00",
+        "shares": 0.167822
+      },
+      {
+        "price": 592.6,
+        "date": "2026-06-09T14:47:56.793695+00:00",
+        "shares": 0.201898
+      },
+      {
+        "price": 562.27,
+        "date": "2026-06-11T13:16:36.813549+00:00",
+        "shares": 2.10165
+      },
+      {
+        "price": 570.81,
+        "date": "2026-06-12T16:37:35.457658+00:00",
+        "shares": 2.102165
+      }
+    ]
   },
   {
     "id": "6",
     "ticker": "NVDA",
     "side": "buy",
-    "status": "submitted",
-    "shares": 0.057386,
-    "entry_price": 209.11000061035156,
-    "mark_price": 209.11000061035156,
+    "status": "open",
+    "shares": 11.637793,
+    "entry_price": 202.848828,
+    "mark_price": 208.954,
     "stop_loss": null,
     "take_profit": null,
-    "unrealized_pnl": 0.0,
+    "unrealized_pnl": 71.050728,
     "realized_pnl": null,
     "exit_price": null,
     "exit_reason": null,
@@ -97,19 +177,42 @@
     "strategy": "equity_analyst",
     "mode": "paper",
     "opened_at": "2026-06-08T17:55:31.328962+00:00",
-    "closed_at": null
+    "closed_at": null,
+    "analysis": null,
+    "entries": [
+      {
+        "price": 208.954,
+        "date": "2026-06-08T17:55:31.328962+00:00",
+        "shares": 0.057386
+      },
+      {
+        "price": 210.226,
+        "date": "2026-06-09T13:48:56.726183+00:00",
+        "shares": 0.713504
+      },
+      {
+        "price": 200.38,
+        "date": "2026-06-11T13:16:37.123777+00:00",
+        "shares": 5.987426
+      },
+      {
+        "price": 204.727704,
+        "date": "2026-06-12T16:37:36.184494+00:00",
+        "shares": 4.879477
+      }
+    ]
   },
   {
     "id": "7",
     "ticker": "LLY",
     "side": "buy",
-    "status": "submitted",
-    "shares": 0.00862,
-    "entry_price": 1160.050048828125,
-    "mark_price": 1160.050048828125,
+    "status": "open",
+    "shares": 1.849082,
+    "entry_price": 1140.789797,
+    "mark_price": 1159.916,
     "stop_loss": null,
     "take_profit": null,
-    "unrealized_pnl": 0.0,
+    "unrealized_pnl": 35.365918,
     "realized_pnl": null,
     "exit_price": null,
     "exit_reason": null,
@@ -117,79 +220,42 @@
     "strategy": "equity_analyst",
     "mode": "paper",
     "opened_at": "2026-06-08T17:55:32.051008+00:00",
-    "closed_at": null
-  },
-  {
-    "id": "8",
-    "ticker": "META",
-    "side": "buy",
-    "status": "submitted",
-    "shares": 0.167822,
-    "entry_price": 595.8699951171875,
-    "mark_price": 595.8699951171875,
-    "stop_loss": null,
-    "take_profit": null,
-    "unrealized_pnl": 0.0,
-    "realized_pnl": null,
-    "exit_price": null,
-    "exit_reason": null,
-    "confidence": 0.857,
-    "strategy": "equity_analyst",
-    "mode": "paper",
-    "opened_at": "2026-06-09T13:48:56.289185+00:00",
-    "closed_at": null
-  },
-  {
-    "id": "9",
-    "ticker": "NVDA",
-    "side": "buy",
-    "status": "submitted",
-    "shares": 0.713504,
-    "entry_price": 210.22999572753906,
-    "mark_price": 210.22999572753906,
-    "stop_loss": null,
-    "take_profit": null,
-    "unrealized_pnl": 0.0,
-    "realized_pnl": null,
-    "exit_price": null,
-    "exit_reason": null,
-    "confidence": 0.7859,
-    "strategy": "equity_analyst",
-    "mode": "paper",
-    "opened_at": "2026-06-09T13:48:56.726183+00:00",
-    "closed_at": null
-  },
-  {
-    "id": "10",
-    "ticker": "LLY",
-    "side": "buy",
-    "status": "submitted",
-    "shares": 0.086112,
-    "entry_price": 1161.280029296875,
-    "mark_price": 1161.280029296875,
-    "stop_loss": null,
-    "take_profit": null,
-    "unrealized_pnl": 0.0,
-    "realized_pnl": null,
-    "exit_price": null,
-    "exit_reason": null,
-    "confidence": 0.7236,
-    "strategy": "equity_analyst",
-    "mode": "paper",
-    "opened_at": "2026-06-09T13:48:57.393079+00:00",
-    "closed_at": null
+    "closed_at": null,
+    "analysis": null,
+    "entries": [
+      {
+        "price": 1159.916,
+        "date": "2026-06-08T17:55:32.051008+00:00",
+        "shares": 0.00862
+      },
+      {
+        "price": 1160.732,
+        "date": "2026-06-09T13:48:57.393079+00:00",
+        "shares": 0.086112
+      },
+      {
+        "price": 1136.294,
+        "date": "2026-06-11T13:16:37.429991+00:00",
+        "shares": 0.879995
+      },
+      {
+        "price": 1143.162,
+        "date": "2026-06-12T16:37:37.269178+00:00",
+        "shares": 0.874355
+      }
+    ]
   },
   {
     "id": "11",
     "ticker": "MSFT",
     "side": "buy",
-    "status": "submitted",
-    "shares": 0.292355,
-    "entry_price": 410.4599914550781,
-    "mark_price": 410.4599914550781,
+    "status": "open",
+    "shares": 5.893798,
+    "entry_price": 391.39647,
+    "mark_price": 410.46,
     "stop_loss": null,
     "take_profit": null,
-    "unrealized_pnl": 0.0,
+    "unrealized_pnl": 112.356595,
     "realized_pnl": null,
     "exit_price": null,
     "exit_reason": null,
@@ -197,26 +263,24 @@
     "strategy": "equity_analyst",
     "mode": "paper",
     "opened_at": "2026-06-09T13:48:57.860127+00:00",
-    "closed_at": null
-  },
-  {
-    "id": "12",
-    "ticker": "META",
-    "side": "buy",
-    "status": "submitted",
-    "shares": 0.201898,
-    "entry_price": 594.3599853515625,
-    "mark_price": 594.3599853515625,
-    "stop_loss": null,
-    "take_profit": null,
-    "unrealized_pnl": 0.0,
-    "realized_pnl": null,
-    "exit_price": null,
-    "exit_reason": null,
-    "confidence": 0.8555,
-    "strategy": "equity_analyst",
-    "mode": "paper",
-    "opened_at": "2026-06-09T14:47:56.793695+00:00",
-    "closed_at": null
+    "closed_at": null,
+    "analysis": null,
+    "entries": [
+      {
+        "price": 410.46,
+        "date": "2026-06-09T13:48:57.860127+00:00",
+        "shares": 0.292355
+      },
+      {
+        "price": 393.001431,
+        "date": "2026-06-11T13:16:37.752469+00:00",
+        "shares": 3.019932
+      },
+      {
+        "price": 387.36,
+        "date": "2026-06-12T16:37:37.774923+00:00",
+        "shares": 2.581511
+      }
+    ]
   }
 ]

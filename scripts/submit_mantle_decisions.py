@@ -58,10 +58,15 @@ def load_commitments(path: str | Path) -> list[CommitmentLine]:
     return lines
 
 
-def select_commitments(items: Iterable[CommitmentLine], limit: int | None) -> list[CommitmentLine]:
+def select_commitments(
+    items: Iterable[CommitmentLine], limit: int | None, skip: int = 0
+) -> list[CommitmentLine]:
     if limit is not None and limit < 1:
         raise ValueError("--limit must be greater than zero")
-    selected = list(items)
+    if skip < 0:
+        raise ValueError("--skip must be zero or greater")
+    # line_number is preserved on each item, so uri #line-N stays correct after a skip
+    selected = list(items)[skip:]
     return selected if limit is None else selected[:limit]
 
 
@@ -80,8 +85,9 @@ def cast_command(
     uri: str,
     rpc_url: str,
     private_key: str,
+    nonce: int | None = None,
 ) -> list[str]:
-    return [
+    command = [
         "cast",
         "send",
         contract,
@@ -94,6 +100,22 @@ def cast_command(
         "--private-key",
         private_key,
     ]
+    # Explicit, locally-incremented nonce avoids the L2 sequencer "nonce too low"
+    # race when broadcasting many sequential txs from one wallet.
+    if nonce is not None:
+        command += ["--nonce", str(nonce)]
+    return command
+
+
+def _cast_stdout(command: list[str]) -> str:
+    result = subprocess.run(command, check=True, text=True, capture_output=True)
+    return result.stdout.strip()
+
+
+def fetch_start_nonce(private_key: str, rpc_url: str) -> int:
+    """Sender address derived from the key, then its current tx count (nonce)."""
+    sender = _cast_stdout(["cast", "wallet", "address", "--private-key", private_key])
+    return int(_cast_stdout(["cast", "nonce", sender, "--rpc-url", rpc_url]))
 
 
 def submit_with_cast(command: list[str]) -> str:
@@ -116,6 +138,7 @@ def main() -> None:
     parser.add_argument("--contract", required=True, help="AgentDecisionRegistry address")
     parser.add_argument("--agent-id", required=True, help="bytes32 agent ID, or a name to sha256 into bytes32")
     parser.add_argument("--limit", type=int, default=1, help="number of commitments to process")
+    parser.add_argument("--skip", type=int, default=0, help="skip the first N commitments (line numbers preserved; use to resume after a partial send)")
     parser.add_argument("--uri-base", default=os.getenv("PUBLIC_COMMITMENTS_URL", ""))
     parser.add_argument(
         "--network",
@@ -155,9 +178,10 @@ def main() -> None:
     if args.dry_run and args.send:
         raise SystemExit("--dry-run and --send are mutually exclusive")
 
-    commitments = select_commitments(load_commitments(args.commitments), args.limit)
+    commitments = select_commitments(load_commitments(args.commitments), args.limit, args.skip)
     agent_id = agent_id_to_bytes32(args.agent_id)
 
+    start_nonce: int | None = None
     if args.send:
         if not rpc_url:
             raise SystemExit("MANTLE_RPC_URL or --rpc-url is required with --send")
@@ -167,10 +191,11 @@ def main() -> None:
             raise SystemExit(f"{args.private_key_env} is required with --send")
         if not PRIVATE_KEY_RE.fullmatch(private_key):
             raise SystemExit(f"--private-key-env={args.private_key_env} did not resolve to a valid 0x+64hex private key")
+        start_nonce = fetch_start_nonce(private_key, rpc_url)
     else:
         private_key = ""
 
-    for item in commitments:
+    for idx, item in enumerate(commitments):
         uri = build_uri(args.uri_base, item)
         print(f"line={item.line_number} commitment={item.decision_hash} uri={uri}")
         print(f"payload={item.raw_line}")
@@ -183,6 +208,7 @@ def main() -> None:
                     uri=uri,
                     rpc_url=rpc_url,
                     private_key=private_key,
+                    nonce=None if start_nonce is None else start_nonce + idx,
                 )
             )
             print(output)

@@ -19,16 +19,34 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Export deterministic decision hashes for Mantle anchoring."
     )
-    parser.add_argument("--ledger", default="data/ledger.db")
+    # Real equity decision reasoning (approved + rejected) is the canonical
+    # source anchored on-chain. The Polymarket ledger is opt-in (legacy/dummy
+    # signals) — pass --ledger explicitly to include it.
+    parser.add_argument("--ledger", default="")
     parser.add_argument("--research-artifacts", default="data/research_artifacts.jsonl")
     parser.add_argument("--open-only", action="store_true")
+    parser.add_argument(
+        "--exclude-infra",
+        action="store_true",
+        help="Drop data-infra non-decisions (decision=error, rejection_reason=invalid_or_stale_price) "
+             "so only substantive AI decisions are anchored.",
+    )
     parser.add_argument("--out", default="")
     args = parser.parse_args()
 
-    commitments = [
-        *export_ledger_commitments(args.ledger, include_resolved=not args.open_only),
-        *research_artifact_commitments(args.research_artifacts),
-    ]
+    commitments = list(research_artifact_commitments(args.research_artifacts))
+    if args.ledger:
+        commitments.extend(
+            export_ledger_commitments(args.ledger, include_resolved=not args.open_only)
+        )
+
+    if args.exclude_infra:
+        _INFRA_REASONS = {"invalid_or_stale_price"}
+        commitments = [
+            c for c in commitments
+            if c.payload.get("decision") != "error"
+            and c.payload.get("rejection_reason") not in _INFRA_REASONS
+        ]
     text = records_to_jsonl(commitment.as_record() for commitment in commitments)
 
     if args.out:
