@@ -45,7 +45,6 @@ function PositionCard({ pos, index }: { pos: EquityPosition; index: number }) {
 
   return (
     <motion.article
-      layout
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 280, damping: 28, delay: index * 0.05 }}
@@ -282,7 +281,7 @@ export function DecisionsSection({ positions }: DecisionsSectionProps) {
         {/* Grid */}
         {visible.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <AnimatePresence mode="popLayout">
+            <AnimatePresence mode="sync">
               {displayed.map((pos, i) => (
                 <PositionCard key={pos.id} pos={pos} index={i} />
               ))}

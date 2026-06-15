@@ -7,10 +7,10 @@ const STYLES = `
   display: inline-flex; align-items: baseline; white-space: nowrap; font-variant-numeric: tabular-nums;
 }
 .an-slot { position: relative; display: inline-block; }
-.an-layer { display: inline-block; will-change: transform, opacity, filter; }
+.an-layer { display: inline-block; }
 .an-out { position: absolute; inset: 0; }
-.an-in { animation: an-slide-in var(--an-dur, 450ms) var(--an-spring) both, an-resolve var(--an-dur, 450ms) cubic-bezier(0.22, 1, 0.36, 1) both; }
-.an-out { animation: an-slide-out var(--an-dur, 450ms) cubic-bezier(0.4, 0, 1, 1) both, an-dissolve var(--an-dur, 450ms) cubic-bezier(0.4, 0, 1, 1) both; }
+.an-in { will-change: transform, opacity, filter; animation: an-slide-in var(--an-dur, 450ms) var(--an-spring) both, an-resolve var(--an-dur, 450ms) cubic-bezier(0.22, 1, 0.36, 1) both; }
+.an-out { will-change: transform, opacity, filter; animation: an-slide-out var(--an-dur, 450ms) cubic-bezier(0.4, 0, 1, 1) both, an-dissolve var(--an-dur, 450ms) cubic-bezier(0.4, 0, 1, 1) both; }
 @keyframes an-slide-in { from { transform: translateY(calc(var(--an-dir, 1) * var(--an-dist))); } to { transform: translateY(0); } }
 @keyframes an-slide-out { from { transform: translateY(0); } to { transform: translateY(calc(var(--an-dir, 1) * var(--an-dist) * -1)); } }
 @keyframes an-resolve { from { opacity: 0; filter: blur(var(--an-blur, 21px)); } to { opacity: 1; filter: blur(0); } }
