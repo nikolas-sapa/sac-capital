@@ -8,12 +8,41 @@ from typing import Protocol
 from equities.analysis.analyst import LLMResponse
 
 
+@dataclass
+class StructuralThesis:
+    """A structural thesis paired with a confidence multiplier.
+
+    confidence_multiplier reflects how much remaining discovery-lag edge a
+    thesis likely has: 1.0 = no adjustment, lower = the thesis's premise has
+    already substantially played out / become consensus (see
+    docs/research/situational-awareness-calibration-2026.md for derivation).
+    """
+
+    text: str
+    confidence_multiplier: float = 1.0
+
+
 STRUCTURAL_THESES = [
-    "AI inference compute scales 100x by 2027, requiring massive GPU, memory, power, and cooling infrastructure",
-    "GLP-1 obesity drugs penetrate 15% of US adults by 2028, reshaping healthcare delivery and diagnostics",
-    "US domestic semiconductor fabrication doubles by 2027 under CHIPS Act, benefiting equipment and materials",
-    "AI-driven grid infrastructure spending reaches $500B over 5 years, requiring transformers, cables, power ICs",
-    "Autonomous defense systems replace 20% of manned platforms by 2028, requiring AI chips, sensors, connectivity",
+    StructuralThesis(
+        "AI inference compute scales 100x by 2027, requiring massive GPU, memory, power, and cooling infrastructure",
+        confidence_multiplier=0.7,
+    ),
+    StructuralThesis(
+        "GLP-1 obesity drugs penetrate 15% of US adults by 2028, reshaping healthcare delivery and diagnostics",
+        confidence_multiplier=1.0,
+    ),
+    StructuralThesis(
+        "US domestic semiconductor fabrication doubles by 2027 under CHIPS Act, benefiting equipment and materials",
+        confidence_multiplier=0.85,
+    ),
+    StructuralThesis(
+        "AI-driven grid infrastructure spending reaches $500B over 5 years, requiring transformers, cables, power ICs",
+        confidence_multiplier=0.6,
+    ),
+    StructuralThesis(
+        "Autonomous defense systems replace 20% of manned platforms by 2028, requiring AI chips, sensors, connectivity",
+        confidence_multiplier=0.9,
+    ),
 ]
 
 _SYSTEM = """You are a supply chain analyst identifying US-listed equities benefiting from a structural thesis.
@@ -52,6 +81,7 @@ class ThesisResult:
     level_2: list[str] = field(default_factory=list)
     level_3: list[str] = field(default_factory=list)
     reasoning: str = ""
+    confidence_multiplier: float = 1.0
 
     def all_tickers(self) -> list[str]:
         seen: set[str] = set()
@@ -91,7 +121,9 @@ class ThesisMiner:
         results = []
         for thesis in STRUCTURAL_THESES:
             try:
-                results.append(self.mine(thesis))
+                result = self.mine(thesis.text)
+                result.confidence_multiplier = thesis.confidence_multiplier
+                results.append(result)
             except Exception:
                 continue
         return results

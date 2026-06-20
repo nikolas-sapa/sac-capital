@@ -4,8 +4,21 @@ import argparse
 from datetime import date
 
 from equities.data.prices import YFinancePriceFeed
+from equities.eval.citation_attribution import SourceAttribution, attribute_returns_by_source
 from equities.eval.replay import ArtifactReplayEvaluator, HistoryProvider
 from equities.research.store import ResearchArtifactStore
+
+
+def _format_citation_attribution(attribution: dict[str, SourceAttribution]) -> str:
+    if not attribution:
+        return ""
+    lines = ["", "Citation attribution by source:"]
+    for source, stats in sorted(attribution.items()):
+        lines.append(
+            f"  {source}: trades={stats.trade_count} "
+            f"expectancy={stats.expectancy_pct:+.2f}% win_rate={stats.win_rate:.2%}"
+        )
+    return "\n".join(lines)
 
 
 def build_report(
@@ -22,8 +35,12 @@ def build_report(
         holding_days=holding_days,
         min_trades=min_trades,
     )
-    report = evaluator.evaluate(store.read_all(), validation_start=validation_start)
-    return report.to_text()
+    artifacts = store.read_all()
+    report = evaluator.evaluate(artifacts, validation_start=validation_start)
+    attribution = attribute_returns_by_source(
+        artifacts, report.train_trades + report.validation_trades
+    )
+    return report.to_text() + _format_citation_attribution(attribution)
 
 
 def main() -> None:
