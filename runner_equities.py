@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import inspect
+import json
 import socket
 import sys
 import time
@@ -49,6 +50,7 @@ from equities.paper import EquityPaperTracker, PaperFill
 from equities.risk.kernel import RiskKernel
 from equities.killgate.thesis_health import ThesisHealthChecker
 from equities.research.artifacts import risk_decision_artifact
+from equities.research.run_manifest import build_run_manifest, settings_snapshot
 from equities.research.store import ResearchArtifactStore
 from equities.screen.inflection_screen import InflectionScanner
 from equities.screen.relative_strength import RelativeStrengthScanner
@@ -508,6 +510,8 @@ async def run_once(
     equity_ledger = EquityLedger(data_dir / "equity.db")
     fp_tracker = ForwardPaperTracker(data_dir / "forward_paper.db")
     artifact_store = ResearchArtifactStore(data_dir / "research_artifacts.jsonl")
+    artifacts_before_run = len(artifact_store.read_all())
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     checkpoint_store = AnalysisCheckpointStore(data_dir / "equity_analysis_checkpoints.jsonl")
     provider_registry = ProviderRegistry()
     if clear_analysis_checkpoints:
@@ -962,6 +966,17 @@ async def run_once(
             await _send_alert(alerts.format_run_summary(stats, budget, provider_registry))
         equity_ledger.close()
         fp_tracker.close()
+
+        new_artifacts = artifact_store.read_all()[artifacts_before_run:]
+        manifest = build_run_manifest(
+            config_snapshot=settings_snapshot(settings),
+            prompt_versions_used=sorted({a.prompt_version for a in new_artifacts}),
+            model_ids=sorted({a.llm_model for a in new_artifacts if a.llm_model}),
+            source_ids_fetched=sorted({s.id for a in new_artifacts for s in a.sources}),
+            run_id=run_id,
+        )
+        with open(data_dir / "run_manifests.jsonl", "a") as f:
+            f.write(json.dumps(manifest.as_record()) + "\n")
 
 
 def main() -> None:

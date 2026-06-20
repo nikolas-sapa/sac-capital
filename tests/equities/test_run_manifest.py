@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from equities.research.run_manifest import build_run_manifest
+from core.config import Settings
+from equities.research.run_manifest import build_run_manifest, settings_snapshot
 
 
 def _base_kwargs() -> dict:
@@ -69,3 +70,46 @@ def test_list_order_is_significant_in_the_hash() -> None:
     swapped = build_run_manifest(**reordered)
 
     assert original.sha256 != swapped.sha256
+
+
+def test_settings_snapshot_never_includes_secret_fields() -> None:
+    settings = Settings(
+        telegram_bot_token="secret-token",
+        telegram_chat_id="secret-chat-id",
+        anthropic_api_key="secret-anthropic-key",
+        openai_api_key="secret-openai-key",
+        finnhub_api_key="secret-finnhub-key",
+        alpaca_api_key_id="secret-alpaca-key-id",
+        alpaca_secret_key="secret-alpaca-secret",
+    )
+
+    snapshot = settings_snapshot(settings)
+
+    for secret_field in (
+        "telegram_bot_token",
+        "telegram_chat_id",
+        "anthropic_api_key",
+        "openai_api_key",
+        "finnhub_api_key",
+        "alpaca_api_key_id",
+        "alpaca_secret_key",
+    ):
+        assert secret_field not in snapshot
+    for secret_value in (
+        "secret-token",
+        "secret-chat-id",
+        "secret-anthropic-key",
+        "secret-openai-key",
+        "secret-finnhub-key",
+        "secret-alpaca-key-id",
+        "secret-alpaca-secret",
+    ):
+        assert secret_value not in snapshot.values()
+
+
+def test_settings_snapshot_includes_behavioral_fields() -> None:
+    snapshot = settings_snapshot(Settings())
+
+    assert snapshot["max_position_pct"] == 0.02
+    assert snapshot["live_trading_enabled"] is False
+    assert snapshot["equity_max_positions"] == 4

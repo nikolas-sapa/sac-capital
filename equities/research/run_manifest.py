@@ -2,7 +2,58 @@ from __future__ import annotations
 
 from typing import Any
 
+from core.config import Settings
 from hackathon.verifiability import Commitment, commitment_for_payload
+
+# Behavioral/risk knobs only — never a credential, token, or secret field.
+# config_snapshot is hashed and written to disk (data/run_manifests.jsonl) in
+# plaintext as part of the Commitment payload, so anything not on this
+# allowlist must never reach settings_snapshot()'s output.
+_SAFE_CONFIG_FIELDS = (
+    "llm_provider",
+    "execution_provider",
+    "bankroll_usd",
+    "kelly_fraction",
+    "max_position_pct",
+    "research_probe_pct",
+    "core_dca_pct",
+    "max_order_usd",
+    "max_daily_order_count",
+    "allow_extended_hours",
+    "allow_test_orders",
+    "live_trading_enabled",
+    "equity_risk_pct",
+    "equity_max_positions",
+    "equity_max_name_pct",
+    "equity_max_sector_pct",
+    "equity_daily_loss_limit_pct",
+    "equity_drawdown_limit_pct",
+    "equity_max_price_age_days",
+    "equity_provider_timeout_seconds",
+    "equity_provider_retries",
+    "equity_runner_max_runtime_seconds",
+    "equity_runner_max_provider_failures",
+    "equity_runner_max_llm_failures",
+    "equity_runner_dry_run",
+    "alpaca_paper",
+    "anthropic_fast_model",
+    "anthropic_strong_model",
+    "openai_fast_model",
+    "openai_strong_model",
+    "codex_fast_model",
+    "codex_strong_model",
+)
+
+
+def settings_snapshot(settings: Settings) -> dict[str, Any]:
+    """Redact *settings* down to the allowlisted behavioral fields.
+
+    Excludes every credential/token field (api keys, secret keys, telegram
+    chat id, alpaca base url is fine but kept out for now since it's not on
+    the allowlist) so a config_snapshot is always safe to hash and persist
+    in plaintext via build_run_manifest().
+    """
+    return {field: getattr(settings, field) for field in _SAFE_CONFIG_FIELDS}
 
 
 def build_run_manifest(
