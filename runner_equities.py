@@ -967,16 +967,19 @@ async def run_once(
         equity_ledger.close()
         fp_tracker.close()
 
-        new_artifacts = artifact_store.read_all()[artifacts_before_run:]
-        manifest = build_run_manifest(
-            config_snapshot=settings_snapshot(settings),
-            prompt_versions_used=sorted({a.prompt_version for a in new_artifacts}),
-            model_ids=sorted({a.llm_model for a in new_artifacts if a.llm_model}),
-            source_ids_fetched=sorted({s.id for a in new_artifacts for s in a.sources}),
-            run_id=run_id,
-        )
-        with open(data_dir / "run_manifests.jsonl", "a") as f:
-            f.write(json.dumps(manifest.as_record()) + "\n")
+        try:
+            new_artifacts = artifact_store.read_all()[artifacts_before_run:]
+            manifest = build_run_manifest(
+                config_snapshot=settings_snapshot(settings),
+                prompt_versions_used=sorted({a.prompt_version for a in new_artifacts}),
+                model_ids=sorted({a.llm_model for a in new_artifacts if a.llm_model}),
+                source_ids_fetched=sorted({s.id for a in new_artifacts for s in a.sources}),
+                run_id=run_id,
+            )
+            with open(data_dir / "run_manifests.jsonl", "a") as f:
+                f.write(json.dumps(manifest.as_record()) + "\n")
+        except Exception as exc:
+            print(f"WARNING: failed to write run manifest: {exc}")
 
 
 def main() -> None:

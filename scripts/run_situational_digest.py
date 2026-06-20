@@ -22,6 +22,10 @@ VALIDATION_LOOKBACK_DAYS = 90
 
 def main() -> None:
     settings = load_config()
+    if not settings.telegram_bot_token or not settings.telegram_chat_id:
+        print("ERROR: telegram_bot_token and telegram_chat_id must be configured")
+        sys.exit(1)
+
     data_dir = Path("data")
 
     equity_ledger = EquityLedger(data_dir / "equity.db")
