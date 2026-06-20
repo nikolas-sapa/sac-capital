@@ -60,7 +60,7 @@ class PreflightResult:
 
 
 def _looks_like_placeholder(value: str) -> bool:
-    """Pragmatic placeholder check: empty, denylisted token, or no real entropy."""
+    """Pragmatic placeholder check: empty or an exact denylisted placeholder token."""
     if not value:
         return True
     if value.strip().lower() in PLACEHOLDER_TOKENS:

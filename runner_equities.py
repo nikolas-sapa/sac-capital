@@ -558,6 +558,12 @@ async def run_once(
     alerts_disabled = False
     if settings.telegram_bot_token and _host_resolves("api.telegram.org"):
         alerts = TelegramAlerts(settings.telegram_bot_token, settings.telegram_chat_id)
+    telegram_alert_mode = str(settings.telegram_alert_mode).strip().lower() or "critical"
+
+    def _telegram_allows(kind: str) -> bool:
+        if telegram_alert_mode == "verbose":
+            return True
+        return kind in {"startup", "error", "stop_loss", "open", "exit"}
 
     async def _send_alert(text: str) -> None:
         nonlocal alerts_disabled
@@ -585,13 +591,14 @@ async def run_once(
                     if alerts is not None and ex.position_id in pre_mark:
                         pos = pre_mark[ex.position_id]
                         portfolio_stats = equity_ledger.portfolio_stats()
-                        await _send_alert(alerts.format_equity_exit(
-                            ex,
-                            ticker=pos["ticker"],
-                            entry_price=pos["entry_price"],
-                            shares=pos["shares"],
-                            portfolio_stats=portfolio_stats,
-                        ))
+                        if _telegram_allows("exit"):
+                            await _send_alert(alerts.format_equity_exit(
+                                ex,
+                                ticker=pos["ticker"],
+                                entry_price=pos["entry_price"],
+                                shares=pos["shares"],
+                                portfolio_stats=portfolio_stats,
+                            ))
                     if ex.position_id in pre_mark:
                         pos = pre_mark[ex.position_id]
                         if alpaca_executor is not None and pos.get("execution_provider") == "alpaca_paper":
@@ -613,7 +620,8 @@ async def run_once(
 
         if mark_only:
             print("Mark-only mode complete.")
-            await _send_alert(alerts.format_equity_portfolio(equity_ledger.portfolio_stats()) if alerts is not None else "")
+            if alerts is not None and _telegram_allows("summary"):
+                await _send_alert(alerts.format_equity_portfolio(equity_ledger.portfolio_stats()))
             return
 
         # --- Macro regime classification ---
@@ -631,7 +639,7 @@ async def run_once(
                 health_checker = ThesisHealthChecker()
                 for health in health_checker.check_all(open_swing, news):
                     print(f"  [HEALTH] {health.ticker}: {health.status} -> {health.action} | {health.reason}")
-                    if health.action == "exit" and alerts is not None:
+                    if health.action == "exit" and alerts is not None and _telegram_allows("exit"):
                         await _send_alert(f"Thesis exit signal: {health.ticker} — {health.reason}")
 
         # --- Thematic concentration check ---
@@ -704,11 +712,12 @@ async def run_once(
                 print(f"\nVIX: {current_vix:.1f} | entries_allowed={entries_allowed}")
             if not entries_allowed:
                 print(f"VIX={current_vix:.1f} > 30 — blocking new entries. Running mark-to-market only.")
-                await _send_alert(f"VIX={current_vix:.1f} — new entries blocked today.")
+                if _telegram_allows("summary"):
+                    await _send_alert(f"VIX={current_vix:.1f} — new entries blocked today.")
                 return
 
         # --- Scan summary alert ---
-        if alerts is not None:
+        if alerts is not None and _telegram_allows("summary"):
             analyst_count = min(len(swing_candidates), 5)
             await _send_alert(alerts.format_equity_scan(swing_candidates, core_candidates, analyst_count))
 
@@ -940,22 +949,31 @@ async def run_once(
                         f"shares={sized.shares:.4f} entry={rec.entry:.2f} "
                         f"stop={rec.stop_loss:.2f} tp={rec.take_profit:.2f}"
                     )
-                if alerts is not None:
+                if alerts is not None and _telegram_allows("open"):
                     await _send_alert(alerts.format_equity_open(rec, fill))
                 open_positions = equity_ledger.open_positions()
 
         # --- Portfolio summary ---
-        if alerts is not None:
+        if alerts is not None and _telegram_allows("summary"):
             await _send_alert(alerts.format_equity_portfolio(equity_ledger.portfolio_stats()))
     finally:
         _print_run_summary(stats, budget, provider_registry=provider_registry)
-        if alerts is not None:
+        if alerts is not None and _telegram_allows("summary"):
             await _send_alert(alerts.format_run_summary(stats, budget, provider_registry))
         equity_ledger.close()
         fp_tracker.close()
 
 
 def main() -> None:
+    from scripts.preflight import run_preflight
+
+    preflight = run_preflight(load_config())
+    if not preflight.ok:
+        print("PREFLIGHT FAILED:")
+        for failure in preflight.failures:
+            print(f"  - {failure}")
+        sys.exit(1)
+
     parser = argparse.ArgumentParser(description="Equities paper runner")
     parser.add_argument("--no-analyse", action="store_true", help="Screen only; skip LLM analyst")
     parser.add_argument("--mark-only", action="store_true", help="Mark-to-market + exits only")
