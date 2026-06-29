@@ -11,6 +11,21 @@ interface PerformanceSectionProps {
   positions: EquityPosition[];
 }
 
+function positionReturnPct(pos: EquityPosition): number | null {
+  const endPrice = pos.status === "closed" ? pos.exit_price : pos.mark_price;
+  if (endPrice == null || endPrice <= 0) return null;
+
+  const entryPrices = pos.entries?.length
+    ? pos.entries.map((entry) => entry.price).filter((price) => price > 0)
+    : pos.entry_price != null && pos.entry_price > 0
+      ? [pos.entry_price]
+      : [];
+  if (entryPrices.length === 0) return null;
+
+  const returns = entryPrices.map((entryPrice) => (endPrice / entryPrice - 1) * 100);
+  return returns.reduce((sum, value) => sum + value, 0) / returns.length;
+}
+
 export function PerformanceSection({ positions }: PerformanceSectionProps) {
   const [range, setRange] = useState<TimeRange>("1W");
   const [historyPoints, setHistoryPoints] = useState<PortfolioHistoryPoint[]>([]);
@@ -89,6 +104,23 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
       ? [{ value: Math.round(avgConfidence * 1000) / 10, label: "Avg confidence", positive: avgConfidence > 0.5, suffix: "%", decimals: 1 }]
       : []),
   ];
+
+  const stockReturns = useMemo(() => {
+    const grouped = new Map<string, number[]>();
+    for (const position of positions) {
+      const pct = positionReturnPct(position);
+      if (pct == null) continue;
+      const ticker = position.ticker.toUpperCase();
+      grouped.set(ticker, [...(grouped.get(ticker) ?? []), pct]);
+    }
+    return [...grouped.entries()]
+      .map(([ticker, values]) => ({
+        ticker,
+        value: values.reduce((sum, item) => sum + item, 0) / values.length,
+        count: values.length,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [positions]);
 
   return (
     <section id="performance" className="py-24 px-6 bg-[#0B0B0D]">
@@ -169,6 +201,41 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
                 <span className="text-xs text-[#8B8D91] font-mono uppercase tracking-wider">{s.label}</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Unweighted stock returns */}
+        {stockReturns.length > 0 && (
+          <div className="mb-10">
+            <div className="mb-4 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-mono tracking-widest uppercase text-[#8B8D91] mb-2">
+                  Unweighted Return By Stock
+                </p>
+                <h3 className="text-lg font-bold text-[#F3F2EE]" style={{ fontFamily: "Poppins, sans-serif" }}>
+                  Per-stock performance
+                </h3>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {stockReturns.slice(0, 8).map((item) => (
+                <div key={item.ticker} className="rounded-[12px] border border-[rgba(243,242,238,0.06)] bg-[#1A1A1E] p-5">
+                  <div className="flex items-baseline justify-between gap-2 mb-2">
+                    <span className="text-sm font-mono text-[#F3F2EE]">{item.ticker}</span>
+                    <span className="text-[10px] font-mono text-[#8B8D91]">{item.count}x</span>
+                  </div>
+                  <div
+                    className={cn(
+                      "text-2xl font-black",
+                      item.value >= 0 ? "text-emerald-400" : "text-red-400"
+                    )}
+                    style={{ fontFamily: "Poppins, sans-serif" }}
+                  >
+                    {item.value >= 0 ? "+" : ""}{item.value.toFixed(1)}%
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

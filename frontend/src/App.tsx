@@ -69,7 +69,9 @@ export default function App() {
       // Always load static snapshot first for analysis/strategy/confidence fields
       let staticPositions: EquityPosition[] = [];
       try {
-        const r = await fetch("/equity_positions.json");
+        const r = await fetch(`/equity_positions.json?ts=${Date.now()}`, {
+          cache: "no-store",
+        });
         if (r.ok) {
           staticPositions = await r.json();
         }
@@ -96,7 +98,7 @@ export default function App() {
 
   // Performance summary
   useEffect(() => {
-    fetch("/performance_summary.json")
+    fetch(`/performance_summary.json?ts=${Date.now()}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data: PerformanceSummary) => setPerf(data))
       .catch(() => setPerf(null));
