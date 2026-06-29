@@ -19,6 +19,7 @@ class CommandHandler:
         "/help":      "List all commands",
         "/stats":     "Equity portfolio summary",
         "/positions": "Open equity positions with entry/mark/PnL",
+        "/closed":    "Closed equity positions with realized P&L",
         "/alpaca":    "Alpaca paper config status",
         "/orders":    "Broker order status from local ledger",
         "/risk":      "Risk limits and current local exposure",
@@ -51,6 +52,8 @@ class CommandHandler:
             "/stats":     self._cmd_stats,
             "/positions": self._cmd_positions,
             "/pos":       self._cmd_positions,
+            "/closed":    self._cmd_closed,
+            "/history":   self._cmd_closed,
             "/alpaca":    self._cmd_alpaca,
             "/orders":    self._cmd_orders,
             "/risk":      self._cmd_risk,
@@ -137,6 +140,47 @@ class CommandHandler:
                 f"  Unrl  {_fmt_pnl(unrl)}  ({pct:+.1f}%)",
                 f"  🛑 {_fmt_price(r['stop_loss'])}    🎯 {_fmt_price(r['take_profit'])}",
                 f"  Opened {opened}",
+            ]
+        return "\n".join(lines)
+
+    def _cmd_closed(self) -> str:
+        if not self._eq_path.exists():
+            return "📋 No closed equity positions."
+        con = sqlite3.connect(str(self._eq_path))
+        con.row_factory = sqlite3.Row
+        rows = con.execute(
+            "SELECT ticker, shares, entry_price, exit_price, realized_pnl, "
+            "exit_reason, opened_at, closed_at, strategy, thesis "
+            "FROM positions WHERE status='closed' "
+            "ORDER BY COALESCE(closed_at, opened_at) DESC LIMIT 10"
+        ).fetchall()
+        con.close()
+
+        if not rows:
+            return "📋 No closed equity positions."
+
+        realized = sum(r["realized_pnl"] or 0.0 for r in rows)
+        wins = sum(1 for r in rows if (r["realized_pnl"] or 0.0) > 0)
+        lines = [
+            f"📋 CLOSED POSITIONS ({len(rows)})",
+            "─" * 28,
+            f"Realized shown: {_fmt_pnl(realized)}  {wins}W {len(rows) - wins}L",
+        ]
+        for r in rows:
+            entry = r["entry_price"] or 0.0
+            exit_price = r["exit_price"] or entry
+            pnl = r["realized_pnl"] or 0.0
+            pct = ((exit_price / entry) - 1.0) * 100 if entry else 0.0
+            closed = r["closed_at"][:10] if r["closed_at"] else "?"
+            thesis = (r["thesis"] or "").strip()
+            if len(thesis) > 90:
+                thesis = thesis[:87].rstrip() + "..."
+            lines += [
+                "",
+                f"{'✅' if pnl >= 0 else '❌'} {r['ticker']}  {_fmt_pnl(pnl)} ({pct:+.1f}%)",
+                f"  Entry ${entry:.2f}  ·  Exit ${exit_price:.2f}",
+                f"  Reason {r['exit_reason'] or 'n/a'}  ·  Closed {closed}",
+                f"  [{r['strategy'] or 'n/a'}] {thesis}",
             ]
         return "\n".join(lines)
 

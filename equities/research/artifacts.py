@@ -115,3 +115,53 @@ def risk_decision_artifact(
         decision=decision,
         rejection_reason=rejection_reason,
     )
+
+
+def static_research_decision_artifact(row: dict[str, Any]) -> EquityResearchArtifact:
+    """Build an approved artifact from a research_static ledger row.
+
+    Static supply-chain probes can bypass the LLM analyst but still encode a
+    thesis and realized outcome. Persisting them lets decision memory learn
+    from the same winner pattern as normal analyst approvals.
+    """
+    ticker = str(row.get("ticker", "")).upper()
+    output_json = {
+        "action": "buy",
+        "entry": row.get("entry_price"),
+        "stop_loss": row.get("stop_loss"),
+        "take_profit": row.get("take_profit"),
+        "confidence": row.get("confidence"),
+        "catalyst": "static supply-chain discovery lag",
+        "thesis": row.get("thesis", ""),
+        "horizon": "1-4 weeks",
+        "exit_price": row.get("exit_price"),
+        "exit_reason": row.get("exit_reason"),
+        "realized_pnl": row.get("realized_pnl"),
+        "closed_at": row.get("closed_at"),
+        "source": "equity_ledger",
+    }
+    candidate = {
+        "ticker": ticker,
+        "strategy": row.get("strategy", "research_static"),
+        "entry": row.get("entry_price"),
+        "opened_at": row.get("opened_at"),
+        "evidence": row.get("thesis", ""),
+    }
+    return EquityResearchArtifact(
+        artifact_id=stable_hash({
+            "ticker": ticker,
+            "strategy": row.get("strategy", "research_static"),
+            "opened_at": row.get("opened_at"),
+            "entry": row.get("entry_price"),
+        }),
+        as_of=str(row.get("opened_at") or utc_now_iso()),
+        ticker=ticker,
+        candidate=candidate,
+        llm_model="",
+        prompt_version="research_static_ledger_v1",
+        output_json=output_json,
+        raw_output="",
+        confidence=row.get("confidence"),
+        decision="approved",
+        rejection_reason="",
+    )
