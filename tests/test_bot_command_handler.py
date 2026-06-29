@@ -40,8 +40,13 @@ def _create_positions_table(db_path) -> None:
             stop_loss REAL,
             take_profit REAL,
             unrealized_pnl REAL,
+            realized_pnl REAL,
             status TEXT NOT NULL,
+            exit_price REAL,
+            exit_reason TEXT,
             opened_at TEXT NOT NULL,
+            closed_at TEXT,
+            thesis TEXT NOT NULL DEFAULT '',
             strategy TEXT NOT NULL DEFAULT '',
             execution_provider TEXT NOT NULL DEFAULT 'internal_paper',
             broker_order_id TEXT NOT NULL DEFAULT '',
@@ -152,3 +157,27 @@ def test_positions_handles_missing_stop_and_target(tmp_path):
 
     assert "AMAT" in msg
     assert "n/a" in msg
+
+
+def test_closed_reports_realized_equity_trades(tmp_path):
+    db_path = tmp_path / "equity.db"
+    _create_positions_table(db_path)
+    con = sqlite3.connect(str(db_path))
+    con.execute(
+        "INSERT INTO positions "
+        "(ticker, shares, entry_price, mark_price, stop_loss, take_profit, unrealized_pnl, "
+        "realized_pnl, status, exit_price, exit_reason, opened_at, closed_at, thesis, strategy) "
+        "VALUES ('AMAT', 0.01, 474.88, 668.0, NULL, NULL, 0.0, 2.13, 'closed', "
+        "668.0, 'time_stop', '2026-06-06T06:10:52', '2026-06-27T06:26:05', "
+        "'lagged bottleneck supplier behind AMD', 'research_static')"
+    )
+    con.commit()
+    con.close()
+
+    msg = _handler(db_path).dispatch("/closed")
+
+    assert "CLOSED POSITIONS (1)" in msg
+    assert "AMAT" in msg
+    assert "+$2.13" in msg
+    assert "+40.7%" in msg
+    assert "research_static" in msg

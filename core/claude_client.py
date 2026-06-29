@@ -60,11 +60,11 @@ class OpenAIResponsesClient:
         fast_model: str | None = None,
         strong_model: str | None = None,
     ) -> None:
-        from openai import OpenAI
-
         self._fast_model = fast_model or os.getenv("OPENAI_FAST_MODEL", "gpt-5-mini")
         self._strong_model = strong_model or os.getenv("OPENAI_STRONG_MODEL", "gpt-5.5")
-        self._client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"), timeout=timeout)
+        self._api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self._timeout = timeout
+        self._client = None
 
     def _map_model(self, model: str) -> str:
         mapped = self._MODEL_MAP.get(model, model)
@@ -75,6 +75,9 @@ class OpenAIResponsesClient:
         return mapped
 
     def complete(self, system: str, user: str, model: str) -> LLMResponse:
+        if self._client is None:
+            from openai import OpenAI
+            self._client = OpenAI(api_key=self._api_key, timeout=self._timeout)
         mapped = self._map_model(model)
         resp = self._client.responses.create(
             model=mapped,
@@ -120,11 +123,11 @@ class AnthropicResponsesClient:
         fast_model: str | None = None,
         strong_model: str | None = None,
     ) -> None:
-        from anthropic import Anthropic
-
         self._fast_model = fast_model or os.getenv("ANTHROPIC_FAST_MODEL", "claude-haiku-4-5-20251001")
         self._strong_model = strong_model or os.getenv("ANTHROPIC_STRONG_MODEL", "claude-sonnet-4-6")
-        self._client = Anthropic(api_key=api_key or os.getenv("ANTHROPIC_API_KEY"), timeout=timeout)
+        self._api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
+        self._timeout = timeout
+        self._client = None
 
     def _map_model(self, model: str) -> str:
         mapped = self._MODEL_MAP.get(model, model)
@@ -135,6 +138,9 @@ class AnthropicResponsesClient:
         return mapped
 
     def complete(self, system: str, user: str, model: str) -> LLMResponse:
+        if self._client is None:
+            from anthropic import Anthropic
+            self._client = Anthropic(api_key=self._api_key, timeout=self._timeout)
         mapped = self._map_model(model)
         resp = self._client.messages.create(
             model=mapped,
@@ -245,7 +251,8 @@ class ClaudeCodeClient:
       - LLM_PROVIDER=openai    -> OpenAI API (requires OPENAI_API_KEY)
       - LLM_PROVIDER=claude    -> Claude CLI
       - LLM_PROVIDER=anthropic -> Anthropic SDK
-      - blank / auto           -> Codex CLI, with Anthropic SDK fallback if configured
+      - blank / auto           -> OpenAI API if configured, else Anthropic SDK if
+                                  configured, else Codex CLI
 
     Args:
         timeout: Max seconds to wait for a response (default 60).
@@ -268,7 +275,9 @@ class ClaudeCodeClient:
     ) -> None:
         self._timeout = timeout
         self._provider = (provider or os.getenv("LLM_PROVIDER", "")).lower()
-        use_openai = self._provider == "openai"
+        use_openai = self._provider == "openai" or (
+            self._provider in {"", "auto"} and bool(os.getenv("OPENAI_API_KEY"))
+        )
         use_anthropic = self._provider == "anthropic"
         use_codex = self._provider in {"", "codex", "auto"}
         self._openai: OpenAIResponsesClient | None = None
@@ -282,10 +291,12 @@ class ClaudeCodeClient:
             if not (anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")):
                 raise RuntimeError("LLM_PROVIDER=anthropic requires ANTHROPIC_API_KEY")
             self._anthropic = AnthropicResponsesClient(api_key=anthropic_api_key, timeout=timeout)
-        if use_codex:
+        if use_codex and not use_openai:
             self._codex = CodexCLIClient(timeout=max(timeout, 300))
         if self._provider in {"", "codex", "auto", "claude", "openai"} and (anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")):
             self._anthropic = AnthropicResponsesClient(api_key=anthropic_api_key, timeout=timeout)
+            if self._provider in {"", "auto"} and self._openai is None:
+                self._codex = None
 
     @staticmethod
     def _should_fallback_to_anthropic(exc: Exception) -> bool:
@@ -302,6 +313,11 @@ class ClaudeCodeClient:
                 "payment required",
                 "limit reached",
                 "quota exceeded",
+                "401 unauthorized",
+                "token_expired",
+                "refresh token",
+                "access token could not be refreshed",
+                "invalid_request_error",
             )
         )
 
