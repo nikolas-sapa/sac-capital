@@ -105,21 +105,15 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
       : []),
   ];
 
-  const stockReturns = useMemo(() => {
-    const grouped = new Map<string, number[]>();
+  const collectiveUnweightedReturn = useMemo(() => {
+    const returns: number[] = [];
     for (const position of positions) {
       const pct = positionReturnPct(position);
       if (pct == null) continue;
-      const ticker = position.ticker.toUpperCase();
-      grouped.set(ticker, [...(grouped.get(ticker) ?? []), pct]);
+      returns.push(pct);
     }
-    return [...grouped.entries()]
-      .map(([ticker, values]) => ({
-        ticker,
-        value: values.reduce((sum, item) => sum + item, 0) / values.length,
-        count: values.length,
-      }))
-      .sort((a, b) => b.value - a.value);
+    if (returns.length === 0) return null;
+    return returns.reduce((sum, item) => sum + item, 0) / returns.length;
   }, [positions]);
 
   return (
@@ -204,38 +198,24 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
           </div>
         )}
 
-        {/* Unweighted stock returns */}
-        {stockReturns.length > 0 && (
-          <div className="mb-10">
-            <div className="mb-4 flex items-end justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-mono tracking-widest uppercase text-[#8B8D91] mb-2">
-                  Unweighted Return By Stock
-                </p>
-                <h3 className="text-lg font-bold text-[#F3F2EE]" style={{ fontFamily: "Poppins, sans-serif" }}>
-                  Per-stock performance
-                </h3>
-              </div>
+        {/* Collective unweighted return */}
+        {collectiveUnweightedReturn != null && (
+          <div className="mb-10 rounded-[12px] border border-[rgba(243,242,238,0.06)] bg-[#1A1A1E] p-6">
+            <p className="text-[10px] font-mono tracking-widest uppercase text-[#8B8D91] mb-2">
+              Collective Unweighted Return
+            </p>
+            <div
+              className={cn(
+                "text-4xl font-black",
+                collectiveUnweightedReturn >= 0 ? "text-emerald-400" : "text-red-400"
+              )}
+              style={{ fontFamily: "Poppins, sans-serif" }}
+            >
+              {collectiveUnweightedReturn >= 0 ? "+" : ""}{collectiveUnweightedReturn.toFixed(1)}%
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {stockReturns.slice(0, 8).map((item) => (
-                <div key={item.ticker} className="rounded-[12px] border border-[rgba(243,242,238,0.06)] bg-[#1A1A1E] p-5">
-                  <div className="flex items-baseline justify-between gap-2 mb-2">
-                    <span className="text-sm font-mono text-[#F3F2EE]">{item.ticker}</span>
-                    <span className="text-[10px] font-mono text-[#8B8D91]">{item.count}x</span>
-                  </div>
-                  <div
-                    className={cn(
-                      "text-2xl font-black",
-                      item.value >= 0 ? "text-emerald-400" : "text-red-400"
-                    )}
-                    style={{ fontFamily: "Poppins, sans-serif" }}
-                  >
-                    {item.value >= 0 ? "+" : ""}{item.value.toFixed(1)}%
-                  </div>
-                </div>
-              ))}
-            </div>
+            <p className="mt-2 text-xs font-mono text-[#8B8D91]">
+              Simple average of position returns. Not weighted by shares or dollars.
+            </p>
           </div>
         )}
 
