@@ -273,10 +273,6 @@ export function StockMiniChart({ ticker, entryPrice, entryDate, markPrice, perio
             <circle cx={m.x} cy={m.y} r={m.isAdd ? 7 : 9} fill="none"
               stroke="#E55A1C" strokeWidth="1" opacity={m.isAdd ? 0.25 : 0.4} />
             <circle cx={m.x} cy={m.y} r="5" fill="#E55A1C" stroke="#0B0B0D" strokeWidth="2" />
-            {m.isAdd && (
-              <text x={m.x} y={m.y - 12} textAnchor="middle" fontSize="7"
-                fill="#E55A1C" fontFamily="monospace" opacity="0.8">+add</text>
-            )}
           </g>
         ))}
 

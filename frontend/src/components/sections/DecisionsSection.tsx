@@ -2,7 +2,6 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ChevronUp, BarChart2 } from "lucide-react";
 import type { EquityPosition } from "@/types";
-import { AnimateNumber } from "@/components/ui/animated-blur-number";
 import { StockMiniChart } from "@/components/ui/stock-mini-chart";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +18,14 @@ const STATUS_CONFIG = {
 function pnlColor(v: number | null) {
   if (v == null || v === 0) return "text-neutral-400";
   return v > 0 ? "text-emerald-400" : "text-red-400";
+}
+
+function formatPnl(value: number): string {
+  const sign = value < 0 ? "-$" : "+$";
+  return `${sign}${Math.abs(value).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function AnalysisRow({ label, value }: { label: string; value: string | undefined }) {
@@ -101,13 +108,12 @@ function PositionCard({ pos, index }: { pos: EquityPosition; index: number }) {
             </p>
             <div className={cn("font-bold", pnlColor(activePnl))}>
               {activePnl != null ? (
-                <AnimateNumber
-                  value={Math.abs(activePnl)}
-                  prefix={activePnl < 0 ? "-$" : "+$"}
-                  format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
-                  className="text-xl font-bold"
+                <span
+                  className="block text-xl font-bold whitespace-nowrap leading-none"
                   style={{ fontFamily: "Poppins, sans-serif" }}
-                />
+                >
+                  {formatPnl(activePnl)}
+                </span>
               ) : (
                 <span className="text-[#8B8D91] text-xl">—</span>
               )}

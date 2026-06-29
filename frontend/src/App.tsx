@@ -21,10 +21,12 @@ function mergeLivePositions(
   live: EquityPosition[],
   staticPositions: EquityPosition[]
 ): EquityPosition[] {
+  const visibleStaticPositions = staticPositions.filter((p) => p.ticker !== "RBRK");
+  const visibleLive = live.filter((p) => p.ticker !== "RBRK");
   const staticByTicker: Record<string, EquityPosition> = {};
-  for (const p of staticPositions) staticByTicker[p.ticker] = p;
+  for (const p of visibleStaticPositions) staticByTicker[p.ticker] = p;
 
-  const merged = live.map((p) => {
+  const merged = visibleLive.map((p) => {
     const meta = staticByTicker[p.ticker];
     return meta
       ? {
@@ -37,10 +39,10 @@ function mergeLivePositions(
       : p;
   });
 
-  const liveKeys = new Set(live.map((p) => `${p.status}:${p.ticker}`));
+  const liveKeys = new Set(visibleLive.map((p) => `${p.status}:${p.ticker}`));
   return [
     ...merged,
-    ...staticPositions.filter(
+    ...visibleStaticPositions.filter(
       (p) => p.status !== "open" && !liveKeys.has(`${p.status}:${p.ticker}`)
     ),
   ];
@@ -88,7 +90,9 @@ export default function App() {
       } catch {}
 
       // Alpaca unavailable — use static snapshot directly
-      if (staticPositions.length > 0) setPositions(staticPositions);
+      if (staticPositions.length > 0) {
+        setPositions(staticPositions.filter((p) => p.ticker !== "RBRK"));
+      }
     }
 
     loadPositions();
