@@ -17,6 +17,34 @@ import {
   createRegistryContract,
 } from "@/data/mantle";
 
+function mergeLivePositions(
+  live: EquityPosition[],
+  staticPositions: EquityPosition[]
+): EquityPosition[] {
+  const staticByTicker: Record<string, EquityPosition> = {};
+  for (const p of staticPositions) staticByTicker[p.ticker] = p;
+
+  const merged = live.map((p) => {
+    const meta = staticByTicker[p.ticker];
+    return meta
+      ? {
+          ...p,
+          analysis: meta.analysis,
+          strategy: meta.strategy || p.strategy,
+          confidence: meta.confidence ?? p.confidence,
+          entries: meta.entries,
+        }
+      : p;
+  });
+
+  const liveKeys = new Set(live.map((p) => `${p.status}:${p.ticker}`));
+  return [
+    ...merged,
+    ...staticPositions.filter(
+      (p) => p.status !== "open" && !liveKeys.has(`${p.status}:${p.ticker}`)
+    ),
+  ];
+}
 
 export default function App() {
   const [commitments, setCommitments] = useState<Commitment[]>([]);
@@ -39,12 +67,11 @@ export default function App() {
   useEffect(() => {
     async function loadPositions() {
       // Always load static snapshot first for analysis/strategy/confidence fields
-      let staticByTicker: Record<string, EquityPosition> = {};
+      let staticPositions: EquityPosition[] = [];
       try {
         const r = await fetch("/equity_positions.json");
         if (r.ok) {
-          const data: EquityPosition[] = await r.json();
-          for (const p of data) staticByTicker[p.ticker] = p;
+          staticPositions = await r.json();
         }
       } catch {}
 
@@ -53,20 +80,13 @@ export default function App() {
         const r = await fetch("/api/positions");
         if (r.ok) {
           const live: EquityPosition[] = await r.json();
-          const merged = live.map((p) => {
-            const meta = staticByTicker[p.ticker];
-            return meta
-              ? { ...p, analysis: meta.analysis, strategy: meta.strategy || p.strategy, confidence: meta.confidence ?? p.confidence, entries: meta.entries }
-              : p;
-          });
-          setPositions(merged);
+          setPositions(mergeLivePositions(live, staticPositions));
           return;
         }
       } catch {}
 
       // Alpaca unavailable — use static snapshot directly
-      const staticList = Object.values(staticByTicker);
-      if (staticList.length > 0) setPositions(staticList);
+      if (staticPositions.length > 0) setPositions(staticPositions);
     }
 
     loadPositions();
