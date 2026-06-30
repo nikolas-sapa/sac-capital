@@ -292,6 +292,7 @@ class ClaudeCodeClient:
             self._anthropic = AnthropicResponsesClient(api_key=anthropic_api_key, timeout=timeout)
         if use_codex and not use_openai:
             self._codex = CodexCLIClient(timeout=max(timeout, 300))
+
     def complete(self, system: str, user: str, model: str) -> LLMResponse:
         """Send a prompt and return the response."""
         if self._openai is not None:
