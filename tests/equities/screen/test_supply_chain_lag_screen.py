@@ -99,3 +99,39 @@ def test_breakout_strategy_sets_delay_and_rejects_chased_leaf():
     assert mu[0].strategy == STRATEGY_POST_BREAKOUT
     assert mu[0].features["entry_delay_days"] == 3
     assert not any(c.ticker == "MU" and c.trunk == "NVDA" for c in rejected)
+
+
+def test_scan_does_not_use_trunk_bar_after_leaf_latest_day():
+    trunk_with_future_breakout = _series_from_points(
+        "NVDA",
+        {196: 100.0, 259: 100.0, 260: 130.0},
+        length=261,
+    )
+    leaf = _series_from_points("MU", {0: 50.0, 196: 90.0, 238: 100.0, 259: 105.0})
+
+    candidates = SupplyChainLagScreen(
+        FakePriceFeed({"NVDA": trunk_with_future_breakout, "MU": leaf})
+    ).scan_post_breakout()
+
+    assert not any(c.ticker == "MU" and c.trunk == "NVDA" for c in candidates)
+
+
+def test_scan_as_of_emits_signal_at_or_before_requested_day():
+    as_of = date(2025, 9, 17)
+    trunk = _series_from_points("NVDA", {196: 90.0, 238: 100.0, 259: 125.0})
+    leaf = _series_from_points("MU", {0: 50.0, 196: 90.0, 238: 100.0, 256: 104.0, 259: 105.0})
+
+    candidates = SupplyChainLagScreen(FakePriceFeed({"NVDA": trunk, "MU": leaf})).scan(as_of=as_of)
+
+    assert candidates
+    assert all(candidate.entry_signal_at <= as_of for candidate in candidates)
+
+
+def test_scan_history_emits_candidates_with_future_bars_available():
+    trunk = _series_from_points("NVDA", {196: 90.0, 238: 100.0, 259: 125.0, 319: 125.0}, length=320)
+    leaf = _series_from_points("MU", {0: 50.0, 196: 90.0, 238: 100.0, 256: 104.0, 259: 105.0, 319: 105.0}, length=320)
+    feed = FakePriceFeed({"SPY": _series("SPY", [100.0] * 320), "NVDA": trunk, "MU": leaf})
+
+    candidates = SupplyChainLagScreen(feed).scan_history(start_after_bars=259, reserve_exit_bars=31, step_bars=10)
+
+    assert any(c.ticker == "MU" and c.entry_signal_at < leaf.bars[-31].day for c in candidates)

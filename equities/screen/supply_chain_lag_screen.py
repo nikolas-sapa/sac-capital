@@ -8,6 +8,7 @@ from typing import Protocol
 from core.assets.bar import PriceSeries
 from equities.research.lag_rules import (
     above_smas,
+    bar_on_or_before,
     is_chased,
     lag_features,
     makes_period_high,
@@ -49,20 +50,36 @@ class SupplyChainLagCandidate:
 
 
 class SupplyChainLagScreen:
-    def __init__(self, prices: HistoryProvider) -> None:
+    def __init__(self, prices: HistoryProvider, period: str = "1y") -> None:
         self._prices = prices
+        self._period = period
         self._cache: dict[str, PriceSeries] = {}
         self._scorer = BottleneckScorer()
 
-    def scan(self) -> list[SupplyChainLagCandidate]:
+    def scan(self, as_of: date | None = None) -> list[SupplyChainLagCandidate]:
         candidates = (
-            self.scan_semi_bottleneck()
-            + self.scan_multi_trunk()
-            + self.scan_post_breakout()
+            self.scan_semi_bottleneck(as_of)
+            + self.scan_multi_trunk(as_of)
+            + self.scan_post_breakout(as_of)
         )
         return sorted(candidates, key=lambda c: c.opportunity_score, reverse=True)
 
-    def scan_semi_bottleneck(self) -> list[SupplyChainLagCandidate]:
+    def scan_history(
+        self,
+        *,
+        start_after_bars: int = 252,
+        reserve_exit_bars: int = 31,
+        step_bars: int = 5,
+        calendar_ticker: str = "SPY",
+    ) -> list[SupplyChainLagCandidate]:
+        calendar = self._series(calendar_ticker)
+        end = max(start_after_bars, len(calendar.bars) - reserve_exit_bars)
+        candidates: list[SupplyChainLagCandidate] = []
+        for idx in range(start_after_bars, end, step_bars):
+            candidates.extend(self.scan(as_of=calendar.bars[idx].day))
+        return sorted(candidates, key=lambda c: c.opportunity_score, reverse=True)
+
+    def scan_semi_bottleneck(self, as_of: date | None = None) -> list[SupplyChainLagCandidate]:
         candidates: list[SupplyChainLagCandidate] = []
         for trunk in ("AMD", "TSM", "NVDA"):
             trunk_series = self._series(trunk)
@@ -70,7 +87,18 @@ class SupplyChainLagScreen:
                 if leaf not in SEMI_BOTTLENECK_UNIVERSE:
                     continue
                 leaf_series = self._series(leaf)
-                features = lag_features(trunk, leaf, trunk_series, leaf_series)
+                aligned = self._aligned_indexes((trunk_series, leaf_series), as_of)
+                if aligned is None:
+                    continue
+                signal_day, (trunk_idx, leaf_idx) = aligned
+                features = lag_features(
+                    trunk,
+                    leaf,
+                    trunk_series,
+                    leaf_series,
+                    trunk_end_index=trunk_idx,
+                    leaf_end_index=leaf_idx,
+                )
                 if features is None:
                     continue
                 if not (
@@ -81,17 +109,15 @@ class SupplyChainLagScreen:
                     and features.opportunity_score >= 0.18
                 ):
                     continue
-                if is_chased(leaf_series):
+                if is_chased(leaf_series, end_index=leaf_idx):
                     continue
-                latest = leaf_series.latest
-                if latest is None:
-                    continue
-                stop_loss = stop_from_atr(latest.close, leaf_series)
+                signal_bar = leaf_series.bars[leaf_idx]
+                stop_loss = stop_from_atr(signal_bar.close, leaf_series, end_index=leaf_idx)
                 candidates.append(SupplyChainLagCandidate(
                     strategy=STRATEGY_SEMI_BOTTLENECK,
                     ticker=leaf,
                     trunk=trunk,
-                    entry_signal_at=latest.day,
+                    entry_signal_at=signal_day,
                     features={
                         "lag_1y": features.lag_1y,
                         "lag_3mo": features.lag_3mo,
@@ -99,7 +125,7 @@ class SupplyChainLagScreen:
                         "bottleneck_score": features.bottleneck_score,
                         "opportunity_score": features.opportunity_score,
                         "stop_loss": stop_loss,
-                        "take_profit": round(latest.close * 1.18, 4),
+                        "take_profit": round(signal_bar.close * 1.18, 4),
                         "max_holding_days": 21,
                     },
                     entry_rule="weekly close after lag signal; next session fill in backtest",
@@ -109,11 +135,8 @@ class SupplyChainLagScreen:
                 ))
         return candidates
 
-    def scan_multi_trunk(self) -> list[SupplyChainLagCandidate]:
+    def scan_multi_trunk(self, as_of: date | None = None) -> list[SupplyChainLagCandidate]:
         qqq = self._series("QQQ")
-        qqq_3mo = return_pct(qqq, 63)
-        if qqq_3mo is None:
-            return []
         leaves = sorted({leaf for chain in SUPPLY_CHAIN.values() for leaf in chain})
         candidates: list[SupplyChainLagCandidate] = []
         for leaf in leaves:
@@ -121,15 +144,27 @@ class SupplyChainLagScreen:
             if len(trunks) < 2:
                 continue
             leaf_series = self._series(leaf)
-            active: list[tuple[str, float, float, float]] = []
+            active: list[tuple[str, float, float, float, date]] = []
             for trunk in trunks:
                 trunk_series = self._series(trunk)
-                trunk_3mo = return_pct(trunk_series, 63)
-                features = lag_features(trunk, leaf, trunk_series, leaf_series)
-                if trunk_3mo is None or features is None:
+                aligned = self._aligned_indexes((qqq, trunk_series, leaf_series), as_of)
+                if aligned is None:
+                    continue
+                signal_day, (qqq_idx, trunk_idx, leaf_idx) = aligned
+                qqq_3mo = return_pct(qqq, 63, end_index=qqq_idx)
+                trunk_3mo = return_pct(trunk_series, 63, end_index=trunk_idx)
+                features = lag_features(
+                    trunk,
+                    leaf,
+                    trunk_series,
+                    leaf_series,
+                    trunk_end_index=trunk_idx,
+                    leaf_end_index=leaf_idx,
+                )
+                if qqq_3mo is None or trunk_3mo is None or features is None:
                     continue
                 if trunk_3mo > qqq_3mo + 10.0:
-                    active.append((trunk, features.lag_3mo, features.lag_1mo, features.bottleneck_score))
+                    active.append((trunk, features.lag_3mo, features.lag_1mo, features.bottleneck_score, signal_day))
             if len(active) < 2:
                 continue
             avg_lag_3mo = sum(row[1] for row in active) / len(active)
@@ -137,26 +172,26 @@ class SupplyChainLagScreen:
             min_bottleneck = min(row[3] for row in active)
             if not (avg_lag_3mo >= 15.0 and one_positive_1mo and min_bottleneck >= 0.45):
                 continue
-            if is_chased(leaf_series):
+            signal_day = min(row[4] for row in active)
+            leaf_idx = bar_on_or_before(leaf_series, signal_day)
+            if leaf_idx is None or is_chased(leaf_series, end_index=leaf_idx):
                 continue
-            latest = leaf_series.latest
-            if latest is None:
-                continue
+            signal_bar = leaf_series.bars[leaf_idx]
             primary = max(active, key=lambda row: row[1])[0]
             active_trunks = [row[0] for row in active]
             candidates.append(SupplyChainLagCandidate(
                 strategy=STRATEGY_MULTI_TRUNK,
                 ticker=leaf,
                 trunk=primary,
-                entry_signal_at=latest.day,
+                entry_signal_at=signal_day,
                 features={
                     "active_trunk_count": len(active),
                     "active_trunks": active_trunks,
                     "avg_lag_3mo": round(avg_lag_3mo, 4),
                     "min_bottleneck_score": round(min_bottleneck, 4),
                     "opportunity_score": round((avg_lag_3mo / 100.0) * min_bottleneck, 4),
-                    "stop_loss": round(latest.close * 0.90, 4),
-                    "take_profit": round(latest.close * 1.20, 4),
+                    "stop_loss": round(signal_bar.close * 0.90, 4),
+                    "take_profit": round(signal_bar.close * 1.20, 4),
                     "max_holding_days": 30,
                 },
                 entry_rule="2+ active trunks outperform QQQ by 10pp; next session fill in backtest",
@@ -166,34 +201,40 @@ class SupplyChainLagScreen:
             ))
         return candidates
 
-    def scan_post_breakout(self) -> list[SupplyChainLagCandidate]:
+    def scan_post_breakout(self, as_of: date | None = None) -> list[SupplyChainLagCandidate]:
         candidates: list[SupplyChainLagCandidate] = []
         for trunk, leaves in SUPPLY_CHAIN.items():
             trunk_series = self._series(trunk)
-            trunk_20d = return_pct(trunk_series, 20)
-            if trunk_20d is None or trunk_20d < 15.0 or not makes_period_high(trunk_series, 63):
-                continue
             for leaf in leaves:
                 leaf_series = self._series(leaf)
-                leaf_20d = return_pct(leaf_series, 20)
-                leaf_3d = return_pct(leaf_series, 3)
+                aligned = self._aligned_indexes((trunk_series, leaf_series), as_of)
+                if aligned is None:
+                    continue
+                signal_day, (trunk_idx, leaf_idx) = aligned
+                trunk_20d = return_pct(trunk_series, 20, end_index=trunk_idx)
+                if (
+                    trunk_20d is None
+                    or trunk_20d < 15.0
+                    or not makes_period_high(trunk_series, 63, end_index=trunk_idx)
+                ):
+                    continue
+                leaf_20d = return_pct(leaf_series, 20, end_index=leaf_idx)
+                leaf_3d = return_pct(leaf_series, 3, end_index=leaf_idx)
                 if leaf_20d is None or leaf_20d > 8.0:
                     continue
                 if leaf_3d is not None and leaf_3d > 10.0:
                     continue
-                if not above_smas(leaf_series, (50, 200)):
+                if not above_smas(leaf_series, (50, 200), end_index=leaf_idx):
                     continue
                 bottleneck = self._scorer.score(leaf, trunk)
                 if bottleneck < 0.50:
                     continue
-                latest = leaf_series.latest
-                if latest is None:
-                    continue
+                signal_bar = leaf_series.bars[leaf_idx]
                 candidates.append(SupplyChainLagCandidate(
                     strategy=STRATEGY_POST_BREAKOUT,
                     ticker=leaf,
                     trunk=trunk,
-                    entry_signal_at=latest.day,
+                    entry_signal_at=signal_day,
                     features={
                         "trunk_20d_return": round(trunk_20d, 4),
                         "leaf_20d_return": round(leaf_20d, 4),
@@ -201,8 +242,8 @@ class SupplyChainLagScreen:
                         "bottleneck_score": bottleneck,
                         "entry_delay_days": 3,
                         "opportunity_score": round((trunk_20d - leaf_20d) / 100.0 * bottleneck, 4),
-                        "stop_loss": round(latest.close * 0.93, 4),
-                        "take_profit": round(latest.close * 1.12, 4),
+                        "stop_loss": round(signal_bar.close * 0.93, 4),
+                        "take_profit": round(signal_bar.close * 1.12, 4),
                         "max_holding_days": 15,
                     },
                     entry_rule="trunk 63d high and 20d breakout; buy delayed leaf after 3 sessions",
@@ -214,5 +255,22 @@ class SupplyChainLagScreen:
 
     def _series(self, ticker: str) -> PriceSeries:
         if ticker not in self._cache:
-            self._cache[ticker] = self._prices.history(ticker, period="1y")
+            try:
+                self._cache[ticker] = self._prices.history(ticker, period=self._period)
+            except Exception as exc:
+                print(f"  [SCREEN] ticker={ticker} error={exc}")
+                self._cache[ticker] = PriceSeries(ticker=ticker, bars=[])
         return self._cache[ticker]
+
+    def _aligned_indexes(
+        self,
+        series: tuple[PriceSeries, ...],
+        as_of: date | None,
+    ) -> tuple[date, tuple[int, ...]] | None:
+        if any(not item.bars for item in series):
+            return None
+        common_day = as_of or min(item.latest.day for item in series if item.latest is not None)
+        indexes = tuple(bar_on_or_before(item, common_day) for item in series)
+        if any(idx is None for idx in indexes):
+            return None
+        return common_day, indexes  # type: ignore[return-value]

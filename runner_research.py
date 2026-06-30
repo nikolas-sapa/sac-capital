@@ -14,19 +14,10 @@ from pathlib import Path
 
 from equities.research.backtest import append_backtest_report, run_backtest
 from equities.research.discovery_lag import DiscoveryLagCalculator
+from equities.research.lag_rules import opportunity_score
 from equities.research.supply_chain import SUPPLY_CHAIN, BottleneckScorer
 from equities.research.thesis_miner import ThesisMiner
 from equities.screen.supply_chain_lag_screen import SupplyChainLagScreen
-
-
-def opportunity_score(*, lag_1y: float, lag_3mo: float, lag_1mo: float, bottleneck: float) -> float:
-    """Score delayed supplier catch-up across slow and fresh windows."""
-    positive_lag = (
-        max(lag_1y, 0.0) * 0.35
-        + max(lag_3mo, 0.0) * 0.40
-        + max(lag_1mo, 0.0) * 0.25
-    )
-    return round((positive_lag / 100) * bottleneck, 4)
 
 
 def _candidate_payload(
@@ -66,8 +57,17 @@ def _candidate_score(candidate: dict) -> float:
 
 def _strategy_candidate_payload(candidate) -> dict:
     payload = asdict(candidate)
+    payload["entry_signal_at"] = candidate.entry_signal_at.isoformat()
     payload["opportunity_score"] = candidate.opportunity_score
+    payload["level"] = "forward_paper_strategy"
     return payload
+
+
+def _write_json_atomic(path: Path, payload: object) -> None:
+    path.parent.mkdir(exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2))
+    tmp.replace(path)
 
 
 def main() -> None:
@@ -80,7 +80,7 @@ def main() -> None:
     parser.add_argument(
         "--strategy-backtest",
         action="store_true",
-        help="Generate top-3 lagged supplier strategy candidates and append a paper backtest report.",
+        help="Generate lagged supplier strategy candidates and append a historical paper backtest when trades exist.",
     )
     args = parser.parse_args()
 
@@ -125,29 +125,24 @@ def main() -> None:
 
     all_candidates.sort(key=lambda x: x["opportunity_score"], reverse=True)
 
+    report = None
     if args.strategy_backtest:
         from equities.data.prices import YFinancePriceFeed
 
         print("\n=== Lagged supplier strategy backtest ===")
         price_feed = YFinancePriceFeed()
-        strategy_screen = SupplyChainLagScreen(price_feed)
+        strategy_screen = SupplyChainLagScreen(price_feed, period="2y")
         strategy_candidates = strategy_screen.scan()
-        print(f"Strategy candidates: {len(strategy_candidates)}")
+        print(f"Forward-paper strategy candidates: {len(strategy_candidates)}")
         for candidate in strategy_candidates[:10]:
             print(
                 f"  [{candidate.strategy}] {candidate.ticker} via {candidate.trunk} "
                 f"score={candidate.opportunity_score:.4f}"
             )
         all_candidates.extend(_strategy_candidate_payload(candidate) for candidate in strategy_candidates)
-        report = run_backtest(strategy_candidates, price_feed)
-        append_backtest_report(Path("data/strategy_backtests.jsonl"), report)
-        print(
-            "Backtest: "
-            f"trades={report.trade_count} expectancy={report.expectancy_pct:+.2f}% "
-            f"hit_rate={report.hit_rate:.0%} profit_factor={report.profit_factor:.2f} "
-            f"max_dd={report.max_drawdown_pct:+.2f}%"
-        )
-        print(f"Backtest report appended to data/strategy_backtests.jsonl")
+        historical_candidates = strategy_screen.scan_history()
+        print(f"Historical strategy candidates: {len(historical_candidates)}")
+        report = run_backtest(historical_candidates, price_feed, period="2y")
 
     all_candidates.sort(key=_candidate_score, reverse=True)
     out = Path("data/research_candidates.json")
@@ -156,8 +151,24 @@ def main() -> None:
             raise RuntimeError(
                 "all research opportunity scores are zero; refusing to overwrite existing candidates"
             )
-    out.write_text(json.dumps(all_candidates[:50], indent=2))
+    _write_json_atomic(out, all_candidates[:50])
     print(f"\nTop 50 saved to {out}")
+
+    if report is not None:
+        benchmark_errors = [item for item in report.data_errors if item.startswith(("SPY:", "QQQ:", "SOXX:"))]
+        if benchmark_errors:
+            raise RuntimeError(f"missing benchmark data: {', '.join(benchmark_errors)}")
+        print(
+            "Backtest: "
+            f"trades={report.trade_count} skipped={report.skipped_count} "
+            f"expectancy={report.expectancy_pct:+.2f}% hit_rate={report.hit_rate:.0%} "
+            f"profit_factor={report.profit_factor:.2f} max_dd={report.max_drawdown_pct:+.2f}%"
+        )
+        if report.trade_count == 0:
+            print("Backtest report not appended: no historical trades")
+            return
+        append_backtest_report(Path("data/strategy_backtests.jsonl"), report)
+        print("Backtest report appended to data/strategy_backtests.jsonl")
 
 
 if __name__ == "__main__":
