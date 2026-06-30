@@ -34,3 +34,9 @@ def test_bottleneck_score_range():
 def test_asml_monopoly_scores_near_one():
     scorer = BottleneckScorer()
     assert scorer.score("ASML", trunk="TSM") > 0.8
+
+
+def test_top_strategy_universe_names_present():
+    assert {"AMAT", "LRCX", "ENTG"}.issubset(set(SUPPLY_CHAIN["TSM"]))
+    assert {"COHR", "MU"}.issubset(set(SUPPLY_CHAIN["NVDA"]))
+    assert "AMAT" in SUPPLY_CHAIN["AMD"]

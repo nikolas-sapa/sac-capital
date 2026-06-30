@@ -9,11 +9,14 @@ from __future__ import annotations
 
 import json
 import argparse
+from dataclasses import asdict
 from pathlib import Path
 
+from equities.research.backtest import append_backtest_report, run_backtest
 from equities.research.discovery_lag import DiscoveryLagCalculator
 from equities.research.supply_chain import SUPPLY_CHAIN, BottleneckScorer
 from equities.research.thesis_miner import ThesisMiner
+from equities.screen.supply_chain_lag_screen import SupplyChainLagScreen
 
 
 def opportunity_score(*, lag_1y: float, lag_3mo: float, lag_1mo: float, bottleneck: float) -> float:
@@ -56,12 +59,28 @@ def _candidate_payload(
     }
 
 
+def _candidate_score(candidate: dict) -> float:
+    value = candidate.get("opportunity_score", 0.0)
+    return float(value) if isinstance(value, int | float) else 0.0
+
+
+def _strategy_candidate_payload(candidate) -> dict:
+    payload = asdict(candidate)
+    payload["opportunity_score"] = candidate.opportunity_score
+    return payload
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--static-only",
         action="store_true",
         help="Skip LLM thesis mining and refresh static supply-chain lag candidates only.",
+    )
+    parser.add_argument(
+        "--strategy-backtest",
+        action="store_true",
+        help="Generate top-3 lagged supplier strategy candidates and append a paper backtest report.",
     )
     args = parser.parse_args()
 
@@ -105,8 +124,34 @@ def main() -> None:
             ))
 
     all_candidates.sort(key=lambda x: x["opportunity_score"], reverse=True)
+
+    if args.strategy_backtest:
+        from equities.data.prices import YFinancePriceFeed
+
+        print("\n=== Lagged supplier strategy backtest ===")
+        price_feed = YFinancePriceFeed()
+        strategy_screen = SupplyChainLagScreen(price_feed)
+        strategy_candidates = strategy_screen.scan()
+        print(f"Strategy candidates: {len(strategy_candidates)}")
+        for candidate in strategy_candidates[:10]:
+            print(
+                f"  [{candidate.strategy}] {candidate.ticker} via {candidate.trunk} "
+                f"score={candidate.opportunity_score:.4f}"
+            )
+        all_candidates.extend(_strategy_candidate_payload(candidate) for candidate in strategy_candidates)
+        report = run_backtest(strategy_candidates, price_feed)
+        append_backtest_report(Path("data/strategy_backtests.jsonl"), report)
+        print(
+            "Backtest: "
+            f"trades={report.trade_count} expectancy={report.expectancy_pct:+.2f}% "
+            f"hit_rate={report.hit_rate:.0%} profit_factor={report.profit_factor:.2f} "
+            f"max_dd={report.max_drawdown_pct:+.2f}%"
+        )
+        print(f"Backtest report appended to data/strategy_backtests.jsonl")
+
+    all_candidates.sort(key=_candidate_score, reverse=True)
     out = Path("data/research_candidates.json")
-    if all_candidates and all(c["opportunity_score"] == 0.0 for c in all_candidates):
+    if all_candidates and all(_candidate_score(c) == 0.0 for c in all_candidates):
         if out.exists():
             raise RuntimeError(
                 "all research opportunity scores are zero; refusing to overwrite existing candidates"
