@@ -172,6 +172,7 @@ class EquityAnalyst:
         checkpoint_store: AnalysisCheckpointStore | None = None,
         checkpoints_enabled: bool | None = None,
         run_date: str | None = None,
+        smart_money_block: str = "",
     ) -> None:
         if llm is None:
             from core.claude_client import ClaudeCodeClient
@@ -218,6 +219,7 @@ class EquityAnalyst:
             ).lower() in {"1", "true", "yes", "on"}
         self._checkpoint_store = checkpoint_store if checkpoints_enabled else None
         self._run_date = run_date or date.today().isoformat()
+        self._smart_money_block = smart_money_block
         self._candidate_by_ticker: dict[str, CandidateEvent] = {}
 
     def analyse(
@@ -366,6 +368,7 @@ class EquityAnalyst:
             memory_block=self._memory_block(ticker),
             sentiment_block=self._sentiment_block(ticker, headlines),
             specialist_block=format_packets(specialist_packets),
+            smart_money_block=self._smart_money_block,
         )
         try:
             raw_output, data, _hit = self._complete_stage(

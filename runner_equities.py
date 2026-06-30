@@ -65,6 +65,7 @@ from equities.screen.politician_screen import PoliticianScreen
 from equities.data.house_clerk_disclosures import HouseClerkDisclosureProvider
 from equities.data.senate_efd_disclosures import SenateEFDDisclosureProvider
 from equities.data.composite_disclosures import CompositeDisclosureProvider
+from equities.data.fund_13f import Fund13FProvider
 
 # ---------------------------------------------------------------------------
 # Default universe (extend via --universe flag or editing this list)
@@ -819,6 +820,21 @@ async def run_once(
 
         # --- Analyst stage (Codex CLI by default; OpenAI/Claude are explicit fallbacks) ---
         budget = DailyBudget(daily_limit_usd=999.0)
+        # Smart-money 13F context (portfolio-level, fetched once per run; off by default)
+        smart_money_block = ""
+        if getattr(settings, "smart_money_13f_enabled", False):
+            with _stage(stats, "smart_money_13f"):
+                summaries = []
+                for pair in settings.smart_money_ciks.split(","):
+                    cik, _, name = pair.strip().partition(":")
+                    if not cik.strip():
+                        continue
+                    summary = Fund13FProvider(cik=cik.strip(), fund_name=name.strip()).context_summary()
+                    if summary and "Failed to fetch" not in summary and "No holdings" not in summary:
+                        summaries.append(summary)
+                        print(f"  [13F] {name.strip() or cik.strip()}: loaded")
+                smart_money_block = "\n\n".join(summaries)
+
         analyst = EquityAnalyst(
             llm=llm_client,
             prices=prices,
@@ -831,6 +847,7 @@ async def run_once(
             artifact_store=artifact_store,
             checkpoint_store=checkpoint_store,
             checkpoints_enabled=checkpoint,
+            smart_money_block=smart_money_block,
         )
 
         with _stage(stats, "analyst"):

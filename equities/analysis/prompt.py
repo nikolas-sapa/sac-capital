@@ -78,6 +78,7 @@ Regime: {macro_regime} | VIX: {vix_str} | Yield curve (10y-3m): {yield_curve_str
 {specialist_section}
 {sentiment_section}
 {memory_section}
+{smart_money_section}
 
 ## Task
 If this setup is already priced in OR has no clear thesis, output:
@@ -117,6 +118,7 @@ def build_analyst_prompt(
     memory_block: str = "",
     sentiment_block: str = "",
     specialist_block: str = "",
+    smart_money_block: str = "",
 ) -> str:
     """Build the Sonnet deep-analyst user message."""
     news_block = "\n".join(f"- {h}" for h in news[:8]) or "  (none)"
@@ -136,6 +138,11 @@ def build_analyst_prompt(
         if specialist_block.strip()
         else ""
     )
+    smart_money_section = (
+        f"\n\n## Smart-money 13F signals\n{smart_money_block.strip()}"
+        if smart_money_block.strip()
+        else ""
+    )
     return _ANALYST_USER.format(
         ticker=candidate.instrument.ticker,
         sector=sector or "Unknown",
@@ -152,6 +159,7 @@ def build_analyst_prompt(
         specialist_section=specialist_section,
         sentiment_section=sentiment_section,
         memory_section=memory_section,
+        smart_money_section=smart_money_section,
     )
 
 
