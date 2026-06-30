@@ -26,6 +26,7 @@ class EventType(Enum):
     EARNINGS_APPROACHING = "earnings_approaching"
     EARNINGS_SURPRISE_DRIFT = "earnings_surprise_drift"
     MATERIAL_FILING = "material_filing"
+    POLITICIAN_DISCLOSURE = "politician_disclosure"
 
 
 @dataclass(frozen=True)
