@@ -8,8 +8,8 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/nikolassapalidis/polymarket-bot/.venv/bin/python</string>
-        <string>/Users/nikolassapalidis/polymarket-bot/scripts/run_nightly.py</string>
+        <string>/Users/nikolassapalidis/sapa_fund/.venv/bin/python</string>
+        <string>/Users/nikolassapalidis/sapa_fund/scripts/run_nightly.py</string>
     </array>
 
     <key>StartCalendarInterval</key>
@@ -21,13 +21,13 @@
     </dict>
 
     <key>StandardOutPath</key>
-    <string>/Users/nikolassapalidis/polymarket-bot/data/nightly.log</string>
+    <string>/Users/nikolassapalidis/sapa_fund/data/nightly.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/nikolassapalidis/polymarket-bot/data/nightly.err.log</string>
+    <string>/Users/nikolassapalidis/sapa_fund/data/nightly.err.log</string>
 
     <key>WorkingDirectory</key>
-    <string>/Users/nikolassapalidis/polymarket-bot</string>
+    <string>/Users/nikolassapalidis/sapa_fund</string>
 
     <key>EnvironmentVariables</key>
     <dict>

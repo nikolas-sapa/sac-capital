@@ -60,7 +60,7 @@ export default function App() {
     fetch("/mantle_commitments.sample.json")
       .then((r) => r.json())
       .then((data: Commitment[]) => setCommitments(data))
-      .catch(() => {});
+      .catch((err) => console.error("Failed to load mantle commitments:", err));
   }, []);
 
   // Alpaca equity positions — live prices merged with static analysis metadata
@@ -75,7 +75,9 @@ export default function App() {
         if (r.ok) {
           staticPositions = await r.json();
         }
-      } catch {}
+      } catch (err) {
+        console.error("Failed to load static positions:", err);
+      }
 
       // Try live Alpaca for fresh prices/pnl; merge analysis from static
       try {
@@ -85,7 +87,9 @@ export default function App() {
           setPositions(mergeLivePositions(live, staticPositions));
           return;
         }
-      } catch {}
+      } catch (err) {
+        console.error("Failed to load live positions:", err);
+      }
 
       // Alpaca unavailable — use static snapshot directly
       if (staticPositions.length > 0) {
@@ -103,7 +107,10 @@ export default function App() {
     fetch(`/performance_summary.json?ts=${Date.now()}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data: PerformanceSummary) => setPerf(data))
-      .catch(() => setPerf(null));
+      .catch((err) => {
+        console.error("Failed to load performance summary:", err);
+        setPerf(null);
+      });
   }, []);
 
   // Live Mantle registry events.
@@ -130,12 +137,14 @@ export default function App() {
             uri: String(log.args.uri ?? ""),
           }))
       );
-    })().catch(() => {});
+    })().catch((err) => console.error("Failed to fetch registry events:", err));
   }, []);
 
   useEffect(() => {
     if (!selected) return;
-    sha256Hex(selected.canonical_json).then(setVerifiedHash);
+    sha256Hex(selected.canonical_json)
+      .then(setVerifiedHash)
+      .catch((err) => console.error("Hash verification failed:", err));
   }, [selected]);
 
   return (

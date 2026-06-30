@@ -8,13 +8,13 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/nikolassapalidis/polymarket-bot/.venv/bin/python</string>
+        <string>/Users/nikolassapalidis/sapa_fund/.venv/bin/python</string>
         <string>runner_equities.py</string>
         <string>--mark-only</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/nikolassapalidis/polymarket-bot</string>
+    <string>/Users/nikolassapalidis/sapa_fund</string>
 
     <key>StartInterval</key>
     <integer>3600</integer>
@@ -23,10 +23,10 @@
     <true/>
 
     <key>StandardOutPath</key>
-    <string>/Users/nikolassapalidis/polymarket-bot/data/equities_mark.log</string>
+    <string>/Users/nikolassapalidis/sapa_fund/data/equities_mark.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/nikolassapalidis/polymarket-bot/data/equities_mark.err.log</string>
+    <string>/Users/nikolassapalidis/sapa_fund/data/equities_mark.err.log</string>
 
     <key>EnvironmentVariables</key>
     <dict>

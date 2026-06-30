@@ -251,8 +251,7 @@ class ClaudeCodeClient:
       - LLM_PROVIDER=openai    -> OpenAI API (requires OPENAI_API_KEY)
       - LLM_PROVIDER=claude    -> Claude CLI
       - LLM_PROVIDER=anthropic -> Anthropic SDK
-      - blank / auto           -> OpenAI API if configured, else Anthropic SDK if
-                                  configured, else Codex CLI
+      - blank / auto           -> Codex CLI
 
     Args:
         timeout: Max seconds to wait for a response (default 60).
@@ -293,54 +292,16 @@ class ClaudeCodeClient:
             self._anthropic = AnthropicResponsesClient(api_key=anthropic_api_key, timeout=timeout)
         if use_codex and not use_openai:
             self._codex = CodexCLIClient(timeout=max(timeout, 300))
-        if self._provider in {"", "codex", "auto", "claude", "openai"} and (anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")):
-            self._anthropic = AnthropicResponsesClient(api_key=anthropic_api_key, timeout=timeout)
-            if self._provider in {"", "auto"} and self._openai is None:
-                self._codex = None
-
-    @staticmethod
-    def _should_fallback_to_anthropic(exc: Exception) -> bool:
-        text = f"{exc.__class__.__name__}: {exc}".lower()
-        return any(
-            marker in text
-            for marker in (
-                "insufficient_quota",
-                "quota",
-                "usage limit",
-                "rate limit",
-                "too many requests",
-                "billing",
-                "payment required",
-                "limit reached",
-                "quota exceeded",
-                "401 unauthorized",
-                "token_expired",
-                "refresh token",
-                "access token could not be refreshed",
-                "invalid_request_error",
-            )
-        )
-
     def complete(self, system: str, user: str, model: str) -> LLMResponse:
         """Send a prompt and return the response."""
         if self._openai is not None:
-            try:
-                return self._openai.complete(system, user, model)
-            except Exception as exc:
-                if self._anthropic is not None and self._should_fallback_to_anthropic(exc):
-                    return self._anthropic.complete(system, user, model)
-                raise
+            return self._openai.complete(system, user, model)
         if self._provider == "anthropic":
             if self._anthropic is None:
                 raise RuntimeError("LLM_PROVIDER=anthropic requires ANTHROPIC_API_KEY")
             return self._anthropic.complete(system, user, model)
         if self._codex is not None:
-            try:
-                return self._codex.complete(system, user, model)
-            except Exception as exc:
-                if self._anthropic is not None and self._should_fallback_to_anthropic(exc):
-                    return self._anthropic.complete(system, user, model)
-                raise
+            return self._codex.complete(system, user, model)
         return self._complete_with_claude_cli(system, user, model)
 
     def _complete_with_claude_cli(self, system: str, user: str, model: str) -> LLMResponse:
@@ -363,8 +324,6 @@ class ClaudeCodeClient:
 
         if result.returncode != 0:
             stderr = result.stderr.strip()
-            if self._anthropic is not None and self._should_fallback_to_anthropic(RuntimeError(stderr)):
-                return self._anthropic.complete(system, user, model)
             raise RuntimeError(f"claude -p failed (exit {result.returncode}): {stderr}")
 
         text = result.stdout.strip()
@@ -395,9 +354,8 @@ class ClaudeCodeBackend:
 def make_llm_client(api_key: str = "") -> "ClaudeCodeClient":
     """Return an LLM client.
 
-    Provider env vars take precedence. Defaults to Codex CLI, with Anthropic
-    fallback when configured. Passing *api_key* preserves the older direct
-    Anthropic behavior for legacy call sites.
+    Provider env vars take precedence. Defaults to Codex CLI. Passing *api_key*
+    preserves the older direct Anthropic behavior for legacy call sites.
     """
     provider = os.getenv("LLM_PROVIDER")
     if provider or os.getenv("OPENAI_API_KEY"):

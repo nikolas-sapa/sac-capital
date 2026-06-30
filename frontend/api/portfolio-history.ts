@@ -51,7 +51,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       base_value: number;
     };
 
-    if (!raw.timestamp?.length) {
+    if (!Array.isArray(raw.timestamp) || !raw.timestamp.length) {
+      return res.status(200).json({ points: [] });
+    }
+
+    if (!Array.isArray(raw.equity) || !Array.isArray(raw.profit_loss)) {
       return res.status(200).json({ points: [] });
     }
 
@@ -94,6 +98,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             points.push({ label: "Now", value: nowPnl });
           }
         }
+      } else {
+        console.warn(`Failed to fetch live equity for intraday chart: ${acctResp.status} ${acctResp.statusText}`);
       }
       totalPnl = points.length > 0 ? points[points.length - 1].value : 0;
 

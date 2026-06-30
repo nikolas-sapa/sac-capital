@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from threading import Thread
 
 try:
     from crawl4ai import AsyncWebCrawler
@@ -42,6 +43,30 @@ async def _fetch_articles(urls: list[str]) -> list[tuple[str, str]]:
     return results
 
 
+def _fetch_articles_sync(urls: list[str]) -> list[tuple[str, str]]:
+    """Run the Crawl4AI coroutine in a worker thread.
+
+    The equities runner already has an active asyncio loop, so calling
+    ``asyncio.run`` directly here would emit a warning and fail fast.
+    """
+    result: list[tuple[str, str]] = []
+    error: list[BaseException] = []
+
+    def _worker() -> None:
+        try:
+            result.extend(asyncio.run(_fetch_articles(urls)))
+        except BaseException as exc:  # pragma: no cover - defensive wrapper
+            error.append(exc)
+
+    thread = Thread(target=_worker, daemon=True)
+    thread.start()
+    thread.join()
+
+    if error:
+        raise error[0]
+    return result
+
+
 class Crawl4AINewsProvider:
     """Fetches full article bodies via Crawl4AI for top yfinance news URLs."""
 
@@ -76,7 +101,7 @@ class Crawl4AINewsProvider:
 
         urls = [u for _, u in entries]
         try:
-            fetched = asyncio.run(_fetch_articles(urls))
+            fetched = _fetch_articles_sync(urls)
         except Exception:
             return []
 

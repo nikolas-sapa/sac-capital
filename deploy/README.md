@@ -4,10 +4,10 @@ Several launchd agents drive the paper-trading loop locally.
 
 | Agent | Plist | Cadence |
 |---|---|---|
-| Polymarket scanner | `com.polymarketbot.runner.plist` | Every 5 min (`StartInterval 300`) |
+| Polymarket scanner | `com.polymarketbot.runner.plist` | Disabled/no-op (`/usr/bin/true`) |
 | Resolution poller | `com.polymarketbot.resolve.plist` | Nightly at 02:00 (`StartCalendarInterval`) |
 | Equity mark/exits | `com.polymarketbot.equities.mark.plist` | Every 60 min (`StartInterval 3600`) |
-| Equity scan/analysis | `com.polymarketbot.equities.scan.plist` | Daily 17:15 local time (`StartCalendarInterval`) |
+| Equity scan/analysis | `com.polymarketbot.equities.scan.plist` | Daily 16:00, 17:00, and 22:30 local time (`StartCalendarInterval` array) |
 | Nightly harness | `com.polymarketbot.nightly.plist` | Nightly at 02:30 (`StartCalendarInterval`) |
 
 Both invoke the venv Python binary directly (no bare `uv`/`python` in PATH) and set `WorkingDirectory` so relative paths like `data/ledger.db` and `.env` resolve correctly.
@@ -18,7 +18,7 @@ Both invoke the venv Python binary directly (no bare `uv`/`python` in PATH) and 
 
 1. `data/` directory must exist. The runner creates it on first use, but you can pre-create it:
    ```sh
-   mkdir -p /Users/nikolassapalidis/polymarket-bot/data
+   mkdir -p /Users/nikolassapalidis/sapa_fund/data
    ```
 2. `.env` at the project root must contain real credentials for live runs (API key, private key, etc.). Without it the bot runs in dry-run/dummy mode only.
 
@@ -72,13 +72,13 @@ launchctl unload ~/Library/LaunchAgents/com.polymarketbot.runner.plist
 launchctl load -w ~/Library/LaunchAgents/com.polymarketbot.runner.plist
 
 # Tail logs
-tail -f /Users/nikolassapalidis/polymarket-bot/data/runner.log
-tail -f /Users/nikolassapalidis/polymarket-bot/data/runner.err.log
-tail -f /Users/nikolassapalidis/polymarket-bot/data/equities_mark.log
-tail -f /Users/nikolassapalidis/polymarket-bot/data/equities_scan.log
-tail -f /Users/nikolassapalidis/polymarket-bot/data/nightly.log
-tail -f /Users/nikolassapalidis/polymarket-bot/data/resolve.log
-tail -f /Users/nikolassapalidis/polymarket-bot/data/resolve.err.log
+tail -f /Users/nikolassapalidis/sapa_fund/data/runner.log
+tail -f /Users/nikolassapalidis/sapa_fund/data/runner.err.log
+tail -f /Users/nikolassapalidis/sapa_fund/data/equities_mark.log
+tail -f /Users/nikolassapalidis/sapa_fund/data/equities_scan.log
+tail -f /Users/nikolassapalidis/sapa_fund/data/nightly.log
+tail -f /Users/nikolassapalidis/sapa_fund/data/resolve.log
+tail -f /Users/nikolassapalidis/sapa_fund/data/resolve.err.log
 ```
 
 ---

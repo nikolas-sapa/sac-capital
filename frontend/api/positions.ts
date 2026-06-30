@@ -25,9 +25,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(response.status).json({ error: text });
     }
 
-    const raw: AlpacaPosition[] = await response.json();
+    const raw = await response.json();
 
-    const positions = raw.map((p, i) => ({
+    if (!Array.isArray(raw)) {
+      return res.status(200).json([]);
+    }
+
+    const positions = raw.map((p: AlpacaPosition, i) => ({
       id: p.asset_id ?? String(i),
       ticker: p.symbol,
       side: p.side,

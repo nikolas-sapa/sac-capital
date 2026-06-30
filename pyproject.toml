@@ -1,7 +1,7 @@
 [project]
-name = "polymarket-bot"
+name = "sac-capital"
 version = "0.1.0"
-description = "Polymarket multi-strategy paper-trading bot"
+description = "AI trading agent with verifiable on-chain decision commitments (Mantle)"
 requires-python = ">=3.12"
 dependencies = [
     "aiogram>=3.28.2",

@@ -53,6 +53,11 @@ class TestDefaults:
         s = load_config(env_file=None)
         assert s.telegram_chat_id == ""
 
+    def test_telegram_alert_mode_default(self, monkeypatch):
+        monkeypatch.delenv("TELEGRAM_ALERT_MODE", raising=False)
+        s = load_config(env_file=None)
+        assert s.telegram_alert_mode == "critical"
+
     def test_anthropic_api_key_default(self, monkeypatch):
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         s = load_config(env_file=None)
@@ -141,6 +146,11 @@ class TestEnvOverrides:
         monkeypatch.setenv("TELEGRAM_CHAT_ID", "12345678")
         s = load_config(env_file=None)
         assert s.telegram_chat_id == "12345678"
+
+    def test_telegram_alert_mode_override(self, monkeypatch):
+        monkeypatch.setenv("TELEGRAM_ALERT_MODE", "verbose")
+        s = load_config(env_file=None)
+        assert s.telegram_alert_mode == "verbose"
 
     def test_anthropic_api_key_override(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")

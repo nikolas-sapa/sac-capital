@@ -91,7 +91,7 @@ print("0x" + hashlib.sha256(canonical.encode()).hexdigest())
 **Integrity guards:**
 - NaN guards at Pydantic schema level + `math.isfinite` check in kernel — invalid decisions are rejected before anchoring
 - Invalid LLM output (malformed JSON, missing fields, `entry <= 0`, `stop_loss >= entry`, confidence outside `[0,1]`) is rejected before a `Recommendation` is created
-- 638 tests, including integration tests for the commitment hashing pipeline
+- 485 tests, including integration tests for the commitment hashing pipeline
 
 **Safety boundary:** paper-only — no live capital at risk during the hackathon.
 
@@ -121,7 +121,7 @@ print("0x" + hashlib.sha256(canonical.encode()).hexdigest())
 ## 7. Reproduce Locally
 
 ```bash
-git clone https://github.com/nikolas-sapa/sapa_fund
+git clone https://github.com/nikolas-sapa/sac-capital
 uv sync
 
 # Export decision commitments from the paper ledger

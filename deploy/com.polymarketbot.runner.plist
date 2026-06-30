@@ -7,22 +7,14 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/nikolassapalidis/polymarket-bot/.venv/bin/python</string>
-        <string>runner.py</string>
-        <string>--strategy</string>
-        <string>weather,crypto_updown</string>
+        <string>/usr/bin/true</string>
     </array>
 
     <key>WorkingDirectory</key>
     <string>/Users/nikolassapalidis/polymarket-bot</string>
 
-    <!-- Scan cadence: every 300 seconds (5 min). Tune by editing this value
-         and reloading: launchctl unload ... && launchctl load -w ... -->
-    <key>StartInterval</key>
-    <integer>300</integer>
-
     <key>RunAtLoad</key>
-    <true/>
+    <false/>
 
     <key>StandardOutPath</key>
     <string>/Users/nikolassapalidis/sapa_fund/data/runner.log</string>
