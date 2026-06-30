@@ -64,6 +64,7 @@ from equities.screen.quality_screen import QualityScreen
 from equities.screen.politician_screen import PoliticianScreen
 from equities.data.house_clerk_disclosures import HouseClerkDisclosureProvider
 from equities.data.senate_efd_disclosures import SenateEFDDisclosureProvider
+from equities.data.executive_disclosures import ExecutiveDisclosureProvider
 from equities.data.composite_disclosures import CompositeDisclosureProvider
 from equities.data.fund_13f import Fund13FProvider
 
@@ -764,6 +765,11 @@ async def run_once(
                     pol_sources.append(SenateEFDDisclosureProvider(
                         lookback_days=settings.politician_lookback_days,
                         max_reports=settings.politician_max_pdfs,
+                        timeout=settings.equity_provider_timeout_seconds,
+                    ))
+                if getattr(settings, "politician_include_executive", False):
+                    pol_sources.append(ExecutiveDisclosureProvider(
+                        lookback_days=settings.politician_lookback_days,
                         timeout=settings.equity_provider_timeout_seconds,
                     ))
                 pol_provider = CompositeDisclosureProvider(pol_sources)

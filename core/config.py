@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     politician_lookback_days: int = 45
     politician_max_pdfs: int = 80
     politician_include_senate: bool = False  # Senate eFD is WAF-blocked from servers; enable where reachable
+    politician_include_executive: bool = False
     smart_money_13f_enabled: bool = False
     smart_money_ciks: str = "2045724:Situational Awareness LP"  # comma-separated CIK:Name pairs
 

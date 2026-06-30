@@ -96,6 +96,10 @@ class TestDefaults:
         assert s.alpaca_paper is True
         assert s.alpaca_base_url == "https://paper-api.alpaca.markets"
 
+    def test_executive_disclosures_default_off(self, monkeypatch):
+        monkeypatch.delenv("POLITICIAN_INCLUDE_EXECUTIVE", raising=False)
+        assert load_config(env_file=None).politician_include_executive is False
+
 
 class TestEnvOverrides:
     """Env vars override defaults."""
@@ -136,6 +140,10 @@ class TestEnvOverrides:
         monkeypatch.setenv("EXECUTION_PROVIDER", "alpaca_paper")
         s = load_config(env_file=None)
         assert s.execution_provider == "alpaca_paper"
+
+    def test_executive_disclosures_override(self, monkeypatch):
+        monkeypatch.setenv("POLITICIAN_INCLUDE_EXECUTIVE", "true")
+        assert load_config(env_file=None).politician_include_executive is True
 
     def test_telegram_bot_token_override(self, monkeypatch):
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok_abc123")
