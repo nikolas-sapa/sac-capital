@@ -7,9 +7,9 @@ def _valid_settings(**overrides) -> Settings:
     defaults = dict(
         alpaca_api_key_id="PKLIVE1234567890",
         alpaca_secret_key="sk-real-looking-secret-value-123",
-        anthropic_api_key="sk-ant-real-looking-key-456",
         telegram_bot_token="123456789:AAFakeRealisticTokenValue",
         telegram_chat_id="987654321",
+        llm_provider="codex",
         live_trading_enabled=False,
     )
     defaults.update(overrides)
@@ -33,17 +33,29 @@ class TestMissingKey:
 
 
 class TestPlaceholderValue:
-    def test_placeholder_value_fails(self):
-        settings = _valid_settings(anthropic_api_key="changeme")
+    def test_placeholder_value_fails_for_openai_provider(self):
+        settings = _valid_settings(llm_provider="openai", openai_api_key="changeme")
         result = run_preflight(settings)
         assert result.ok is False
-        assert any("ANTHROPIC_API_KEY" in f for f in result.failures)
+        assert any("OPENAI_API_KEY" in f for f in result.failures)
 
     def test_placeholder_value_case_insensitive(self):
         settings = _valid_settings(telegram_bot_token="ChangeMe")
         result = run_preflight(settings)
         assert result.ok is False
         assert any("TELEGRAM_BOT_TOKEN" in f for f in result.failures)
+
+    def test_codex_provider_does_not_require_anthropic_key(self):
+        settings = _valid_settings(anthropic_api_key="", llm_provider="codex")
+        result = run_preflight(settings)
+        assert result.ok is True
+        assert result.failures == []
+
+    def test_anthropic_provider_requires_anthropic_key(self):
+        settings = _valid_settings(llm_provider="anthropic", anthropic_api_key="")
+        result = run_preflight(settings)
+        assert result.ok is False
+        assert any("ANTHROPIC_API_KEY" in f for f in result.failures)
 
 
 class TestLiveTradingGate:

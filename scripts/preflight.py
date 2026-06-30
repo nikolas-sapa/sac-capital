@@ -22,7 +22,6 @@ from core.config import Settings, load_config
 REQUIRED_SECRET_FIELDS: dict[str, str] = {
     "alpaca_api_key_id": "ALPACA_API_KEY_ID",
     "alpaca_secret_key": "ALPACA_SECRET_KEY",
-    "anthropic_api_key": "ANTHROPIC_API_KEY",
     "telegram_bot_token": "TELEGRAM_BOT_TOKEN",
     "telegram_chat_id": "TELEGRAM_CHAT_ID",
 }
@@ -68,6 +67,15 @@ def _looks_like_placeholder(value: str) -> bool:
     return False
 
 
+def _required_llm_secret(settings: Settings) -> tuple[str, str] | None:
+    provider = settings.llm_provider.strip().lower()
+    if provider == "openai":
+        return ("openai_api_key", "OPENAI_API_KEY")
+    if provider == "anthropic":
+        return ("anthropic_api_key", "ANTHROPIC_API_KEY")
+    return None
+
+
 def run_preflight(settings: Settings) -> PreflightResult:
     """Run all preflight checks against *settings* and return the result.
 
@@ -77,6 +85,13 @@ def run_preflight(settings: Settings) -> PreflightResult:
     result = PreflightResult()
 
     for field_name, env_name in REQUIRED_SECRET_FIELDS.items():
+        value = getattr(settings, field_name, "")
+        if _looks_like_placeholder(value):
+            result.add(f"{env_name} is missing or looks like a placeholder value")
+
+    llm_secret = _required_llm_secret(settings)
+    if llm_secret is not None:
+        field_name, env_name = llm_secret
         value = getattr(settings, field_name, "")
         if _looks_like_placeholder(value):
             result.add(f"{env_name} is missing or looks like a placeholder value")
