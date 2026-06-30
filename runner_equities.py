@@ -988,10 +988,19 @@ async def run_once(
                         f"order_id={order.id} client_order_id={order.client_order_id or client_order_id} "
                         f"status={order.status}"
                     )
+                    # Record in forward-paper tracker immediately (even if not yet filled)
+                    # so pending orders are counted toward the 100-trade promotion gate
+                    fp_tracker.record_entry(
+                        ticker=rec.instrument.ticker,
+                        sleeve=rec.sleeve.value,
+                        entry_price=fill.entry_price,
+                        shares=fill.shares,
+                        strategy="equity_analyst",
+                    )
                     if order.status != "filled":
                         print(
                             f"  PENDING BROKER ORDER [{rec.instrument.ticker}] "
-                            f"status={order.status}; not recording forward-paper fill yet"
+                            f"status={order.status}; recorded forward-paper entry at intended price"
                         )
                         open_positions = equity_ledger.open_positions()
                         continue
@@ -1012,13 +1021,13 @@ async def run_once(
                         entry_price=rec.entry,
                         sleeve=rec.sleeve.value,
                     )
-                fp_tracker.record_entry(
-                    ticker=rec.instrument.ticker,
-                    sleeve=rec.sleeve.value,
-                    entry_price=fill.entry_price,
-                    shares=fill.shares,
-                    strategy="equity_analyst",
-                )
+                    fp_tracker.record_entry(
+                        ticker=rec.instrument.ticker,
+                        sleeve=rec.sleeve.value,
+                        entry_price=fill.entry_price,
+                        shares=fill.shares,
+                        strategy="equity_analyst",
+                    )
                 artifact_store.append(risk_decision_artifact(
                     rec, decision="approved", stage="risk",
                     shares=fill.shares, notional=fill.shares * fill.entry_price,
