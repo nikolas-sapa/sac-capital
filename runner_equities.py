@@ -61,6 +61,8 @@ from equities.screen.event_screen import (
     FilingsAdapter,
 )
 from equities.screen.quality_screen import QualityScreen
+from equities.screen.politician_screen import PoliticianScreen
+from equities.data.politician_disclosures import PoliticianDisclosureProvider
 
 # ---------------------------------------------------------------------------
 # Default universe (extend via --universe flag or editing this list)
@@ -159,6 +161,45 @@ DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     Instrument("TDC",   "Teradata",                   "NYSE",   CapTier.MID),
     Instrument("PGY",   "Pagaya Technologies",        "NASDAQ", CapTier.SMALL),
     Instrument("JBL",   "Jabil",                      "NYSE",   CapTier.LARGE),
+    # Non-AI laggards / policy-sensitive re-rating plays
+    Instrument("PFE",   "Pfizer",                     "NYSE",   CapTier.LARGE),
+    Instrument("BMY",   "Bristol Myers Squibb",       "NYSE",   CapTier.LARGE),
+    Instrument("CVS",   "CVS Health",                 "NYSE",   CapTier.LARGE),
+    Instrument("HUM",   "Humana",                     "NYSE",   CapTier.LARGE),
+    Instrument("TMO",   "Thermo Fisher Scientific",   "NYSE",   CapTier.LARGE),
+    Instrument("DHR",   "Danaher",                    "NYSE",   CapTier.LARGE),
+    Instrument("BAC",   "Bank of America",            "NYSE",   CapTier.LARGE),
+    Instrument("C",     "Citigroup",                  "NYSE",   CapTier.LARGE),
+    Instrument("SCHW",  "Charles Schwab",             "NYSE",   CapTier.LARGE),
+    Instrument("BX",    "Blackstone",                 "NYSE",   CapTier.LARGE),
+    Instrument("KKR",   "KKR",                        "NYSE",   CapTier.LARGE),
+    Instrument("DIS",   "Disney",                     "NYSE",   CapTier.LARGE),
+    Instrument("NKE",   "Nike",                       "NYSE",   CapTier.LARGE),
+    Instrument("SBUX",  "Starbucks",                  "NASDAQ", CapTier.LARGE),
+    Instrument("TGT",   "Target",                     "NYSE",   CapTier.LARGE),
+    Instrument("LULU",  "Lululemon",                  "NASDAQ", CapTier.LARGE),
+    Instrument("EL",    "Estee Lauder",               "NYSE",   CapTier.LARGE),
+    Instrument("HD",    "Home Depot",                 "NYSE",   CapTier.LARGE),
+    Instrument("LOW",   "Lowe's",                     "NYSE",   CapTier.LARGE),
+    Instrument("LEN",   "Lennar",                     "NYSE",   CapTier.LARGE),
+    Instrument("DHI",   "D.R. Horton",                "NYSE",   CapTier.LARGE),
+    Instrument("CBRE",  "CBRE Group",                 "NYSE",   CapTier.LARGE),
+    Instrument("PLD",   "Prologis",                   "NYSE",   CapTier.LARGE),
+    Instrument("OXY",   "Occidental Petroleum",       "NYSE",   CapTier.LARGE),
+    Instrument("SLB",   "SLB",                        "NYSE",   CapTier.LARGE),
+    Instrument("LNG",   "Cheniere Energy",            "NYSE",   CapTier.LARGE),
+    Instrument("FSLR",  "First Solar",                "NASDAQ", CapTier.LARGE),
+    Instrument("NEE",   "NextEra Energy",             "NYSE",   CapTier.LARGE),
+    Instrument("FCX",   "Freeport-McMoRan",           "NYSE",   CapTier.LARGE),
+    Instrument("NUE",   "Nucor",                      "NYSE",   CapTier.LARGE),
+    Instrument("CAT",   "Caterpillar",                "NYSE",   CapTier.LARGE),
+    Instrument("DE",    "Deere",                      "NYSE",   CapTier.LARGE),
+    Instrument("UPS",   "UPS",                        "NYSE",   CapTier.LARGE),
+    Instrument("FDX",   "FedEx",                      "NYSE",   CapTier.LARGE),
+    Instrument("LMT",   "Lockheed Martin",            "NYSE",   CapTier.LARGE),
+    Instrument("RTX",   "RTX",                        "NYSE",   CapTier.LARGE),
+    Instrument("NOC",   "Northrop Grumman",           "NYSE",   CapTier.LARGE),
+    Instrument("GD",    "General Dynamics",           "NYSE",   CapTier.LARGE),
     # Edge AI / robotics
     Instrument("AMBA",  "Ambarella",                  "NASDAQ", CapTier.SMALL),
     Instrument("PRCT",  "PROCEPT BioRobotics",        "NASDAQ", CapTier.MID),
@@ -185,6 +226,34 @@ DEFAULT_CORE_UNIVERSE: list[Instrument] = [
     Instrument("ASML",  "ASML Holding",    "NASDAQ", CapTier.LARGE),
     Instrument("ORCL",  "Oracle",          "NYSE",   CapTier.LARGE),
     Instrument("COST",  "Costco",          "NASDAQ", CapTier.LARGE),
+    Instrument("PFE",   "Pfizer",          "NYSE",   CapTier.LARGE),
+    Instrument("BMY",   "Bristol Myers",   "NYSE",   CapTier.LARGE),
+    Instrument("CVS",   "CVS Health",      "NYSE",   CapTier.LARGE),
+    Instrument("TMO",   "Thermo Fisher",   "NYSE",   CapTier.LARGE),
+    Instrument("DHR",   "Danaher",         "NYSE",   CapTier.LARGE),
+    Instrument("BAC",   "Bank of America", "NYSE",   CapTier.LARGE),
+    Instrument("C",     "Citigroup",       "NYSE",   CapTier.LARGE),
+    Instrument("SCHW",  "Charles Schwab",  "NYSE",   CapTier.LARGE),
+    Instrument("BX",    "Blackstone",      "NYSE",   CapTier.LARGE),
+    Instrument("KKR",   "KKR",             "NYSE",   CapTier.LARGE),
+    Instrument("DIS",   "Disney",          "NYSE",   CapTier.LARGE),
+    Instrument("NKE",   "Nike",            "NYSE",   CapTier.LARGE),
+    Instrument("SBUX",  "Starbucks",       "NASDAQ", CapTier.LARGE),
+    Instrument("HD",    "Home Depot",      "NYSE",   CapTier.LARGE),
+    Instrument("LOW",   "Lowe's",          "NYSE",   CapTier.LARGE),
+    Instrument("OXY",   "Occidental",      "NYSE",   CapTier.LARGE),
+    Instrument("SLB",   "SLB",             "NYSE",   CapTier.LARGE),
+    Instrument("LNG",   "Cheniere Energy", "NYSE",   CapTier.LARGE),
+    Instrument("FSLR",  "First Solar",     "NASDAQ", CapTier.LARGE),
+    Instrument("NEE",   "NextEra Energy",  "NYSE",   CapTier.LARGE),
+    Instrument("FCX",   "Freeport-McMoRan", "NYSE",  CapTier.LARGE),
+    Instrument("NUE",   "Nucor",           "NYSE",   CapTier.LARGE),
+    Instrument("CAT",   "Caterpillar",     "NYSE",   CapTier.LARGE),
+    Instrument("DE",    "Deere",           "NYSE",   CapTier.LARGE),
+    Instrument("LMT",   "Lockheed Martin", "NYSE",   CapTier.LARGE),
+    Instrument("RTX",   "RTX",             "NYSE",   CapTier.LARGE),
+    Instrument("NOC",   "Northrop Grumman", "NYSE",  CapTier.LARGE),
+    Instrument("GD",    "General Dynamics", "NYSE",  CapTier.LARGE),
 ]
 
 
@@ -548,7 +617,7 @@ async def run_once(
     ], failure_callback=record_provider_failure, registry=provider_registry)
     filings_client = SECEdgarFilings()
     filings_summary = _FilingsSummaryAdapter(filings_client, failure_callback=record_provider_failure)
-    llm_client = _LLMFailureCountingClient(ClaudeCodeClient(), stats)
+    llm_client = _LLMFailureCountingClient(ClaudeCodeClient(provider=settings.llm_provider), stats)
 
     paper = EquityPaperTracker(
         equity_ledger,
@@ -677,6 +746,19 @@ async def run_once(
                 )
                 print(f"  [RS] {candidate.instrument.ticker}: {evidence.evidence}")
             swing_candidates = enriched_candidates
+
+        # --- Politician disclosure screen (off by default) ---
+        if getattr(settings, "politician_signal_enabled", False):
+            with _stage(stats, "politician_screen"):
+                pol_provider = PoliticianDisclosureProvider(
+                    house_url=settings.politician_house_url,
+                    senate_url=settings.politician_senate_url,
+                    timeout=settings.equity_provider_timeout_seconds,
+                )
+                pol_candidates = PoliticianScreen(pol_provider).scan(swing_universe)
+                for c in pol_candidates:
+                    print(f"  [POL] {c.instrument.ticker}: {c.evidence} (urgency={c.urgency:.2f})")
+                swing_candidates = swing_candidates + pol_candidates
 
         # --- Core screen ---
         with _stage(stats, "core_screen"):

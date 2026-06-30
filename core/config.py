@@ -13,6 +13,7 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
+    telegram_alert_mode: str = "critical"  # critical | verbose
     anthropic_api_key: str = ""
     anthropic_fast_model: str = "claude-haiku-4-5-20251001"
     anthropic_strong_model: str = "claude-sonnet-4-6"
@@ -50,6 +51,9 @@ class Settings(BaseSettings):
     equity_runner_max_llm_failures: int = 5
     equity_runner_dry_run: bool = False
     finnhub_api_key: str = ""
+    politician_signal_enabled: bool = False
+    politician_house_url: str = "https://house-stock-watcher-data.s3-us-west-2.amazonaws.com/data/all_transactions.json"
+    politician_senate_url: str = "https://senate-stock-watcher-data.s3-us-west-2.amazonaws.com/aggregate/all_transactions.json"
 
     # Alpaca Trading API (paper by default)
     alpaca_api_key_id: str = ""
