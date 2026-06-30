@@ -63,6 +63,8 @@ from equities.screen.event_screen import (
 from equities.screen.quality_screen import QualityScreen
 from equities.screen.politician_screen import PoliticianScreen
 from equities.data.house_clerk_disclosures import HouseClerkDisclosureProvider
+from equities.data.senate_efd_disclosures import SenateEFDDisclosureProvider
+from equities.data.composite_disclosures import CompositeDisclosureProvider
 
 # ---------------------------------------------------------------------------
 # Default universe (extend via --universe flag or editing this list)
@@ -750,11 +752,20 @@ async def run_once(
         # --- Politician disclosure screen (off by default) ---
         if getattr(settings, "politician_signal_enabled", False):
             with _stage(stats, "politician_screen"):
-                pol_provider = HouseClerkDisclosureProvider(
-                    lookback_days=settings.politician_lookback_days,
-                    max_pdfs=settings.politician_max_pdfs,
-                    timeout=settings.equity_provider_timeout_seconds,
-                )
+                pol_sources = [
+                    HouseClerkDisclosureProvider(
+                        lookback_days=settings.politician_lookback_days,
+                        max_pdfs=settings.politician_max_pdfs,
+                        timeout=settings.equity_provider_timeout_seconds,
+                    )
+                ]
+                if getattr(settings, "politician_include_senate", False):
+                    pol_sources.append(SenateEFDDisclosureProvider(
+                        lookback_days=settings.politician_lookback_days,
+                        max_reports=settings.politician_max_pdfs,
+                        timeout=settings.equity_provider_timeout_seconds,
+                    ))
+                pol_provider = CompositeDisclosureProvider(pol_sources)
                 pol_candidates = PoliticianScreen(pol_provider).scan(swing_universe)
                 for c in pol_candidates:
                     print(f"  [POL] {c.instrument.ticker}: {c.evidence} (urgency={c.urgency:.2f})")
