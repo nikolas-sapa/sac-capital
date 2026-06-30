@@ -110,7 +110,7 @@ equities/
   killgate/       Forward-paper tracker and promotion gates
   research/       Artifact store and offline research modules
   risk/           Sizing, exits, risk kernel
-  screen/         Event, quality, inflection, thematic, relative-strength
+  screen/         Event, quality, inflection, thematic, relative-strength, politician
 contracts/        AgentDecisionRegistry.sol (Mantle)
 scripts/          Commitment exporter, Mantle submission, nightly maintenance
 runner_research.py Paper-only supplier-lag research runner
@@ -140,6 +140,15 @@ deploy/           macOS launchd plists
 12. Pass through risk kernel
 13. Submit Alpaca paper orders or internal paper fills
 
+**Optional — Politician disclosure screen** (off by default). When
+`POLITICIAN_SIGNAL_ENABLED=true`, a stage after relative-strength pulls recent
+US congressional STOCK Act buy disclosures (public House + Senate filings),
+scores them deterministically (recency, cluster, repeat-buyer, size), and feeds
+scored candidates into the same analyst funnel. Public-disclosure lag research
+only — not insider data, not copy-trading. Source feed URL is config-injected so
+the canonical House Clerk / Senate eFD sources can be swapped in without code
+changes.
+
 ---
 
 ## Key Configuration
@@ -166,6 +175,11 @@ TELEGRAM_ALERT_MODE=critical   # critical | verbose
 # LLM
 ANTHROPIC_FAST_MODEL=claude-haiku-4-5-20251001
 ANTHROPIC_STRONG_MODEL=claude-sonnet-4-6
+
+# Politician disclosure screen (off by default)
+POLITICIAN_SIGNAL_ENABLED=false
+# Feed URLs default to public House/Senate stock-watcher mirrors; override to
+# point at canonical sources. POLITICIAN_HOUSE_URL / POLITICIAN_SENATE_URL
 ```
 
 ---
