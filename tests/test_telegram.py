@@ -208,10 +208,10 @@ class _FakeCoreCandidate:
 
 def test_format_equity_scan_contains_tickers():
     alerts = TelegramAlerts(token="t", chat_id="1")
-    swing = [_FakeSwingCandidate("RBRK", "earnings_approaching", "earnings Jun 4")]
+    swing = [_FakeSwingCandidate("TEST", "earnings_approaching", "earnings Jun 4")]
     core = [_FakeCoreCandidate("NVDA")]
     msg = alerts.format_equity_scan(swing, core, analyst_count=1)
-    assert "RBRK" in msg
+    assert "TEST" in msg
     assert "NVDA" in msg
 
 
@@ -225,7 +225,7 @@ def test_format_equity_scan_header():
 
 def test_format_equity_scan_days_to_event():
     alerts = TelegramAlerts(token="t", chat_id="1")
-    swing = [_FakeSwingCandidate("RBRK", "earnings_approaching", "earnings Jun 4", days=2)]
+    swing = [_FakeSwingCandidate("TEST", "earnings_approaching", "earnings Jun 4", days=2)]
     msg = alerts.format_equity_scan(swing, [], analyst_count=1)
     assert "in 2d" in msg
 
@@ -236,7 +236,7 @@ def test_format_equity_scan_days_to_event():
 
 class _FakeRec:
     def __init__(self):
-        self.instrument = _FakeInstrument("RBRK", "Rubrik")
+        self.instrument = _FakeInstrument("TEST", "TestCo")
         self.entry = 84.50
         self.stop_loss = 75.50
         self.take_profit = 98.00
@@ -253,7 +253,7 @@ class _FakeFill:
 def test_format_equity_open_contains_ticker():
     alerts = TelegramAlerts(token="t", chat_id="1")
     msg = alerts.format_equity_open(_FakeRec(), _FakeFill())
-    assert "RBRK" in msg
+    assert "TEST" in msg
     assert "PAPER OPEN" in msg
 
 
@@ -300,10 +300,10 @@ def test_format_equity_exit_win():
     alerts = TelegramAlerts(token="t", chat_id="1")
     msg = alerts.format_equity_exit(
         _FakeExitSignal(reason="target_hit", exit_price=98.20),
-        ticker="RBRK", entry_price=84.50, shares=2.3664,
+        ticker="TEST", entry_price=84.50, shares=2.3664,
         portfolio_stats=_portfolio_stats_fixture(),
     )
-    assert "RBRK" in msg
+    assert "TEST" in msg
     assert "WIN" in msg
     assert "TARGET HIT" in msg
 
@@ -314,7 +314,7 @@ def test_format_equity_exit_loss():
     stats.update(wins=0, losses=1, win_rate=0.0, realized_pnl=-20.0)
     msg = alerts.format_equity_exit(
         _FakeExitSignal(reason="stop_hit", exit_price=75.50),
-        ticker="RBRK", entry_price=84.50, shares=2.3664,
+        ticker="TEST", entry_price=84.50, shares=2.3664,
         portfolio_stats=stats,
     )
     assert "LOSS" in msg

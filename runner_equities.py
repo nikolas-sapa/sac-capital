@@ -117,7 +117,6 @@ DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     Instrument("TSLA",  "Tesla",                      "NASDAQ", CapTier.LARGE),
     Instrument("ARM",   "Arm Holdings",               "NASDAQ", CapTier.LARGE),
     Instrument("CVNA",  "Carvana",                    "NYSE",   CapTier.MID),
-    Instrument("RBRK",  "Rubrik",                     "NYSE",   CapTier.MID),
     Instrument("SOUN",  "SoundHound AI",              "NASDAQ", CapTier.SMALL),
     Instrument("XPEL",  "XPEL",                       "NASDAQ", CapTier.SMALL),
     # Cybersecurity

@@ -82,8 +82,6 @@ def compute_equity_stats(csv_path: Path) -> dict:
     with csv_path.open("r", encoding="utf-8", newline="") as fh:
         reader = csv.DictReader(fh)
         for row in reader:
-            if row.get("ticker", "").strip().upper() == "RBRK":
-                continue
             total += 1
             status = row.get("status", "").strip().lower()
 
@@ -146,8 +144,6 @@ def export_equity_positions(db_path: Path) -> list[dict]:
     groups: dict[tuple, list] = defaultdict(list)
     for row in rows:
         d = dict(row)
-        if d.get("ticker") == "RBRK":
-            continue
         key = (d.get("ticker", ""), d.get("status", "open"))
         groups[key].append(d)
 

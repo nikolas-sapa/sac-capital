@@ -68,11 +68,11 @@ def test_strategy_filter(tmp_path):
 
 def test_record_exit_for_open_trade_matches_oldest_trade(tmp_path):
     tracker = ForwardPaperTracker(tmp_path / "fp.db")
-    first = tracker.record_entry("RBRK", "swing", 100.0, 1.0, strategy="equity_analyst")
-    second = tracker.record_entry("RBRK", "swing", 110.0, 1.0, strategy="equity_analyst")
+    first = tracker.record_entry("TEST", "swing", 100.0, 1.0, strategy="equity_analyst")
+    second = tracker.record_entry("TEST", "swing", 110.0, 1.0, strategy="equity_analyst")
 
     closed = tracker.record_exit_for_open_trade(
-        "RBRK",
+        "TEST",
         90.0,
         sleeve="swing",
         strategy="equity_analyst",
