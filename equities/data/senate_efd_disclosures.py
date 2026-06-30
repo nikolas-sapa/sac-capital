@@ -37,6 +37,7 @@ log = logging.getLogger(__name__)
 _USER_AGENT = "sapa-fund-research/1.0 (paper-trading; public-disclosure research)"
 
 _SENATE_HOME_URL = "https://efdsearch.senate.gov/search/home/"
+_SENATE_SEARCH_URL = "https://efdsearch.senate.gov/search/"
 _SENATE_SEARCH_AJAX_URL = "https://efdsearch.senate.gov/search/report/data/"
 _SENATE_PTR_DETAIL_TEMPLATE = "https://efdsearch.senate.gov/search/view/ptr/{uuid}/"
 
@@ -396,22 +397,35 @@ class SenateEFDDisclosureProvider:
         today = date.today()
         start_date = today - timedelta(days=self._lookback_days)
 
-        # Build AJAX request body (form data format)
+        # /search/report/data/ is CSRF-protected (Django) — without the token it
+        # returns 403. After the agreement gate we're on /search/; read its hidden
+        # csrfmiddlewaretoken and send it as BOTH the X-CSRFToken header and a body
+        # field. Field names + MM/DD/YYYY date format confirmed against the live form
+        # (report_type, submitted_start_date/end_date — not report_types/dtServer*).
+        if page.query_selector("input[name=csrfmiddlewaretoken]") is None:
+            page.goto(_SENATE_SEARCH_URL, timeout=int(self._timeout * 1000))
+            page.wait_for_selector("input[name=csrfmiddlewaretoken]",
+                                   timeout=int(self._timeout * 1000))
+        token = page.eval_on_selector("input[name=csrfmiddlewaretoken]", "el => el.value")
+
+        start_fmt = start_date.strftime("%m/%d/%Y").replace("/", "%2F")
+        end_fmt = today.strftime("%m/%d/%Y").replace("/", "%2F")
         post_data = (
-            f"draw=1&start=0&length={self._max_reports}&"
-            f"report_types=11&"  # 11 = Periodic Transaction Report
-            f"dtServerStart={start_date.isoformat()}&"
-            f"dtServerEnd={today.isoformat()}"
+            f"csrfmiddlewaretoken={token}"
+            f"&draw=1&start=0&length={self._max_reports}"
+            f"&report_type=11"  # 11 = Periodic Transaction Report
+            f"&submitted_start_date={start_fmt}"
+            f"&submitted_end_date={end_fmt}"
         )
 
-        # Use page.request to make the AJAX call (carries browser cookies + passes WAF)
         response = page.request.post(
             _SENATE_SEARCH_AJAX_URL,
             data=post_data,
             headers={
                 "Content-Type": "application/x-www-form-urlencoded",
-                "Referer": _SENATE_HOME_URL,
+                "Referer": _SENATE_SEARCH_URL,
                 "X-Requested-With": "XMLHttpRequest",
+                "X-CSRFToken": token,
             },
             timeout=int(self._timeout * 1000),
         )
