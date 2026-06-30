@@ -47,3 +47,11 @@ def test_sells_and_off_universe_excluded():
 def test_stale_filing_rejected():
     prov = _StubProvider([_trade("AAPL", "A", days_ago_filed=99)])
     assert PoliticianScreen(prov, lookback_days=30).scan([_AAPL]) == []
+
+
+def test_lookback_zero_does_not_divide_by_zero():
+    today = date.today()
+    trade = _trade("AAPL", "A", days_ago_filed=0)
+    out = PoliticianScreen(_StubProvider([trade]), lookback_days=0).scan([_AAPL])
+    assert len(out) == 1
+    assert 0.0 < out[0].urgency <= 1.0

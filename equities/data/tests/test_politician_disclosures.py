@@ -58,3 +58,24 @@ def test_fetch_partial_failure_never_raises(monkeypatch):
     assert result.trades[0].ticker == "AAPL"
     assert result.source == "house"
     assert result.error is not None and "senate" in result.error
+
+
+def test_malformed_feed_never_raises(monkeypatch):
+    """Non-list payloads and non-dict / non-string-field rows must not crash fetch()."""
+    def fake_fetch_json(url, *, timeout):
+        if "house" in url:
+            return {"error": "AccessDenied"}          # dict, not list
+        return [
+            "garbage",                                  # non-dict row -> skipped
+            {"ticker": "AAPL", "representative": "Rep A", "type": "purchase",
+             "owner": "self", "amount": 12345,          # non-string amount
+             "transaction_date": 20260601,              # non-string date
+             "disclosure_date": "2026-06-20", "ptr_link": "http://x"},
+        ]
+    monkeypatch.setattr(mod, "_fetch_json", fake_fetch_json)
+    result = PoliticianDisclosureProvider(house_url="http://house", senate_url="http://senate").fetch()
+    assert result.error is not None and "house" in result.error  # dict payload surfaced as error
+    assert len(result.trades) == 1                                # senate good row survived
+    assert result.trades[0].ticker == "AAPL"
+    assert result.trades[0].amount_min == 12345                   # str-coerced amount parsed
+    assert result.trades[0].transaction_date is None              # numeric date -> None, no crash

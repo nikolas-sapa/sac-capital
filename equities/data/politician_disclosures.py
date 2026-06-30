@@ -54,10 +54,10 @@ class DisclosureFetch:
     error: str | None
 
 
-def parse_amount_range(raw: str) -> tuple[int, int]:
+def parse_amount_range(raw: object) -> tuple[int, int]:
     if not raw:
         return (0, 0)
-    nums = [int(m.replace(",", "")) for m in _AMOUNT_RE.findall(raw)]
+    nums = [int(m.replace(",", "")) for m in _AMOUNT_RE.findall(str(raw))]
     if len(nums) >= 2:
         return (nums[0], nums[1])
     if len(nums) == 1:
@@ -65,12 +65,12 @@ def parse_amount_range(raw: str) -> tuple[int, int]:
     return (0, 0)
 
 
-def _parse_date(raw: str | None) -> date | None:
+def _parse_date(raw: object) -> date | None:
     if not raw:
         return None
     for fmt in ("%Y-%m-%d", "%m/%d/%Y"):
         try:
-            return datetime.strptime(raw.strip(), fmt).date()
+            return datetime.strptime(str(raw).strip(), fmt).date()
         except (ValueError, TypeError):
             continue
     return None
@@ -163,12 +163,16 @@ class PoliticianDisclosureProvider:
                 continue
             try:
                 rows = _fetch_json(url, timeout=self._timeout)
+                if not isinstance(rows, list):
+                    raise ValueError(f"expected JSON list, got {type(rows).__name__}")
                 for raw in rows:
+                    if not isinstance(raw, dict):
+                        continue  # skip malformed non-object rows
                     t = normalizer(raw)
                     if t is not None:
                         trades.append(t)
                 sources.append(label)
-            except (urllib.error.URLError, ValueError, TimeoutError) as exc:
+            except (urllib.error.URLError, ValueError, TypeError, TimeoutError) as exc:
                 msg = f"{label}: {exc}"
                 print(f"  [PROVIDER] source=politician_{label} error={exc}")
                 errors.append(msg)

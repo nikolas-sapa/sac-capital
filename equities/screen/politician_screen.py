@@ -73,7 +73,7 @@ class PoliticianScreen:
             return None
 
         freshest_lag = min((today - t.date_filed).days for t in trades)
-        recency = max(0.0, 1.0 - freshest_lag / self._lookback)
+        recency = max(0.0, 1.0 - freshest_lag / self._lookback) if self._lookback > 0 else 1.0
         distinct = len({t.politician for t in trades})
         cluster = min(distinct / 3.0, 1.0)
         repeat = min(len(trades) / 3.0, 1.0)
