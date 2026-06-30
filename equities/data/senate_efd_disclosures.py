@@ -214,9 +214,20 @@ class SenateEFDDisclosureProvider:
         try:
             # Launch browser and navigate through agreement gate
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=self._headless)
+                # Anti-bot-detection: Akamai challenges headless Chromium. These
+                # reduce the signals it fingerprints. Headful (headless=False)
+                # passes far more reliably from a flagged IP.
+                browser = p.chromium.launch(
+                    headless=self._headless,
+                    args=["--disable-blink-features=AutomationControlled"],
+                )
                 context = browser.new_context(
                     user_agent=_USER_AGENT,
+                    viewport={"width": 1280, "height": 900},
+                    locale="en-US",
+                )
+                context.add_init_script(
+                    "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
                 )
                 page = context.new_page()
 
