@@ -362,31 +362,27 @@ class SenateEFDDisclosureProvider:
         else:
             raise ValueError(f"Agreement checkbox never appeared (WAF challenge?): {last_exc}")
 
-        # force=True bypasses strict actionability checks for the old-markup checkbox
+        # Checking the box fires a JS change handler that AUTO-SUBMITS the
+        # agreement form (#agreement_form has no submit button) and navigates to
+        # the search page. The check() call can race with that navigation, so
+        # tolerate it, then confirm the gate cleared by waiting for the checkbox
+        # to detach from the DOM (i.e. the page navigated away).
         try:
             page.check(checkbox_selector, force=True, timeout=int(self._timeout * 1000))
-            log.debug("Checked agreement checkbox")
         except Exception as exc:
-            raise ValueError(f"Failed to check agreement checkbox: {exc}")
+            log.debug("check() raced with auto-submit navigation: %s", exc)
 
-        # Submit the form (typically a button or form submission)
-        # Wait for any form to be present and submit it
         try:
-            # Try to find and click a submit button, or just submit the form
-            submit_selector = 'button[type="submit"]'
-            if page.query_selector(submit_selector):
-                page.click(submit_selector, timeout=int(self._timeout * 1000))
-                log.debug("Clicked submit button")
-            else:
-                # Alternative: submit the form directly
-                page.evaluate('document.querySelector("form").submit()')
-                log.debug("Submitted form via JavaScript")
-
-            # Wait for navigation to complete (agreement accepted)
-            page.wait_for_load_state("networkidle")
-            log.debug("Agreement gate accepted")
-        except Exception as exc:
-            raise ValueError(f"Failed to submit agreement: {exc}")
+            page.wait_for_selector(checkbox_selector, state="detached",
+                                   timeout=int(self._timeout * 1000))
+            log.debug("Agreement gate cleared")
+        except Exception:
+            try:
+                page.wait_for_load_state("networkidle", timeout=int(self._timeout * 1000))
+            except Exception:
+                pass
+            if page.query_selector(checkbox_selector) is not None:
+                raise ValueError("Agreement gate did not clear after checking the box")
 
     def _search_reports_browser(self, page) -> list[dict]:
         """Search for recent Senate PTRs via browser's API request.
