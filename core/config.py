@@ -52,8 +52,8 @@ class Settings(BaseSettings):
     equity_runner_dry_run: bool = False
     finnhub_api_key: str = ""
     politician_signal_enabled: bool = False
-    politician_house_url: str = "https://house-stock-watcher-data.s3-us-west-2.amazonaws.com/data/all_transactions.json"
-    politician_senate_url: str = "https://senate-stock-watcher-data.s3-us-west-2.amazonaws.com/aggregate/all_transactions.json"
+    politician_lookback_days: int = 45
+    politician_max_pdfs: int = 80
 
     # Alpaca Trading API (paper by default)
     alpaca_api_key_id: str = ""

@@ -62,7 +62,7 @@ from equities.screen.event_screen import (
 )
 from equities.screen.quality_screen import QualityScreen
 from equities.screen.politician_screen import PoliticianScreen
-from equities.data.politician_disclosures import PoliticianDisclosureProvider
+from equities.data.house_clerk_disclosures import HouseClerkDisclosureProvider
 
 # ---------------------------------------------------------------------------
 # Default universe (extend via --universe flag or editing this list)
@@ -750,9 +750,9 @@ async def run_once(
         # --- Politician disclosure screen (off by default) ---
         if getattr(settings, "politician_signal_enabled", False):
             with _stage(stats, "politician_screen"):
-                pol_provider = PoliticianDisclosureProvider(
-                    house_url=settings.politician_house_url,
-                    senate_url=settings.politician_senate_url,
+                pol_provider = HouseClerkDisclosureProvider(
+                    lookback_days=settings.politician_lookback_days,
+                    max_pdfs=settings.politician_max_pdfs,
                     timeout=settings.equity_provider_timeout_seconds,
                 )
                 pol_candidates = PoliticianScreen(pol_provider).scan(swing_universe)
