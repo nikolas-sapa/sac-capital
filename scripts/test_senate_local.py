@@ -18,7 +18,7 @@ def main() -> None:
     provider = SenateEFDDisclosureProvider(
         max_reports=5,
         lookback_days=90,
-        headless=True,   # set False to watch Chromium drive the agreement gate
+        headless=False,  # headful passes Akamai's bot-check; a Chromium window will pop up
     )
     result = provider.fetch()
 
