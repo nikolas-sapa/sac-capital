@@ -27,6 +27,13 @@ class RelativeStrengthEvidence:
     evidence: str
 
 
+@dataclass(frozen=True)
+class ScreeningCoverage:
+    total: int
+    screened: int
+    failed: dict[str, str]
+
+
 class RelativeStrengthScanner:
     """Deterministic technical scanner for relative strength and breakout bases."""
 
@@ -51,6 +58,7 @@ class RelativeStrengthScanner:
         self._breakout_volume_multiple = breakout_volume_multiple
         self._chase_5d_return = chase_5d_return
         self._chase_20d_return = chase_20d_return
+        self.coverage = ScreeningCoverage(total=0, screened=0, failed={})
 
     def scan(self, universe: list[Instrument]) -> dict[str, RelativeStrengthEvidence]:
         series_by_ticker = {
@@ -97,6 +105,16 @@ class RelativeStrengthScanner:
                 do_not_chase=do_not_chase,
                 evidence=evidence,
             )
+        failure_reason = getattr(self._prices, "failure_reason", lambda ticker: None)
+        self.coverage = ScreeningCoverage(
+            total=len(universe),
+            screened=len(results),
+            failed={
+                inst.ticker: failure_reason(inst.ticker) or "insufficient history"
+                for inst in universe
+                if inst.ticker not in results
+            },
+        )
         return results
 
     def _benchmark_return(self) -> float:

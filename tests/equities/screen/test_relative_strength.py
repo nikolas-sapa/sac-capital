@@ -14,6 +14,9 @@ class FakePriceFeed:
     def history(self, ticker: str, period: str = "1y", interval: str = "1d") -> PriceSeries:
         return self._series[ticker]
 
+    def failure_reason(self, ticker: str) -> str | None:
+        return "timeout after 10s" if ticker == "STUCK" else None
+
 
 def _instrument(ticker: str) -> Instrument:
     return Instrument(ticker, ticker, "NASDAQ", CapTier.MID)
@@ -107,3 +110,24 @@ def test_relative_strength_scanner_handles_zero_closing_price():
 
     # base_ok should return False (not crash) when closes[-1] <= 0
     assert result["ZERO"].base_ok is False
+
+
+def test_relative_strength_scanner_reports_exact_coverage():
+    spy = [100.0 + idx * 0.03 for idx in range(220)]
+    feed = FakePriceFeed({
+        "GOOD": _series("GOOD", spy),
+        "SHORT": _series("SHORT", [1.0, 2.0]),
+        "STUCK": PriceSeries(ticker="STUCK", bars=[]),
+        "SPY": _series("SPY", spy),
+        "QQQ": _series("QQQ", spy),
+    })
+    scanner = RelativeStrengthScanner(feed)
+
+    scanner.scan([_instrument("GOOD"), _instrument("SHORT"), _instrument("STUCK")])
+
+    assert scanner.coverage.total == 3
+    assert scanner.coverage.screened == 1
+    assert scanner.coverage.failed == {
+        "SHORT": "insufficient history",
+        "STUCK": "timeout after 10s",
+    }

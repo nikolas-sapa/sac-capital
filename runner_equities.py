@@ -43,6 +43,7 @@ from equities.data.calendar import YFinanceCalendar
 from equities.data.filings import SECEdgarFilings
 from equities.data.fundamentals import YFinanceFundamentals
 from equities.data.prices import YFinancePriceFeed
+from equities.data.yfinance_utils import IsolatedCall
 from equities.execution.alpaca import AlpacaPaperExecutor, client_order_id_for
 from equities.killgate.tracker import ForwardPaperTracker
 from equities.ledger_equity import EquityLedger
@@ -476,14 +477,16 @@ class _LLMFailureCountingClient:
 
 
 class _FundamentalsFailureAdapter:
-    def __init__(self, provider: YFinanceFundamentals, failure_callback=None) -> None:
+    def __init__(self, provider: YFinanceFundamentals, failure_callback=None, timeout: float = 10) -> None:
         self._provider = provider
         self._failure_callback = failure_callback
+        self._timeout = timeout
+        self._isolated_fetch = IsolatedCall(provider.fetch, timeout)
 
     def fetch(self, ticker: str):
         started = time.monotonic()
         try:
-            return self._provider.fetch(ticker)
+            return self._isolated_fetch(ticker)
         except Exception as exc:
             duration = time.monotonic() - started
             print(
@@ -736,6 +739,14 @@ async def run_once(
         with _stage(stats, "relative_strength_screen"):
             rs_scanner = RelativeStrengthScanner(price_feed)
             rs_evidence = rs_scanner.scan(swing_universe)
+            coverage = rs_scanner.coverage
+            print("\n=== Relative-strength screening coverage ===")
+            print("scope=curated_swing_universe (not entire stock market)")
+            print(f"total_universe={coverage.total}")
+            print(f"successfully_screened={coverage.screened}")
+            print(f"skipped_failed={len(coverage.failed)}")
+            for ticker, reason in coverage.failed.items():
+                print(f"  ticker={ticker} reason={reason}")
             enriched_candidates = []
             for candidate in swing_candidates:
                 evidence = rs_evidence.get(candidate.instrument.ticker)
@@ -783,6 +794,7 @@ async def run_once(
             fundamentals_provider = _FundamentalsFailureAdapter(
                 YFinanceFundamentals(),
                 failure_callback=record_provider_failure,
+                timeout=settings.equity_provider_timeout_seconds,
             )
             quality_screen = QualityScreen(fundamentals_provider)
             core_candidates = quality_screen.scan(core_universe)

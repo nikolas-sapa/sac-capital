@@ -11,6 +11,11 @@ import pytest
 from core.assets.bar import Bar, PriceSeries
 
 
+class SlowFundamentals:
+    def fetch(self, ticker: str):
+        time.sleep(5)
+
+
 def test_reconcile_only_cli_calls_reconcile_hook(monkeypatch):
     import runner_equities
 
@@ -62,6 +67,24 @@ def test_llm_failure_budget_trips_cleanly():
 
     assert stats.llm_failures == 1
     assert stats.exit_reason == "max_llm_failures_exceeded"
+
+
+def test_fundamentals_adapter_hard_timeout_counts_failure():
+    import runner_equities
+
+    failures = []
+    adapter = runner_equities._FundamentalsFailureAdapter(
+        SlowFundamentals(),
+        failure_callback=lambda: failures.append("failed"),
+        timeout=0.05,
+    )
+    started = time.monotonic()
+
+    with pytest.raises(TimeoutError, match="timeout after 0.05s"):
+        adapter.fetch("STUCK")
+
+    assert time.monotonic() - started < 1
+    assert failures == ["failed"]
 
 
 def test_news_provider_failure_logs_counts_and_continues(capsys):

@@ -1,9 +1,15 @@
 from datetime import date
+import time
 
 import pandas as pd
 
 from core.assets.bar import PriceSeries
 from equities.data.prices import PriceFeed, YFinancePriceFeed
+
+
+def _slow_download(**kwargs):
+    time.sleep(5)
+    return pd.DataFrame()
 
 
 def test_pricefeed_protocol_runtime_checkable():
@@ -34,7 +40,7 @@ def test_yfinance_feed_maps_dataframe_to_priceseries(monkeypatch):
 
     monkeypatch.setattr("equities.data.prices.yf.download", fake_download)
 
-    feed = YFinancePriceFeed()
+    feed = YFinancePriceFeed(isolate_requests=False)
     ps = feed.history("ACME", period="5d", interval="1d")
     assert ps.ticker == "ACME"
     assert ps.closes == [10.5, 11.0]
@@ -44,7 +50,7 @@ def test_yfinance_feed_maps_dataframe_to_priceseries(monkeypatch):
 
 def test_yfinance_feed_empty_df_returns_empty_series(monkeypatch):
     monkeypatch.setattr("equities.data.prices.yf.download", lambda **kwargs: pd.DataFrame())
-    ps = YFinancePriceFeed().history("BADTICKER")
+    ps = YFinancePriceFeed(isolate_requests=False).history("BADTICKER")
     assert ps.bars == []
 
 
@@ -53,7 +59,7 @@ def test_yfinance_feed_exception_returns_empty_series(monkeypatch):
         raise RuntimeError("network failed")
 
     monkeypatch.setattr("equities.data.prices.yf.download", fake_download)
-    ps = YFinancePriceFeed(retries=0).history("BADTICKER")
+    ps = YFinancePriceFeed(retries=0, isolate_requests=False).history("BADTICKER")
     assert ps.bars == []
 
 
@@ -65,7 +71,7 @@ def test_yfinance_feed_passes_timeout_when_supported(monkeypatch):
         return pd.DataFrame()
 
     monkeypatch.setattr("equities.data.prices.yf.download", fake_download)
-    YFinancePriceFeed(timeout=7).history("ACME")
+    YFinancePriceFeed(timeout=7, isolate_requests=False).history("ACME")
     assert seen["timeout"] == 7
 
 
@@ -87,8 +93,23 @@ def test_yfinance_feed_handles_nan_volume(monkeypatch):
 
     monkeypatch.setattr("equities.data.prices.yf.download", fake_download)
 
-    feed = YFinancePriceFeed()
+    feed = YFinancePriceFeed(isolate_requests=False)
     ps = feed.history("ACME")
     assert len(ps.bars) == 2
     assert ps.bars[0].volume == 1000
     assert ps.bars[1].volume == 0  # NaN coerced to 0
+
+
+def test_yfinance_feed_hard_timeout_terminates_blocked_download():
+    started = time.monotonic()
+    feed = YFinancePriceFeed(
+        timeout=0.05,
+        retries=0,
+        download=_slow_download,
+    )
+
+    ps = feed.history("STUCK")
+
+    assert time.monotonic() - started < 1
+    assert ps.bars == []
+    assert feed.failure_reason("STUCK") == "timeout after 0.05s"

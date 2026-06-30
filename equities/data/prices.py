@@ -2,13 +2,21 @@ from __future__ import annotations
 
 import math
 import time
-from typing import Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, runtime_checkable
 
 import yfinance as yf
 import pandas as pd
 
 from core.assets.bar import Bar, PriceSeries
-from equities.data.yfinance_utils import call_quietly
+from equities.data.yfinance_utils import call_quietly, IsolatedCall
+
+
+def _download_request(download: Callable[..., Any], kwargs: dict[str, Any]):
+    try:
+        return call_quietly(lambda: download(**kwargs))
+    except TypeError:
+        kwargs.pop("timeout", None)
+        return call_quietly(lambda: download(**kwargs))
 
 
 @runtime_checkable
@@ -24,38 +32,52 @@ class YFinancePriceFeed:
     when `auto_adjust=True`.
     """
 
-    def __init__(self, timeout: int = 10, retries: int = 1) -> None:
+    def __init__(
+        self,
+        timeout: float = 10,
+        retries: int = 1,
+        *,
+        download: Callable[..., Any] | None = None,
+        isolate_requests: bool = True,
+    ) -> None:
         self._timeout = timeout
         self._retries = retries
+        self._download = download or yf.download
+        self._isolate_requests = isolate_requests
+        self._failures: dict[str, str] = {}
+        self._isolated_download = IsolatedCall(_download_request, timeout) if isolate_requests else None
+
+    def failure_reason(self, ticker: str) -> str | None:
+        return self._failures.get(ticker)
+
+    def _download_once(self, kwargs: dict[str, Any]):
+        if not self._isolate_requests:
+            try:
+                return call_quietly(lambda: self._download(**kwargs))
+            except TypeError:
+                kwargs.pop("timeout", None)
+                return call_quietly(lambda: self._download(**kwargs))
+
+        return self._isolated_download(
+            self._download,
+            kwargs,
+        )
 
     def history(self, ticker: str, period: str = "1y", interval: str = "1d") -> PriceSeries:
         df = None
+        self._failures.pop(ticker, None)
         for attempt in range(self._retries + 1):
             started = time.monotonic()
             try:
-                try:
-                    df = call_quietly(
-                        lambda: yf.download(
-                            tickers=ticker,
-                            period=period,
-                            interval=interval,
-                            progress=False,
-                            auto_adjust=True,
-                            threads=False,
-                            timeout=self._timeout,
-                        )
-                    )
-                except TypeError:
-                    df = call_quietly(
-                        lambda: yf.download(
-                            tickers=ticker,
-                            period=period,
-                            interval=interval,
-                            progress=False,
-                            auto_adjust=True,
-                            threads=False,
-                        )
-                    )
+                df = self._download_once({
+                    "tickers": ticker,
+                    "period": period,
+                    "interval": interval,
+                    "progress": False,
+                    "auto_adjust": True,
+                    "threads": False,
+                    "timeout": self._timeout,
+                })
                 duration = time.monotonic() - started
                 print(
                     f"  [PROVIDER] source=yfinance_download ticker={ticker} "
@@ -63,6 +85,7 @@ class YFinancePriceFeed:
                 )
                 break
             except Exception as exc:
+                self._failures[ticker] = str(exc)
                 duration = time.monotonic() - started
                 print(
                     f"  [PROVIDER] source=yfinance_download ticker={ticker} "
