@@ -329,15 +329,31 @@ class SenateEFDDisclosureProvider:
         This sets the session + agreement cookies that unlock the search.
         Raises on navigation or interaction error.
         """
-        # Navigate to home page
-        page.goto(_SENATE_HOME_URL, timeout=int(self._timeout * 1000))
-        page.wait_for_load_state("networkidle")
+        # Confirmed live markup: <input type="checkbox" id="agree_statement"
+        # name="prohibition_agreement" value="1">. The WAF (Akamai) sometimes
+        # serves a JS challenge page first, so retry the nav until the real
+        # checkbox actually appears rather than failing on the challenge page.
+        checkbox_selector = "#agree_statement"
+        last_exc = None
+        for attempt in range(3):
+            page.goto(_SENATE_HOME_URL, timeout=int(self._timeout * 1000))
+            try:
+                page.wait_for_load_state("networkidle", timeout=int(self._timeout * 1000))
+            except Exception:
+                pass  # networkidle can hang on analytics long-polls; the wait below is what matters
+            try:
+                page.wait_for_selector(checkbox_selector, state="visible",
+                                       timeout=int(self._timeout * 1000))
+                break
+            except Exception as exc:
+                last_exc = exc
+                log.debug("Agreement checkbox not visible (attempt %d); likely WAF challenge, retrying", attempt + 1)
+        else:
+            raise ValueError(f"Agreement checkbox never appeared (WAF challenge?): {last_exc}")
 
-        # Check the "I understand the prohibitions" checkbox
-        # The checkbox typically has a name like "prohibition_agreement"
+        # force=True bypasses strict actionability checks for the old-markup checkbox
         try:
-            checkbox_selector = 'input[name="prohibition_agreement"]'
-            page.check(checkbox_selector, timeout=int(self._timeout * 1000))
+            page.check(checkbox_selector, force=True, timeout=int(self._timeout * 1000))
             log.debug("Checked agreement checkbox")
         except Exception as exc:
             raise ValueError(f"Failed to check agreement checkbox: {exc}")
