@@ -18,9 +18,31 @@ def test_make_llm_client_respects_codex_provider(monkeypatch):
 def test_make_llm_client_defaults_to_codex(monkeypatch):
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     client = make_llm_client()
     assert isinstance(client, ClaudeCodeClient)
     assert client._codex is not None  # type: ignore[attr-defined]
+
+
+def test_make_llm_client_auto_prefers_openai_api_key(monkeypatch):
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-test")
+
+    client = make_llm_client()
+
+    assert client._openai is not None  # type: ignore[attr-defined]
+    assert client._codex is None  # type: ignore[attr-defined]
+
+
+def test_auto_provider_uses_anthropic_before_codex_when_configured(monkeypatch):
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+
+    client = make_llm_client()
+
+    assert client._anthropic is not None  # type: ignore[attr-defined]
+    assert client._codex is None  # type: ignore[attr-defined]
 
 
 def test_make_llm_client_uses_anthropic_for_legacy_api_key(monkeypatch):
@@ -68,10 +90,30 @@ def test_codex_cli_writes_and_reads_last_message(monkeypatch):
 
 
 def test_codex_client_falls_back_to_anthropic_on_quota_error(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "codex")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
 
     def fake_codex_complete(self, system, user, model):
         raise RuntimeError("codex exec failed (exit 1): quota exceeded")
+
+    def fake_anthropic_complete(self, system, user, model):
+        return LLMResponse(content="anthropic-fallback", input_tokens=1, output_tokens=1)
+
+    monkeypatch.setattr("core.claude_client.CodexCLIClient.complete", fake_codex_complete)
+    monkeypatch.setattr("core.claude_client.AnthropicResponsesClient.complete", fake_anthropic_complete)
+
+    client = ClaudeCodeClient()
+    resp = client.complete("sys", "user", "sonnet")
+
+    assert resp.content == "anthropic-fallback"
+
+
+def test_codex_client_falls_back_to_anthropic_on_token_expired(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "codex")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+
+    def fake_codex_complete(self, system, user, model):
+        raise RuntimeError("codex exec failed (exit 1): HTTP 401 Unauthorized token_expired")
 
     def fake_anthropic_complete(self, system, user, model):
         return LLMResponse(content="anthropic-fallback", input_tokens=1, output_tokens=1)

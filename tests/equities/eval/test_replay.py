@@ -5,7 +5,12 @@ from datetime import date, timedelta
 from core.assets.bar import Bar, PriceSeries
 from equities.eval.report import build_report
 from equities.eval.replay import ArtifactReplayEvaluator
-from equities.research.artifacts import EquityResearchArtifact, stable_hash
+from equities.research.artifacts import (
+    Citation,
+    EquityResearchArtifact,
+    SourceRef,
+    stable_hash,
+)
 from equities.research.store import ResearchArtifactStore
 
 
@@ -154,3 +159,27 @@ def test_report_command_builder_reads_artifact_store(tmp_path):
     assert "Equity artifact replay report" in text
     assert "validation: trades=1" in text
     assert "promotable=True" in text
+
+
+def test_report_includes_citation_attribution_section(tmp_path):
+    artifact = _artifact("WIN", "2026-01-01T00:00:00+00:00", "Technology")
+    artifact.sources.append(
+        SourceRef(id="src-1", kind="news", source="Reuters")
+    )
+    artifact.citations.append(
+        Citation(source_ref_id="src-1", quote_or_summary="bullish outlook")
+    )
+    store = ResearchArtifactStore(tmp_path / "research_artifacts.jsonl")
+    store.append(artifact)
+    feed = FakePriceFeed({"WIN": _series("WIN", [100, 101, 104, 108, 112, 113])})
+
+    text = build_report(
+        str(store.path),
+        validation_start=date(2026, 1, 1),
+        holding_days=5,
+        min_trades=1,
+        prices=feed,
+    )
+
+    assert "Citation attribution by source:" in text
+    assert "Reuters: trades=1" in text

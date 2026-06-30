@@ -11,6 +11,21 @@ interface PerformanceSectionProps {
   positions: EquityPosition[];
 }
 
+function positionReturnPct(pos: EquityPosition): number | null {
+  const endPrice = pos.status === "closed" ? pos.exit_price : pos.mark_price;
+  if (endPrice == null || endPrice <= 0) return null;
+
+  const entryPrices = pos.entries?.length
+    ? pos.entries.map((entry) => entry.price).filter((price) => price > 0)
+    : pos.entry_price != null && pos.entry_price > 0
+      ? [pos.entry_price]
+      : [];
+  if (entryPrices.length === 0) return null;
+
+  const returns = entryPrices.map((entryPrice) => (endPrice / entryPrice - 1) * 100);
+  return returns.reduce((sum, value) => sum + value, 0) / returns.length;
+}
+
 export function PerformanceSection({ positions }: PerformanceSectionProps) {
   const [range, setRange] = useState<TimeRange>("1W");
   const [historyPoints, setHistoryPoints] = useState<PortfolioHistoryPoint[]>([]);
@@ -89,6 +104,17 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
       ? [{ value: Math.round(avgConfidence * 1000) / 10, label: "Avg confidence", positive: avgConfidence > 0.5, suffix: "%", decimals: 1 }]
       : []),
   ];
+
+  const collectiveUnweightedReturn = useMemo(() => {
+    const returns: number[] = [];
+    for (const position of positions) {
+      const pct = positionReturnPct(position);
+      if (pct == null) continue;
+      returns.push(pct);
+    }
+    if (returns.length === 0) return null;
+    return returns.reduce((sum, item) => sum + item, 0) / returns.length;
+  }, [positions]);
 
   return (
     <section id="performance" className="py-24 px-6 bg-[#0B0B0D]">
@@ -169,6 +195,27 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
                 <span className="text-xs text-[#8B8D91] font-mono uppercase tracking-wider">{s.label}</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Collective unweighted return */}
+        {collectiveUnweightedReturn != null && (
+          <div className="mb-10 rounded-[12px] border border-[rgba(243,242,238,0.06)] bg-[#1A1A1E] p-6">
+            <p className="text-[10px] font-mono tracking-widest uppercase text-[#8B8D91] mb-2">
+              Collective Unweighted Return
+            </p>
+            <div
+              className={cn(
+                "text-4xl font-black",
+                collectiveUnweightedReturn >= 0 ? "text-emerald-400" : "text-red-400"
+              )}
+              style={{ fontFamily: "Poppins, sans-serif" }}
+            >
+              {collectiveUnweightedReturn >= 0 ? "+" : ""}{collectiveUnweightedReturn.toFixed(1)}%
+            </div>
+            <p className="mt-2 text-xs font-mono text-[#8B8D91]">
+              Simple average of position returns. Not weighted by shares or dollars.
+            </p>
           </div>
         )}
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 
 from equities.analysis.analyst import LLMResponse
-from equities.research.thesis_miner import ThesisMiner
+from equities.research.thesis_miner import STRUCTURAL_THESES, ThesisMiner
 
 
 class _StubLLM:
@@ -37,3 +37,18 @@ def test_thesis_miner_all_tickers_no_duplicates():
     all_t = result.all_tickers()
     assert len(all_t) == len(set(all_t))
     assert "AVGO" in all_t
+
+
+def test_structural_theses_have_text_and_multiplier():
+    for thesis in STRUCTURAL_THESES:
+        assert isinstance(thesis.text, str) and thesis.text
+        assert isinstance(thesis.confidence_multiplier, float)
+
+
+def test_mine_all_surfaces_confidence_multiplier():
+    miner = ThesisMiner(_StubLLM())
+    results = miner.mine_all()
+    assert len(results) == len(STRUCTURAL_THESES)
+    by_text = {r.thesis: r for r in results}
+    for thesis in STRUCTURAL_THESES:
+        assert by_text[thesis.text].confidence_multiplier == thesis.confidence_multiplier

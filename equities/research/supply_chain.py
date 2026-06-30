@@ -5,10 +5,10 @@ from dataclasses import dataclass
 
 
 SUPPLY_CHAIN: dict[str, list[str]] = {
-    "NVDA": ["MU", "COHR", "AMKR", "ONTO", "KLIC", "FN", "APH", "ENTG", "LRCX", "KLAC", "VRT", "MPWR", "AMAT", "CLS"],
-    "AMD":  ["MU", "AMKR", "COHR", "LRCX", "AMAT"],
-    "AVGO": ["AMKR", "COHR", "MU", "MRVL"],
-    "TSM":  ["ASML", "LRCX", "KLAC", "AMAT", "ENTG"],
+    "NVDA": ["MU", "COHR", "AMKR", "ONTO", "KLIC", "FN", "APH", "ENTG", "LRCX", "KLAC", "VRT", "MPWR", "AMAT", "CLS", "ALAB", "MRVL", "SMCI", "DELL", "ANET", "ETN", "GEV", "CEG", "PWR"],
+    "AMD":  ["MU", "AMKR", "COHR", "LRCX", "AMAT", "ALAB", "MRVL", "SMCI", "DELL"],
+    "AVGO": ["AMKR", "COHR", "MU", "MRVL", "ALAB", "ANET", "APH"],
+    "TSM":  ["ASML", "LRCX", "KLAC", "AMAT", "ENTG", "ONTO", "KLIC"],
     "LLY":  ["DOCS", "GEHC", "TEM", "HIMS"],
     "MSFT": ["NOW", "CRM", "CRWD", "DDOG"],
     "GOOGL":["VRT", "ETN", "GEV", "CEG", "PWR"],
@@ -44,6 +44,10 @@ _BOTTLENECK_META: dict[str, dict[str, float]] = {
     "MPWR": {"market_share": 0.10, "switching_cost": 0.70, "lead_time_years": 1.5},
     "MRVL": {"market_share": 0.12, "switching_cost": 0.75, "lead_time_years": 2.0},
     "CRM":  {"market_share": 0.20, "switching_cost": 0.80, "lead_time_years": 2.0},
+    "ALAB": {"market_share": 0.10, "switching_cost": 0.80, "lead_time_years": 2.0},
+    "SMCI": {"market_share": 0.12, "switching_cost": 0.55, "lead_time_years": 1.0},
+    "DELL": {"market_share": 0.18, "switching_cost": 0.50, "lead_time_years": 1.0},
+    "ANET": {"market_share": 0.25, "switching_cost": 0.85, "lead_time_years": 2.0},
 }
 
 _DEFAULT_META = {"market_share": 0.05, "switching_cost": 0.40, "lead_time_years": 1.0}
