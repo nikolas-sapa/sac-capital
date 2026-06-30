@@ -1,7 +1,7 @@
 """07d — Equity paper tracker.
 
 Nightly mark-to-market: updates unrealized PnL for open positions and fires
-exit triggers (stop / target / time-stop). Plugs into EquityLedger + PriceFeed.
+exit triggers (stop / target). Plugs into EquityLedger + PriceFeed.
 """
 from __future__ import annotations
 
@@ -30,7 +30,6 @@ class EquityPaperTracker:
     Args:
         ledger:    EquityLedger instance.
         prices:    Price provider; must have `latest_close(ticker) -> float | None`.
-        time_stop_days: Days before a position is time-stopped (default 21).
     """
 
     def __init__(
@@ -38,12 +37,10 @@ class EquityPaperTracker:
         ledger: EquityLedger,
         prices: Any,
         price_fallback: Callable[[str], float | None] | None = None,
-        time_stop_days: int = 21,
     ) -> None:
         self._ledger = ledger
         self._prices = prices
         self._price_fallback = price_fallback
-        self._time_stop_days = time_stop_days
 
     def open_position(
         self,
@@ -88,18 +85,11 @@ class EquityPaperTracker:
             self._ledger.mark(ticker, price)
 
             # Check exit conditions
-            opened_at = datetime.fromisoformat(pos["opened_at"])
-            if opened_at.tzinfo is None:
-                opened_at = opened_at.replace(tzinfo=timezone.utc)
-
             signal = check_exit(
                 position_id=pos["id"],
                 current_price=price,
                 stop_loss=pos.get("stop_loss"),
                 take_profit=pos.get("take_profit"),
-                opened_at=opened_at,
-                current_time=now,
-                max_days=self._time_stop_days,
             )
 
             if signal is not None:

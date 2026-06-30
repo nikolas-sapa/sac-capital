@@ -1,6 +1,4 @@
 """Tests for EquityPaperTracker."""
-from datetime import datetime, timezone, timedelta
-
 import pytest
 
 from core.assets.instrument import CapTier, Instrument
@@ -39,7 +37,6 @@ def test_mark_uses_fallback_price_when_live_price_missing(tmp_path):
         ledger,
         FakePrices({}),
         price_fallback=lambda ticker: 79.0 if ticker == "ARWR" else None,
-        time_stop_days=100,
     )
     tracker.open_position(_rec("ARWR", entry=74.0, stop=68.0, tp=120.0), shares=2.0, fill_price=74.0)
     tracker.mark_and_check_exits()
@@ -58,7 +55,7 @@ def test_open_position_recorded(tmp_path):
 
 def test_stop_hit_fires_exit(tmp_path):
     ledger = EquityLedger(tmp_path / "e.db")
-    tracker = EquityPaperTracker(ledger, FakePrices({"ARWR": 65.0}), time_stop_days=21)
+    tracker = EquityPaperTracker(ledger, FakePrices({"ARWR": 65.0}))
     tracker.open_position(_rec("ARWR", entry=74.0, stop=68.0), shares=1.0, fill_price=74.0)
     exits = tracker.mark_and_check_exits()
     assert len(exits) == 1
@@ -68,7 +65,7 @@ def test_stop_hit_fires_exit(tmp_path):
 
 def test_target_hit_fires_exit(tmp_path):
     ledger = EquityLedger(tmp_path / "e.db")
-    tracker = EquityPaperTracker(ledger, FakePrices({"ARWR": 90.0}), time_stop_days=21)
+    tracker = EquityPaperTracker(ledger, FakePrices({"ARWR": 90.0}))
     tracker.open_position(_rec("ARWR", tp=88.0), shares=1.0, fill_price=74.0)
     exits = tracker.mark_and_check_exits()
     assert len(exits) == 1
@@ -77,7 +74,7 @@ def test_target_hit_fires_exit(tmp_path):
 
 def test_no_exit_within_bands(tmp_path):
     ledger = EquityLedger(tmp_path / "e.db")
-    tracker = EquityPaperTracker(ledger, FakePrices({"ARWR": 76.0}), time_stop_days=21)
+    tracker = EquityPaperTracker(ledger, FakePrices({"ARWR": 76.0}))
     tracker.open_position(_rec("ARWR", stop=68.0, tp=88.0), shares=1.0, fill_price=74.0)
     exits = tracker.mark_and_check_exits()
     assert exits == []
@@ -86,7 +83,7 @@ def test_no_exit_within_bands(tmp_path):
 
 def test_mark_updates_unrealized_pnl(tmp_path):
     ledger = EquityLedger(tmp_path / "e.db")
-    tracker = EquityPaperTracker(ledger, FakePrices({"ARWR": 80.0}), time_stop_days=100)
+    tracker = EquityPaperTracker(ledger, FakePrices({"ARWR": 80.0}))
     tracker.open_position(_rec("ARWR", stop=68.0, tp=120.0), shares=2.0, fill_price=74.0)
     tracker.mark_and_check_exits()
     pos = ledger.open_positions()[0]
