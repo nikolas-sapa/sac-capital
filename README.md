@@ -33,6 +33,15 @@ Mantle is the immutable benchmark layer. The agent hashes each decision payload 
 
 **Safety boundary:** paper-only. On-chain records are verifiability anchors — not custody, brokerage, or live-trading instructions.
 
+The equities research side now also includes a paper-only supplier-lag research runner:
+
+```sh
+uv run runner-research --static-only
+uv run runner-research --strategy-backtest --static-only
+```
+
+`runner-research` saves the top research candidates to `data/research_candidates.json` and appends historical strategy backtests to `data/strategy_backtests.jsonl` when trades exist.
+
 ---
 
 ## Reproduce Locally
@@ -104,8 +113,9 @@ equities/
   screen/         Event, quality, inflection, thematic, relative-strength
 contracts/        AgentDecisionRegistry.sol (Mantle)
 scripts/          Commitment exporter, Mantle submission, nightly maintenance
+runner_research.py Paper-only supplier-lag research runner
 frontend/         React/Vite verification dashboard
-tests/            481-test regression suite
+tests/            485-test regression suite
 docs/             Operator runbooks
 deploy/           macOS launchd plists
 ```
@@ -147,6 +157,11 @@ ALPACA_PAPER=true
 ALPACA_BASE_URL=https://paper-api.alpaca.markets
 ALPACA_API_KEY_ID=...
 ALPACA_SECRET_KEY=...
+
+# Telegram
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_CHAT_ID=...
+TELEGRAM_ALERT_MODE=critical   # critical | verbose
 
 # LLM
 ANTHROPIC_FAST_MODEL=claude-haiku-4-5-20251001
