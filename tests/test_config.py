@@ -184,8 +184,8 @@ class TestEnvOverrides:
 def test_equity_defaults_present():
     cfg = load_config(env_file=None)
     assert cfg.equity_ledger_path.endswith(".db")
-    assert cfg.equity_risk_pct == 0.02
-    assert cfg.equity_max_positions == 4
+    assert cfg.equity_risk_pct == 0.005
+    assert cfg.equity_max_positions == 12
     assert cfg.equity_max_name_pct == 0.25
     assert cfg.equity_max_sector_pct == 0.35
     assert cfg.equity_daily_loss_limit_pct == 0.05

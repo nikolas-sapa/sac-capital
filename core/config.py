@@ -36,8 +36,8 @@ class Settings(BaseSettings):
 
     # equities (Plan 07)
     equity_ledger_path: str = "data/equity.db"
-    equity_risk_pct: float = 0.02  # per-swing-trade cap; ratchets to 0.01 after grilling
-    equity_max_positions: int = 4
+    equity_risk_pct: float = 0.005
+    equity_max_positions: int = 12
     equity_max_name_pct: float = 0.25
     equity_max_sector_pct: float = 0.35
     equity_daily_loss_limit_pct: float = 0.05

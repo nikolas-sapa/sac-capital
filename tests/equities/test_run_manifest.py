@@ -112,4 +112,4 @@ def test_settings_snapshot_includes_behavioral_fields() -> None:
 
     assert snapshot["max_position_pct"] == 0.02
     assert snapshot["live_trading_enabled"] is False
-    assert snapshot["equity_max_positions"] == 4
+    assert snapshot["equity_max_positions"] == 12
