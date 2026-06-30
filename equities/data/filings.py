@@ -55,6 +55,13 @@ class SECEdgarFilings:
         cutoff = date.today() - timedelta(days=days)
         result: list[Filing] = []
 
+        # Guard against mismatched list lengths
+        if len(forms) != len(dates) or len(dates) != len(items_raw):
+            print(
+                f"  [PROVIDER] source=sec_filings ticker={ticker} "
+                f"warning=mismatched_lengths forms={len(forms)} dates={len(dates)} items={len(items_raw)}"
+            )
+
         for form, dt_str, item_str in zip(forms, dates, items_raw):
             try:
                 filed = date.fromisoformat(dt_str)

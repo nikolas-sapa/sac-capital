@@ -202,3 +202,17 @@ def test_broker_orders_opened_on_counts_only_matching_provider_and_day(tmp_path)
 
     assert led.broker_orders_opened_on("2026-01-02") == 1
     led.close()
+
+
+def test_close_position_raises_on_missing_position(tmp_path):
+    """Test that closing a non-existent position raises ValueError."""
+    led = EquityLedger(tmp_path / "eq.db")
+    try:
+        # Try to close position ID 999 which doesn't exist
+        led.close_position(999, exit_price=13.0, exit_reason="test",
+                           closed_at=datetime(2026, 1, 5))
+        assert False, "Should have raised ValueError"
+    except ValueError as e:
+        assert "Position 999 not found" in str(e)
+    finally:
+        led.close()

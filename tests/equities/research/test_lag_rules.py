@@ -106,3 +106,17 @@ def test_stop_from_atr_uses_requested_end_index():
     )
 
     assert stop_from_atr(100.0, calm_then_wild, end_index=24) == pytest.approx(97.0)
+
+
+def test_stop_from_atr_raises_on_zero_entry():
+    """Test that entry price of 0 raises ValueError."""
+    series = _series("TEST", [100.0] * 30)
+    with pytest.raises(ValueError, match="entry must be positive"):
+        stop_from_atr(0.0, series)
+
+
+def test_stop_from_atr_raises_on_negative_entry():
+    """Test that negative entry price raises ValueError."""
+    series = _series("TEST", [100.0] * 30)
+    with pytest.raises(ValueError, match="entry must be positive"):
+        stop_from_atr(-50.0, series)

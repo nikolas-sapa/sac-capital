@@ -203,3 +203,31 @@ def test_satisfies_result_protocol():
     )
     assert hasattr(c, "instrument")
     assert hasattr(c, "urgency")
+
+
+def test_filing_window_guard_handles_zero_window():
+    """Test that zero filing_window doesn't crash with division by zero."""
+    inst = _inst("TEST")
+    screen = EventScreen(
+        earnings=FakeEarnings(),
+        filings=FakeFilings({"TEST": [(_today(-2), ["5.02"])]}),
+        filing_window_days=0,  # Zero window — should not crash
+    )
+    # Should not raise ZeroDivisionError
+    results = screen.scan([inst])
+    # With zero window, days_ago > window so should be filtered
+    assert len(results) == 0
+
+
+def test_filing_window_guard_handles_negative_window():
+    """Test that negative filing_window doesn't crash."""
+    inst = _inst("TEST")
+    screen = EventScreen(
+        earnings=FakeEarnings(),
+        filings=FakeFilings({"TEST": [(_today(-2), ["5.02"])]}),
+        filing_window_days=-5,  # Negative window — should not crash
+    )
+    # Should not raise division by zero
+    results = screen.scan([inst])
+    # Filings should be filtered by the negative window check
+    assert len(results) == 0

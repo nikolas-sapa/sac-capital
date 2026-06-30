@@ -58,3 +58,28 @@ def test_yfinance_fundamentals_failure_returns_empty_snapshot(monkeypatch):
     assert snap.ticker == "STALE"
     assert snap.gross_margins is None
     assert snap.analyst_count == 0
+
+
+def test_yfinance_fundamentals_handles_non_numeric_cap_and_fcf(monkeypatch):
+    """Test that non-numeric cap_raw and fcf_raw are safely coerced to None."""
+    class FakeTicker:
+        def __init__(self, symbol):
+            self.symbol = symbol
+
+        @property
+        def info(self):
+            return {
+                "marketCap": "invalid",
+                "freeCashflow": "also_invalid",
+                "sector": "Tech",
+            }
+
+        @property
+        def earnings_history(self):
+            return None
+
+    monkeypatch.setattr("yfinance.Ticker", FakeTicker)
+    snap = YFinanceFundamentals().fetch("TEST")
+    assert snap.ticker == "TEST"
+    assert snap.market_cap_m is None
+    assert snap.free_cash_flow_m is None

@@ -318,8 +318,8 @@ class EquityAnalyst:
                 rejection_reason="invalid_or_stale_price",
             )
             return None
-        headlines = self._news.headlines(ticker, limit=15)
-        filings = self._filings.summary(ticker, days=90)
+        headlines = self._news.headlines(ticker, limit=15) if self._news is not None else []
+        filings = self._filings.summary(ticker, days=90) if self._filings is not None else []
 
         sector = ""
         analyst_count = 0

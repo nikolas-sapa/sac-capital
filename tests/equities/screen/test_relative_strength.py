@@ -90,3 +90,20 @@ def test_relative_strength_scanner_flags_do_not_chase():
 
     assert result["RUN"].do_not_chase is True
     assert "do_not_chase=yes" in result["RUN"].evidence
+
+
+def test_relative_strength_scanner_handles_zero_closing_price():
+    """Test that zero or negative closing price in base check doesn't crash."""
+    # Simulate a series that ends with zero price
+    closes_with_zero = [50.0 + idx * 0.25 for idx in range(200)] + [0.0]
+    spy = [100.0 + idx * 0.03 for idx in range(201)]
+    feed = FakePriceFeed({
+        "ZERO": _series("ZERO", closes_with_zero),
+        "SPY": _series("SPY", spy),
+        "QQQ": _series("QQQ", spy),
+    })
+
+    result = RelativeStrengthScanner(feed).scan([_instrument("ZERO")])
+
+    # base_ok should return False (not crash) when closes[-1] <= 0
+    assert result["ZERO"].base_ok is False

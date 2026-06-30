@@ -79,6 +79,46 @@ def test_dca_wait_skips_candidate():
     assert _make_dca_analyst(resp).analyse([_candidate()]) == []
 
 
+def test_equity_analyst_handles_none_news_and_filings_providers():
+    """Test that EquityAnalyst gracefully handles None news/filings providers."""
+    from equities.analysis.analyst import EquityAnalyst
+    from equities.screen.event_screen import CandidateEvent, EventType
+
+    class _MinimalLLM:
+        def complete(self, system: str, user: str, model: str) -> LLMResponse:
+            # Return minimal analyst decision that doesn't require news/filings
+            return LLMResponse(
+                content='{"ticker": "TEST", "decision": "pass"}',
+                input_tokens=100,
+                output_tokens=50
+            )
+
+    class _MinimalPrices:
+        def latest_close(self, ticker: str) -> float | None:
+            return 100.0
+
+    # Create analyst with news=None and filings=None
+    analyst = EquityAnalyst(
+        llm=_MinimalLLM(),
+        prices=_MinimalPrices(),
+        news=None,  # Provider is None
+        filings=None,  # Provider is None
+        budget=DailyBudget(daily_limit_usd=999.0),
+    )
+
+    candidate = CandidateEvent(
+        instrument=_INST,
+        event_type=EventType.EARNINGS_APPROACHING,
+        evidence="Earnings in 5 days",
+        urgency=0.8,
+        days_to_event=5,
+    )
+
+    # Should not crash with AttributeError when calling headlines() or summary()
+    result = analyst._analyse_one(candidate)
+    # Result might be None due to other validations, but no AttributeError should occur
+
+
 def test_dca_pct_clamped_upper_bound():
     resp = json.dumps({"action": "dca", "risk_flags": [], "dca_pct": 0.99, "thesis": "ok"})
     results = _make_dca_analyst(resp).analyse([_candidate()])

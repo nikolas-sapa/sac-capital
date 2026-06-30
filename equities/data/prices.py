@@ -82,6 +82,8 @@ class YFinancePriceFeed:
             close = float(r["Close"])
             if math.isnan(close):  # skip incomplete intraday bars
                 continue
+            volume_raw = r["Volume"]
+            volume = 0 if (isinstance(volume_raw, float) and math.isnan(volume_raw)) else int(volume_raw)
             bars.append(
                 Bar(
                     day=ts.date(),
@@ -89,7 +91,7 @@ class YFinancePriceFeed:
                     high=float(r["High"]),
                     low=float(r["Low"]),
                     close=close,
-                    volume=int(r["Volume"]),
+                    volume=volume,
                 )
             )
         return PriceSeries(ticker=ticker, bars=bars)

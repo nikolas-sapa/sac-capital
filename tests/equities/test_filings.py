@@ -69,3 +69,43 @@ def test_recent_returns_fast_when_ticker_not_in_map(monkeypatch):
     calls = []
     assert client.recent("ZZZZ", days=30) == []
     assert calls == []
+
+
+def test_recent_handles_mismatched_list_lengths(monkeypatch, capsys):
+    """Test that mismatched list lengths are logged and truncated safely."""
+    filings_mod._company_ticker_map.cache_clear()
+    filings_mod._ticker_to_cik.cache_clear()
+
+    monkeypatch.setattr(
+        filings_mod,
+        "_company_ticker_map",
+        lambda: {"ACME": 123456},
+    )
+
+    def fake_get(url, headers=None, timeout=None):  # noqa: ANN001
+        if url.endswith("CIK0000123456.json"):
+            return _Response(
+                {
+                    "filings": {
+                        "recent": {
+                            "form": ["8-K", "10-Q", "10-K"],  # 3 items
+                            "filingDate": ["2026-06-28", "2026-06-25"],  # 2 items (mismatch)
+                            "items": ["2.02", ""],  # 2 items
+                        }
+                    }
+                }
+            )
+        raise AssertionError(f"unexpected url: {url}")
+
+    monkeypatch.setattr(filings_mod, "_USER_AGENT", "test-agent")
+    fake_httpx = ModuleType("httpx")
+    fake_httpx.get = fake_get  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "httpx", fake_httpx)
+
+    client = filings_mod.SECEdgarFilings()
+    filings = client.recent("ACME", days=30)
+
+    # Should truncate to the shortest (2 items) and log warning
+    assert len(filings) == 2
+    captured = capsys.readouterr()
+    assert "warning=mismatched_lengths" in captured.out

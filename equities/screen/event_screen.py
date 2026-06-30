@@ -180,7 +180,7 @@ class EventScreen:
             days_ago = (today - filed_date).days
             if days_ago < 0 or days_ago > self._file_window:
                 continue
-            base_urgency = max(0.0, 1.0 - days_ago / self._file_window)
+            base_urgency = max(0.0, 1.0 - days_ago / self._file_window) if self._file_window > 0 else 1.0
 
             if "2.02" in items:
                 events.append(

@@ -61,7 +61,10 @@ class YFinanceCalendar:
             if history is not None and not history.empty:
                 col = [c for c in history.columns if "surprise" in str(c).lower()]
                 if col:
-                    return float(history[col[0]].dropna().iloc[-1])
+                    series = history[col[0]].dropna()
+                    if series.empty:
+                        return None
+                    return float(series.iloc[-1])
         except Exception:
             pass
         return None

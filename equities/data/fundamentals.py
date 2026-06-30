@@ -66,9 +66,19 @@ class YFinanceFundamentals:
         except Exception:
             eps_trend = []
 
+        # Guard cap_raw for non-numeric values
+        market_cap_m = None
+        if cap_raw and isinstance(cap_raw, (int, float)):
+            market_cap_m = cap_raw / 1e6
+
+        # Guard fcf_raw for non-numeric values
+        free_cash_flow_m = None
+        if fcf_raw and isinstance(fcf_raw, (int, float)):
+            free_cash_flow_m = fcf_raw / 1e6
+
         return FundamentalsSnapshot(
             ticker=ticker,
-            market_cap_m=cap_raw / 1e6 if cap_raw else None,
+            market_cap_m=market_cap_m,
             trailing_pe=info.get("trailingPE"),
             forward_pe=info.get("forwardPE"),
             gross_margins=info.get("grossMargins"),
@@ -80,5 +90,5 @@ class YFinanceFundamentals:
             peg_ratio=info.get("pegRatio"),
             operating_margins=info.get("operatingMargins"),
             debt_to_equity=info.get("debtToEquity"),
-            free_cash_flow_m=fcf_raw / 1e6 if fcf_raw else None,
+            free_cash_flow_m=free_cash_flow_m,
         )

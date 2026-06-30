@@ -217,6 +217,10 @@ class EquityLedger:
             "SELECT shares, entry_price FROM positions WHERE id = ?",
             (position_id,),
         ).fetchone()
+        if row is None:
+            raise ValueError(f"Position {position_id} not found")
+        if row["entry_price"] is None or row["shares"] is None:
+            raise ValueError(f"Position {position_id} missing entry_price or shares")
         realized = (exit_price - row["entry_price"]) * row["shares"]
         self._con.execute(
             "UPDATE positions SET status='closed', exit_price=?, exit_reason=?, "

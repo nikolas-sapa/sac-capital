@@ -115,6 +115,8 @@ class RelativeStrengthScanner:
         highs = [bar.high for bar in window]
         lows = [bar.low for bar in window]
         closes = [bar.close for bar in window]
+        if closes[-1] <= 0:
+            return False
         range_pct = (max(highs) - min(lows)) / closes[-1]
         if range_pct > self._max_base_range_pct:
             return False

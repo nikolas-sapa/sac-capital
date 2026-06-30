@@ -161,6 +161,8 @@ def stop_from_atr(
     max_loss_pct: float = 8.0,
     end_index: int | None = None,
 ) -> float:
+    if entry <= 0:
+        raise ValueError(f"entry must be positive, got {entry}")
     latest_atr = atr(series, 20, end_index=end_index)
     atr_stop = entry - (latest_atr or (entry * max_loss_pct / 100.0)) * atr_multiple
     capped_stop = entry * (1.0 - max_loss_pct / 100.0)

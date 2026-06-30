@@ -67,3 +67,28 @@ def test_yfinance_feed_passes_timeout_when_supported(monkeypatch):
     monkeypatch.setattr("equities.data.prices.yf.download", fake_download)
     YFinancePriceFeed(timeout=7).history("ACME")
     assert seen["timeout"] == 7
+
+
+def test_yfinance_feed_handles_nan_volume(monkeypatch):
+    """Test that NaN Volume values are coerced to 0 without crashing."""
+    df = pd.DataFrame(
+        {
+            "Open": [10.0, 10.5],
+            "High": [11.0, 12.0],
+            "Low": [9.5, 10.0],
+            "Close": [10.5, 11.0],
+            "Volume": [1000, float("nan")],  # Second volume is NaN
+        },
+        index=pd.to_datetime(["2026-01-02", "2026-01-03"]),
+    )
+
+    def fake_download(**kwargs):
+        return df
+
+    monkeypatch.setattr("equities.data.prices.yf.download", fake_download)
+
+    feed = YFinancePriceFeed()
+    ps = feed.history("ACME")
+    assert len(ps.bars) == 2
+    assert ps.bars[0].volume == 1000
+    assert ps.bars[1].volume == 0  # NaN coerced to 0
