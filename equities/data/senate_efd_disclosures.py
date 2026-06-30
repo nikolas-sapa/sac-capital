@@ -4,25 +4,25 @@ Official source: Senate eFilings Disclosure (eFD)
 https://efdsearch.senate.gov/search/home/
 
 Flow:
-1. GET home page, extract CSRF token and session cookie
-2. POST agreement acceptance with CSRF token
-3. POST AJAX search for recent PTRs (report_types=[11], date range)
-4. For each recent PTR, fetch and parse HTML table of transactions
+1. Launch headless Chromium (via Playwright)
+2. Navigate to home page, accept agreement checkbox
+3. Submit to unlock search (sets agreement cookie via WAF)
+4. Drive AJAX search for recent PTRs (report_types=[11], date range)
+5. For each recent PTR, fetch and parse HTML table of transactions
 
 IMPORTANT: Senate PTRs rendered electronically use HTML tables. Older PDFs may not be supported.
 Partial results are valid. Never raises — all errors surface in DisclosureFetch.error.
+Playwright is lazy-imported inside fetch() so the module imports fine without it.
 """
 from __future__ import annotations
 
 import html.parser
 import io
+import json
 import logging
 import re
 import time
-import urllib.error
-import urllib.request
 from datetime import date, datetime, timedelta, timezone
-from http.cookiejar import CookieJar
 from pathlib import Path
 
 from equities.data.politician_disclosures import (
@@ -176,6 +176,7 @@ class SenateEFDDisclosureProvider:
         cache_dir: str = "data/senate_efd_cache",
         timeout: float = 30.0,
         rate_limit_s: float = 0.4,
+        headless: bool = True,
     ) -> None:
         """Initialize provider.
 
@@ -185,101 +186,132 @@ class SenateEFDDisclosureProvider:
             cache_dir: Directory to cache downloaded report HTML.
             timeout: HTTP request timeout in seconds.
             rate_limit_s: Sleep between report fetches (polite rate limiting).
+            headless: Run Chromium in headless mode (no UI).
         """
         self._lookback_days = lookback_days
         self._max_reports = max_reports
         self._cache_dir = Path(cache_dir)
         self._timeout = timeout
         self._rate_limit_s = rate_limit_s
+        self._headless = headless
 
         # Create cache directory if needed
         self._cache_dir.mkdir(parents=True, exist_ok=True)
 
     def fetch(self) -> DisclosureFetch:
-        """Fetch and parse Senate PTRs. Never raises — errors surface in .error."""
+        """Fetch and parse Senate PTRs via Playwright browser. Never raises — errors surface in .error."""
+        # Lazy-import Playwright so module imports fine without it
+        from playwright.sync_api import sync_playwright
+
         trades: list[PoliticianTrade] = []
         errors: list[str] = []
-
         fetched_at = datetime.now(timezone.utc).isoformat()
 
-        # Step 1: Accept agreement gate
+        browser = None
+        context = None
+        page = None
+
         try:
-            cookie_jar = self._accept_agreement()
-        except Exception as exc:
-            msg = f"Failed to accept agreement gate: {exc}"
-            log.warning(msg)
-            return DisclosureFetch(
-                trades=[],
-                fetched_at=fetched_at,
-                source="senate_efd",
-                error=msg,
-            )
-
-        # Step 2: Search for recent PTRs
-        try:
-            reports = self._search_reports(cookie_jar)
-        except Exception as exc:
-            msg = f"Failed to search Senate PTRs: {exc}"
-            log.warning(msg)
-            return DisclosureFetch(
-                trades=[],
-                fetched_at=fetched_at,
-                source="senate_efd",
-                error=msg,
-            )
-
-        if not reports:
-            log.info(f"No Senate PTRs found within {self._lookback_days} days")
-            return DisclosureFetch(
-                trades=[],
-                fetched_at=fetched_at,
-                source="senate_efd",
-                error=None,
-            )
-
-        # Cap at max_reports
-        reports = reports[:self._max_reports]
-
-        # Step 3: Fetch and parse reports
-        for idx, report in enumerate(reports):
-            try:
-                # Extract report details
-                first_name = report.get("first_name", "")
-                last_name = report.get("last_name", "")
-                office = report.get("office", "unknown")
-                date_filed_str = report.get("date_filed", "")
-                uuid = report.get("uuid", "")
-
-                if not uuid:
-                    continue
-
-                politician_name = f"{first_name} {last_name}".strip() or "unknown"
-                source_url = _SENATE_PTR_DETAIL_TEMPLATE.format(uuid=uuid)
-
-                # Fetch or load from cache
-                html = self._fetch_report_html(uuid, cookie_jar)
-
-                # Parse transactions
-                trades_from_html = parse_senate_ptr_html(
-                    html,
-                    date_filed=date_filed_str,
-                    politician=politician_name,
-                    office=office,
-                    source_url=source_url,
+            # Launch browser and navigate through agreement gate
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=self._headless)
+                context = browser.new_context(
+                    user_agent=_USER_AGENT,
                 )
+                page = context.new_page()
 
-                trades.extend(trades_from_html)
-                log.debug(f"Parsed {len(trades_from_html)} trades from {politician_name} ({uuid})")
+                # Step 1: Accept agreement gate
+                try:
+                    self._accept_agreement_browser(page)
+                except Exception as exc:
+                    msg = f"Failed to accept agreement gate: {exc}"
+                    log.warning(msg)
+                    return DisclosureFetch(
+                        trades=[],
+                        fetched_at=fetched_at,
+                        source="senate_efd",
+                        error=msg,
+                    )
 
-                # Rate limiting between fetches (but not for cached reports)
-                if idx < len(reports) - 1:
-                    time.sleep(self._rate_limit_s)
+                # Step 2: Search for recent PTRs
+                try:
+                    reports = self._search_reports_browser(page)
+                except Exception as exc:
+                    msg = f"Failed to search Senate PTRs: {exc}"
+                    log.warning(msg)
+                    return DisclosureFetch(
+                        trades=[],
+                        fetched_at=fetched_at,
+                        source="senate_efd",
+                        error=msg,
+                    )
 
-            except Exception as exc:
-                msg = f"Failed to process Senate PTR {report.get('uuid', '?')}: {exc}"
-                log.warning(msg)
+                if not reports:
+                    log.info(f"No Senate PTRs found within {self._lookback_days} days")
+                    return DisclosureFetch(
+                        trades=[],
+                        fetched_at=fetched_at,
+                        source="senate_efd",
+                        error=None,
+                    )
+
+                # Cap at max_reports
+                reports = reports[:self._max_reports]
+
+                # Step 3: Fetch and parse reports
+                for idx, report in enumerate(reports):
+                    try:
+                        # Extract report details
+                        first_name = report.get("first_name", "")
+                        last_name = report.get("last_name", "")
+                        office = report.get("office", "unknown")
+                        date_filed_str = report.get("date_filed", "")
+                        uuid = report.get("uuid", "")
+
+                        if not uuid:
+                            continue
+
+                        politician_name = f"{first_name} {last_name}".strip() or "unknown"
+                        source_url = _SENATE_PTR_DETAIL_TEMPLATE.format(uuid=uuid)
+
+                        # Fetch or load from cache
+                        html = self._fetch_report_html_browser(page, uuid)
+
+                        # Parse transactions
+                        trades_from_html = parse_senate_ptr_html(
+                            html,
+                            date_filed=date_filed_str,
+                            politician=politician_name,
+                            office=office,
+                            source_url=source_url,
+                        )
+
+                        trades.extend(trades_from_html)
+                        log.debug(f"Parsed {len(trades_from_html)} trades from {politician_name} ({uuid})")
+
+                        # Rate limiting between fetches (but not for cached reports)
+                        if idx < len(reports) - 1:
+                            time.sleep(self._rate_limit_s)
+
+                    except Exception as exc:
+                        msg = f"Failed to process Senate PTR {report.get('uuid', '?')}: {exc}"
+                        log.warning(msg)
+                        errors.append(msg)
+                        continue
+
+        except Exception as exc:
+            # Catch any uncaught exception from the with block
+            msg = f"Browser error during Senate eFD fetch: {exc}"
+            log.warning(msg)
+            if not errors:
                 errors.append(msg)
-                continue
+        finally:
+            # Ensure browser is closed
+            if browser:
+                try:
+                    browser.close()
+                except Exception as exc:
+                    log.debug(f"Error closing browser: {exc}")
 
         error_str = "; ".join(errors) if errors else None
 
@@ -290,83 +322,83 @@ class SenateEFDDisclosureProvider:
             error=error_str,
         )
 
-    def _accept_agreement(self) -> CookieJar:
-        """Accept Senate eFD agreement gate.
+    def _accept_agreement_browser(self, page) -> None:
+        """Accept Senate eFD agreement gate via browser.
 
-        Returns a CookieJar with session + agreement cookies.
-        Raises on network or CSRF extraction error.
+        Navigates to home page, accepts the agreement checkbox, and submits.
+        This sets the session + agreement cookies that unlock the search.
+        Raises on navigation or interaction error.
         """
-        cookie_jar = CookieJar()
-        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar))
+        # Navigate to home page
+        page.goto(_SENATE_HOME_URL, timeout=int(self._timeout * 1000))
+        page.wait_for_load_state("networkidle")
 
-        # Step 1: GET home page, extract CSRF token
-        req = urllib.request.Request(
-            _SENATE_HOME_URL,
-            headers={"User-Agent": _USER_AGENT},
-        )
-        with opener.open(req, timeout=self._timeout) as resp:
-            html = resp.read().decode("utf-8", errors="ignore")
+        # Check the "I understand the prohibitions" checkbox
+        # The checkbox typically has a name like "prohibition_agreement"
+        try:
+            checkbox_selector = 'input[name="prohibition_agreement"]'
+            page.check(checkbox_selector, timeout=int(self._timeout * 1000))
+            log.debug("Checked agreement checkbox")
+        except Exception as exc:
+            raise ValueError(f"Failed to check agreement checkbox: {exc}")
 
-        # Extract CSRF token from hidden input
-        csrf_match = re.search(r'name="csrfmiddlewaretoken"\s+value="([^"]+)"', html)
-        if not csrf_match:
-            raise ValueError("CSRF token not found in Senate home page")
+        # Submit the form (typically a button or form submission)
+        # Wait for any form to be present and submit it
+        try:
+            # Try to find and click a submit button, or just submit the form
+            submit_selector = 'button[type="submit"]'
+            if page.query_selector(submit_selector):
+                page.click(submit_selector, timeout=int(self._timeout * 1000))
+                log.debug("Clicked submit button")
+            else:
+                # Alternative: submit the form directly
+                page.evaluate('document.querySelector("form").submit()')
+                log.debug("Submitted form via JavaScript")
 
-        csrf_token = csrf_match.group(1)
+            # Wait for navigation to complete (agreement accepted)
+            page.wait_for_load_state("networkidle")
+            log.debug("Agreement gate accepted")
+        except Exception as exc:
+            raise ValueError(f"Failed to submit agreement: {exc}")
 
-        # Step 2: POST agreement acceptance
-        post_data = f"csrfmiddlewaretoken={csrf_token}&prohibition_agreement=1".encode("utf-8")
-        req = urllib.request.Request(
-            _SENATE_HOME_URL,
-            data=post_data,
-            headers={
-                "User-Agent": _USER_AGENT,
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Referer": _SENATE_HOME_URL,
-            },
-        )
-        with opener.open(req, timeout=self._timeout) as resp:
-            resp.read()  # Consume response (we just need the cookie)
+    def _search_reports_browser(self, page) -> list[dict]:
+        """Search for recent Senate PTRs via browser's API request.
 
-        return cookie_jar
-
-    def _search_reports(self, cookie_jar: CookieJar) -> list[dict]:
-        """Search for recent Senate PTRs.
-
-        Returns list of report dicts with keys: uuid, first_name, last_name,
-        office, date_filed, report_type_html.
+        Uses page.request to make AJAX call, which carries browser's cookies
+        and passes the WAF. Returns list of report dicts with keys: uuid,
+        first_name, last_name, office, date_filed, report_type_html.
         Raises on network or parse error.
         """
-        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar))
-
         # Calculate date range
         today = date.today()
         start_date = today - timedelta(days=self._lookback_days)
 
-        # Build AJAX request body (JSON would be cleaner, but form data is more robust)
+        # Build AJAX request body (form data format)
         post_data = (
             f"draw=1&start=0&length={self._max_reports}&"
             f"report_types=11&"  # 11 = Periodic Transaction Report
             f"dtServerStart={start_date.isoformat()}&"
             f"dtServerEnd={today.isoformat()}"
-        ).encode("utf-8")
+        )
 
-        req = urllib.request.Request(
+        # Use page.request to make the AJAX call (carries browser cookies + passes WAF)
+        response = page.request.post(
             _SENATE_SEARCH_AJAX_URL,
             data=post_data,
             headers={
-                "User-Agent": _USER_AGENT,
                 "Content-Type": "application/x-www-form-urlencoded",
                 "Referer": _SENATE_HOME_URL,
                 "X-Requested-With": "XMLHttpRequest",
             },
+            timeout=int(self._timeout * 1000),
         )
 
-        with opener.open(req, timeout=self._timeout) as resp:
-            response_text = resp.read().decode("utf-8")
+        if not response.ok:
+            raise ValueError(f"AJAX search returned {response.status}: {response.text()[:200]}")
+
+        response_text = response.text()
 
         # Parse response (expect JSON with "data" array)
-        import json
         try:
             response_json = json.loads(response_text)
         except json.JSONDecodeError as exc:
@@ -404,8 +436,8 @@ class SenateEFDDisclosureProvider:
 
         return reports
 
-    def _fetch_report_html(self, uuid: str, cookie_jar: CookieJar) -> str:
-        """Fetch PTR report HTML. Uses cache if available, otherwise downloads.
+    def _fetch_report_html_browser(self, page, uuid: str) -> str:
+        """Fetch PTR report HTML via browser. Uses cache if available, otherwise downloads.
 
         Returns HTML content as string.
         Raises on network or file error.
@@ -417,20 +449,17 @@ class SenateEFDDisclosureProvider:
             log.debug(f"Loading cached report: {uuid}")
             return cache_path.read_text(encoding="utf-8")
 
-        # Download
+        # Download via browser's API request (carries cookies + passes WAF)
         report_url = _SENATE_PTR_DETAIL_TEMPLATE.format(uuid=uuid)
-        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar))
-
-        req = urllib.request.Request(
+        response = page.request.get(
             report_url,
-            headers={
-                "User-Agent": _USER_AGENT,
-                "Referer": _SENATE_HOME_URL,
-            },
+            timeout=int(self._timeout * 1000),
         )
 
-        with opener.open(req, timeout=self._timeout) as resp:
-            html = resp.read().decode("utf-8", errors="ignore")
+        if not response.ok:
+            raise ValueError(f"Failed to fetch report {uuid}: HTTP {response.status}")
+
+        html = response.text()
 
         # Cache it
         cache_path.write_text(html, encoding="utf-8")

@@ -217,64 +217,46 @@ def test_parse_senate_ptr_html_case_insensitive_ticker():
     assert trades[0].ticker == "AAPL"  # Normalized to uppercase
 
 
-@patch("equities.data.senate_efd_disclosures.urllib.request.build_opener")
-def test_fetch_never_raises_on_agreement_failure(mock_opener):
+def test_fetch_never_raises_on_agreement_failure():
     """Provider.fetch() never raises — errors surface in .error."""
-    mock_opener.side_effect = Exception("Network error")
-
     provider = SenateEFDDisclosureProvider(lookback_days=30)
-    result = provider.fetch()
 
-    assert result.trades == []
-    assert result.source == "senate_efd"
-    assert result.error is not None
-    assert "Failed to accept agreement" in result.error
+    with patch.object(provider, "_accept_agreement_browser") as mock_accept:
+        mock_accept.side_effect = Exception("Browser error")
+
+        result = provider.fetch()
+
+        assert result.trades == []
+        assert result.source == "senate_efd"
+        assert result.error is not None
+        assert "Failed to accept agreement" in result.error
 
 
-@patch("equities.data.senate_efd_disclosures.urllib.request.build_opener")
-def test_fetch_never_raises_on_search_failure(mock_opener):
+def test_fetch_never_raises_on_search_failure():
     """Provider.fetch() never raises even if search fails."""
     provider = SenateEFDDisclosureProvider(lookback_days=30)
 
-    # Mock all opener calls to fail at search stage
-    mock_opener_instance = MagicMock()
-    mock_opener.return_value = mock_opener_instance
+    with patch.object(provider, "_accept_agreement_browser") as mock_accept:
+        with patch.object(provider, "_search_reports_browser") as mock_search:
+            mock_accept.return_value = None
+            mock_search.side_effect = Exception("Network timeout on search")
 
-    # Setup first call (agreement home page GET) to succeed
-    get_response = MagicMock()
-    get_response.read.return_value = b'<input name="csrfmiddlewaretoken" value="csrf123">'
-    get_response.__enter__ = MagicMock(return_value=get_response)
-    get_response.__exit__ = MagicMock(return_value=False)
+            result = provider.fetch()
 
-    # Setup second call (agreement POST) to succeed
-    post_response = MagicMock()
-    post_response.read.return_value = b''
-    post_response.__enter__ = MagicMock(return_value=post_response)
-    post_response.__exit__ = MagicMock(return_value=False)
-
-    # Setup third call (search) to fail
-    mock_opener_instance.open.side_effect = [
-        get_response,
-        post_response,
-        Exception("Network timeout on search"),
-    ]
-
-    result = provider.fetch()
-
-    # Provider should never raise, error should be captured
-    assert result.trades == []
-    assert result.source == "senate_efd"
-    assert result.error is not None
-    assert "Failed to search" in result.error or "Network timeout" in result.error
+            # Provider should never raise, error should be captured
+            assert result.trades == []
+            assert result.source == "senate_efd"
+            assert result.error is not None
+            assert "Failed to search" in result.error or "Network timeout" in result.error
 
 
 def test_fetch_handles_empty_search_results():
     """Provider.fetch() handles empty search results gracefully."""
     provider = SenateEFDDisclosureProvider(lookback_days=30)
 
-    with patch.object(provider, "_accept_agreement") as mock_accept:
-        with patch.object(provider, "_search_reports") as mock_search:
-            mock_accept.return_value = MagicMock()
+    with patch.object(provider, "_accept_agreement_browser") as mock_accept:
+        with patch.object(provider, "_search_reports_browser") as mock_search:
+            mock_accept.return_value = None
             mock_search.return_value = []
 
             result = provider.fetch()
@@ -300,10 +282,10 @@ def test_fetch_caps_reports_at_max():
         for i in range(5)
     ]
 
-    with patch.object(provider, "_accept_agreement") as mock_accept:
-        with patch.object(provider, "_search_reports") as mock_search:
-            with patch.object(provider, "_fetch_report_html") as mock_fetch:
-                mock_accept.return_value = MagicMock()
+    with patch.object(provider, "_accept_agreement_browser") as mock_accept:
+        with patch.object(provider, "_search_reports_browser") as mock_search:
+            with patch.object(provider, "_fetch_report_html_browser") as mock_fetch:
+                mock_accept.return_value = None
                 mock_search.return_value = mock_reports
                 mock_fetch.return_value = "<html><table></table></html>"
 
