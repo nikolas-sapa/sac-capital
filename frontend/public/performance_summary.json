@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-06-30T09:36:21.903478+00:00",
+  "generated_at": "2026-06-30T13:56:29.539304+00:00",
   "total_commitments": 25,
   "equity_trades": {
     "total": 69,
-    "closed": 6,
-    "open": 13,
-    "realized_pnl": 4.501941,
-    "win_rate": 0.666667,
+    "closed": 10,
+    "open": 9,
+    "realized_pnl": -18.277936,
+    "win_rate": 0.5,
     "avg_confidence": 0.774336
   },
   "strategies": [
