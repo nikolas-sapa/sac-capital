@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     research_probe_pct: float = 0.005
     core_dca_pct: float = 0.01
     max_order_usd: float = 25.0
-    max_daily_order_count: int = 3
+    max_daily_order_count: int = 10
     allow_extended_hours: bool = False
     allow_test_orders: bool = False
     live_trading_enabled: bool = False
