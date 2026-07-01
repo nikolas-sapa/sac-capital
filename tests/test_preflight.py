@@ -39,6 +39,13 @@ class TestPlaceholderValue:
         assert result.ok is False
         assert any("OPENAI_API_KEY" in f for f in result.failures)
 
+    def test_placeholder_value_fails(self):
+        # alpaca_api_key_id is always required — verifies placeholder detection still works
+        settings = _valid_settings(alpaca_api_key_id="changeme")
+        result = run_preflight(settings)
+        assert result.ok is False
+        assert any("ALPACA_API_KEY_ID" in f for f in result.failures)
+
     def test_placeholder_value_case_insensitive(self):
         settings = _valid_settings(telegram_bot_token="ChangeMe")
         result = run_preflight(settings)

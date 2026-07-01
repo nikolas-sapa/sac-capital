@@ -1,7 +1,11 @@
 """Tiingo news provider — free tier requires TIINGO_API_KEY env var."""
 from __future__ import annotations
 
+import logging
 import os
+
+_TIMEOUT = 8.0  # HTTP timeout for Tiingo API
+_logger = logging.getLogger(__name__)
 
 
 class TiingoNewsProvider:
@@ -24,7 +28,7 @@ class TiingoNewsProvider:
                     "Content-Type": "application/json",
                     "Authorization": f"Token {self._key}",
                 },
-                timeout=8,
+                timeout=_TIMEOUT,
             )
             resp.raise_for_status()
             results: list[str] = []
@@ -34,5 +38,8 @@ class TiingoNewsProvider:
                 if title:
                     results.append(f"{title} — {desc}" if desc else title)
             return results
+        except httpx.TimeoutException:
+            _logger.warning(f"Timeout fetching news from Tiingo for {ticker}; returning empty list")
+            return []
         except Exception:
             return []

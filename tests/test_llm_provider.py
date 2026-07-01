@@ -89,14 +89,16 @@ def test_codex_cli_writes_and_reads_last_message(monkeypatch):
     assert "Do not inspect files" in calls["input"]
 
 
-def test_codex_client_does_not_fall_back_to_anthropic_on_quota_error(monkeypatch):
+def test_codex_client_reraises_on_quota_error_when_no_claude_cli(monkeypatch):
+    """Non-auth Codex failure with no `claude` binary for fallback → re-raise original."""
     monkeypatch.setenv("LLM_PROVIDER", "codex")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
     def fake_codex_complete(self, system, user, model):
         raise RuntimeError("codex exec failed (exit 1): quota exceeded")
 
     monkeypatch.setattr("core.claude_client.CodexCLIClient.complete", fake_codex_complete)
+    monkeypatch.setattr("core.claude_client.shutil.which", lambda name: None)
 
     client = ClaudeCodeClient()
     with pytest.raises(RuntimeError, match="quota exceeded"):
@@ -104,17 +106,61 @@ def test_codex_client_does_not_fall_back_to_anthropic_on_quota_error(monkeypatch
     assert client._anthropic is None  # type: ignore[attr-defined]
 
 
-def test_codex_client_does_not_fall_back_to_anthropic_on_token_expired(monkeypatch):
+def test_codex_fallback_on_token_expired_uses_claude_cli(monkeypatch):
+    """Codex auth expiry → fall back to the `claude` CLI (subscription-billed, NOT metered API)."""
+    monkeypatch.setenv("LLM_PROVIDER", "codex")
+
+    def fake_codex_complete(self, system, user, model):
+        raise RuntimeError("codex exec failed (exit 1): HTTP 401 Unauthorized token_expired")
+
+    def fake_claude_cli(self, system, user, model):
+        return LLMResponse(content="claude-cli-response", input_tokens=10, output_tokens=20)
+
+    monkeypatch.setattr("core.claude_client.CodexCLIClient.complete", fake_codex_complete)
+    monkeypatch.setattr("core.claude_client.shutil.which", lambda name: "/usr/bin/claude")
+    monkeypatch.setattr("core.claude_client.ClaudeCodeClient._complete_with_claude_cli", fake_claude_cli)
+
+    client = ClaudeCodeClient()
+    resp = client.complete("sys", "user", "sonnet")
+    assert resp.content == "claude-cli-response"
+
+
+def test_codex_fallback_never_uses_metered_anthropic_api(monkeypatch):
+    """Guard: even with ANTHROPIC_API_KEY set, the fallback must NOT hit the metered SDK."""
     monkeypatch.setenv("LLM_PROVIDER", "codex")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
 
     def fake_codex_complete(self, system, user, model):
         raise RuntimeError("codex exec failed (exit 1): HTTP 401 Unauthorized token_expired")
 
+    def boom(self, system, user, model):
+        raise AssertionError("metered Anthropic API must not be used as fallback")
+
     monkeypatch.setattr("core.claude_client.CodexCLIClient.complete", fake_codex_complete)
+    monkeypatch.setattr("core.claude_client.AnthropicResponsesClient.complete", boom)
+    monkeypatch.setattr("core.claude_client.shutil.which", lambda name: "/usr/bin/claude")
+    monkeypatch.setattr(
+        "core.claude_client.ClaudeCodeClient._complete_with_claude_cli",
+        lambda self, s, u, m: LLMResponse(content="claude-cli", input_tokens=1, output_tokens=1),
+    )
 
     client = ClaudeCodeClient()
-    with pytest.raises(RuntimeError, match="token_expired"):
+    resp = client.complete("sys", "user", "sonnet")
+    assert resp.content == "claude-cli"
+
+
+def test_codex_client_raises_clean_message_when_claude_cli_missing(monkeypatch):
+    """Codex auth expiry with no `claude` binary for fallback → clean 'codex login' message."""
+    monkeypatch.setenv("LLM_PROVIDER", "codex")
+
+    def fake_codex_complete(self, system, user, model):
+        raise RuntimeError("codex exec failed (exit 1): HTTP 401 Unauthorized refresh_token_reused")
+
+    monkeypatch.setattr("core.claude_client.CodexCLIClient.complete", fake_codex_complete)
+    monkeypatch.setattr("core.claude_client.shutil.which", lambda name: None)
+
+    client = ClaudeCodeClient()
+    with pytest.raises(RuntimeError, match="codex login"):
         client.complete("sys", "user", "sonnet")
     assert client._anthropic is None  # type: ignore[attr-defined]
 
@@ -132,3 +178,22 @@ def test_explicit_anthropic_provider_uses_sdk(monkeypatch):
     resp = client.complete("sys", "user", "strong")
 
     assert resp.content == "strong:sys:user"
+
+
+def test_codex_fallback_on_exec_failure_uses_claude_cli(monkeypatch):
+    """Non-auth Codex exec failure → fall back to the `claude` CLI (subscription)."""
+    monkeypatch.setenv("LLM_PROVIDER", "codex")
+
+    def fake_codex_complete(self, system, user, model):
+        raise RuntimeError("codex exec failed (exit 1): internal error")
+
+    def fake_claude_cli(self, system, user, model):
+        return LLMResponse(content="fallback-response", input_tokens=5, output_tokens=15)
+
+    monkeypatch.setattr("core.claude_client.CodexCLIClient.complete", fake_codex_complete)
+    monkeypatch.setattr("core.claude_client.shutil.which", lambda name: "/usr/bin/claude")
+    monkeypatch.setattr("core.claude_client.ClaudeCodeClient._complete_with_claude_cli", fake_claude_cli)
+
+    client = ClaudeCodeClient()
+    resp = client.complete("sys", "user", "sonnet")
+    assert resp.content == "fallback-response"

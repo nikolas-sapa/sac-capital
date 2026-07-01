@@ -1,6 +1,8 @@
 """Helpers for calling yfinance without leaking its noisy stderr/stdout."""
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as _FuturesTimeout
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 import multiprocessing as mp
@@ -76,3 +78,24 @@ class IsolatedCall:
 
     def __del__(self) -> None:
         self._stop()
+
+
+def call_with_timeout(fn: Callable[[], T], timeout: float) -> T:
+    """Run *fn* in a worker thread, raising ``TimeoutError`` if it exceeds *timeout*.
+
+    yfinance's lazy network accesses (``.calendar``, ``.earnings_history``) have no
+    timeout of their own and can block the runner forever. This bounds them the same
+    way the crawl4ai fix does: on timeout we abandon the worker and raise, rather than
+    wait. ponytail: worker thread leaks on timeout (daemon executor, not joined) — an
+    unavoidable cost of a non-cancellable blocking call; upgrade to IsolatedCall
+    (multiprocessing kill) only if leaked threads pile up in practice.
+    """
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(fn)
+    try:
+        result = future.result(timeout=timeout)
+    except _FuturesTimeout as exc:
+        executor.shutdown(wait=False, cancel_futures=True)
+        raise TimeoutError("yfinance call exceeded timeout") from exc
+    executor.shutdown(wait=False)
+    return result

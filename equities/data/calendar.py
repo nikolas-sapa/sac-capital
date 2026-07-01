@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date
 from typing import Protocol, runtime_checkable
 
-from equities.data.yfinance_utils import call_quietly
+from equities.data.yfinance_utils import call_quietly, call_with_timeout
+
+_TIMEOUT = 10.0  # yfinance HTTP timeout for calendar/earnings data
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -25,7 +29,15 @@ class YFinanceCalendar:
     def fetch(self, ticker: str) -> EarningsSnapshot:
         import yfinance as yf
 
-        t = call_quietly(lambda: yf.Ticker(ticker))
+        try:
+            t = call_quietly(lambda: yf.Ticker(ticker))
+        except Exception as e:
+            _logger.warning(f"Failed to create ticker object for {ticker}: {e}")
+            return EarningsSnapshot(
+                ticker=ticker,
+                next_earnings_date=None,
+                last_surprise_pct=None,
+            )
         next_date = self._next_date(t)
         last_surprise = self._last_surprise(t)
         return EarningsSnapshot(
@@ -36,7 +48,7 @@ class YFinanceCalendar:
 
     def _next_date(self, t: object) -> date | None:
         try:
-            cal = call_quietly(lambda: t.calendar)  # type: ignore[attr-defined]
+            cal = call_with_timeout(lambda: call_quietly(lambda: t.calendar), _TIMEOUT)  # type: ignore[attr-defined]
             if cal is None:
                 return None
             # yfinance ≥0.2: calendar is a dict with 'Earnings Date' key
@@ -51,13 +63,15 @@ class YFinanceCalendar:
                 if cols:
                     val = cal[cols[0]].iloc[0]
                     return _to_date(val)
+        except TimeoutError:
+            _logger.warning("Timeout fetching earnings calendar; returning None")
         except Exception:
             pass
         return None
 
     def _last_surprise(self, t: object) -> float | None:
         try:
-            history = call_quietly(lambda: t.earnings_history)  # type: ignore[attr-defined]
+            history = call_with_timeout(lambda: call_quietly(lambda: t.earnings_history), _TIMEOUT)  # type: ignore[attr-defined]
             if history is not None and not history.empty:
                 col = [c for c in history.columns if "surprise" in str(c).lower()]
                 if col:
@@ -65,6 +79,8 @@ class YFinanceCalendar:
                     if series.empty:
                         return None
                     return float(series.iloc[-1])
+        except TimeoutError:
+            _logger.warning("Timeout fetching earnings history; returning None")
         except Exception:
             pass
         return None

@@ -24,6 +24,7 @@ REQUIRED_SECRET_FIELDS: dict[str, str] = {
     "alpaca_secret_key": "ALPACA_SECRET_KEY",
     "telegram_bot_token": "TELEGRAM_BOT_TOKEN",
     "telegram_chat_id": "TELEGRAM_CHAT_ID",
+    # Note: anthropic_api_key is optional (used as fallback when LLM_PROVIDER=codex)
 }
 
 # Case-insensitive denylist of obvious placeholder values.

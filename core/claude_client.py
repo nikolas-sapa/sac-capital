@@ -15,11 +15,15 @@ temporary provider swap.
 """
 from __future__ import annotations
 
+import logging
 import os
+import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -302,7 +306,27 @@ class ClaudeCodeClient:
                 raise RuntimeError("LLM_PROVIDER=anthropic requires ANTHROPIC_API_KEY")
             return self._anthropic.complete(system, user, model)
         if self._codex is not None:
-            return self._codex.complete(system, user, model)
+            try:
+                return self._codex.complete(system, user, model)
+            except RuntimeError as exc:
+                exc_str = str(exc)
+                is_auth_error = (
+                    "401" in exc_str
+                    or "refresh_token_reused" in exc_str
+                    or "token_expired" in exc_str
+                )
+                # Fall back to the `claude` CLI, which bills the user's Claude
+                # subscription (Max plan) — NOT the metered Anthropic API. Auto-
+                # failover on ANY codex exec failure (auth or transient).
+                if shutil.which("claude") is not None:
+                    if is_auth_error:
+                        _logger.warning("Codex auth expired — falling back to `claude` CLI (subscription). Run `codex login` to restore Codex.")
+                    else:
+                        _logger.warning("Codex exec failed (%s) — falling back to `claude` CLI (subscription).", exc_str[:120])
+                    return self._complete_with_claude_cli(system, user, model)
+                if is_auth_error:
+                    raise RuntimeError("Codex auth expired — run: codex login (and `claude` CLI not found for fallback)") from exc
+                raise
         return self._complete_with_claude_cli(system, user, model)
 
     def _complete_with_claude_cli(self, system: str, user: str, model: str) -> LLMResponse:

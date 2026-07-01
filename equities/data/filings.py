@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from dataclasses import dataclass
 from datetime import date, timedelta, datetime
@@ -7,6 +8,9 @@ from typing import Protocol, runtime_checkable
 
 
 _USER_AGENT = "polymarket-bot research@example.com"
+_SUBMISSIONS_TIMEOUT = 10.0  # HTTP timeout for SEC EDGAR submissions API
+_TICKERS_TIMEOUT = 5.0  # HTTP timeout for SEC ticker mapping (cached)
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -40,9 +44,12 @@ class SECEdgarFilings:
             resp = httpx.get(
                 f"{self._SUBMISSIONS}/CIK{padded}.json",
                 headers={"User-Agent": "polymarket-bot research@example.com"},
-                timeout=10,
+                timeout=_SUBMISSIONS_TIMEOUT,
             )
             resp.raise_for_status()
+        except httpx.TimeoutException:
+            _logger.warning(f"Timeout fetching SEC filings for {ticker} (CIK {cik}); returning empty list")
+            return []
         except Exception:
             return []
 
@@ -88,7 +95,7 @@ def _company_ticker_map() -> dict[str, int]:
         resp = httpx.get(
             SECEdgarFilings._TICKERS,
             headers={"User-Agent": _USER_AGENT},
-            timeout=httpx.Timeout(5.0, connect=2.0, read=3.0, write=2.0, pool=2.0),
+            timeout=httpx.Timeout(_TICKERS_TIMEOUT, connect=2.0, read=3.0, write=2.0, pool=2.0),
         )
         resp.raise_for_status()
         mapping: dict[str, int] = {}
@@ -98,6 +105,9 @@ def _company_ticker_map() -> dict[str, int]:
             if ticker and cik:
                 mapping[ticker] = cik
         return mapping
+    except httpx.TimeoutException:
+        _logger.warning("Timeout fetching SEC ticker map; returning empty mapping")
+        return {}
     except Exception:
         return {}
 
