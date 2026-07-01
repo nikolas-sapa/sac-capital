@@ -19,6 +19,11 @@ from equities.data.yfinance_utils import call_quietly
 
 _TIMEOUT = 8.0
 _MAX_URLS = 3
+# Hard wall-clock cap on the whole worker. asyncio.wait_for cancels a wedged
+# crawl4ai coroutine, but the headless-browser subprocess teardown can still
+# hang — without this the runner blocks forever on thread.join(). Budget =
+# per-URL timeout * URLs + startup/teardown slack.
+_JOIN_TIMEOUT = _MAX_URLS * _TIMEOUT + 6.0
 _EXCERPT_LEN = 600
 _BLOCKED_DOMAINS = ("finance.yahoo.com", "yahoo.com")
 
@@ -60,7 +65,14 @@ def _fetch_articles_sync(urls: list[str]) -> list[tuple[str, str]]:
 
     thread = Thread(target=_worker, daemon=True)
     thread.start()
-    thread.join()
+    thread.join(timeout=_JOIN_TIMEOUT)
+
+    if thread.is_alive():
+        # crawl4ai/browser teardown wedged. Abandon the daemon thread (it dies
+        # with the process) and return whatever completed — never hang the runner.
+        # ponytail: leaks one browser subprocess per wedge; acceptable at the
+        # call volume here (<=5 analyst candidates). Revisit if it accumulates.
+        return list(result)
 
     if error:
         raise error[0]
