@@ -522,6 +522,12 @@ def _has_active_broker_order(row: dict | None) -> bool:
     return status is not None and status not in _TERMINAL_LOCAL_ORDER_STATUSES
 
 
+def _should_skip_duplicate(existing_order: dict | None) -> bool:
+    # ponytail: any prior row with this client_order_id blocks resubmission;
+    # Alpaca idempotency on reused IDs after rejection is undefined.
+    return existing_order is not None
+
+
 def _host_resolves(hostname: str) -> bool:
     try:
         socket.getaddrinfo(hostname, 443)
@@ -985,7 +991,7 @@ async def run_once(
                 if alpaca_executor is not None:
                     client_order_id = client_order_id_for(rec, sized.shares)
                     existing_order = equity_ledger.position_by_broker_client_order_id(client_order_id)
-                    if _has_active_broker_order(existing_order):
+                    if _should_skip_duplicate(existing_order):
                         print(
                             f"  SKIPPED [{rec.instrument.ticker}] duplicate_client_order_id="
                             f"{client_order_id} status={existing_order.get('status')}"
