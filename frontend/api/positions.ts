@@ -1,9 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { upstreamError, withGuard } from "./_lib/guard";
 
 const BASE_URL =
   process.env.ALPACA_BASE_URL ?? "https://paper-api.alpaca.markets";
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: VercelRequest, res: VercelResponse) {
   const keyId = (process.env.ALPACA_API_KEY_ID ?? process.env.ALPACA_KEY_ID ?? "").trim();
   const secret = (process.env.ALPACA_SECRET_KEY ?? "").trim();
 
@@ -22,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!response.ok) {
       const text = await response.text();
-      return res.status(response.status).json({ error: text });
+      return upstreamError(res, response.status, text);
     }
 
     const raw = await response.json();
@@ -52,12 +53,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       closed_at: null,
     }));
 
-    res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=60");
+    res.setHeader("Cache-Control", "private, no-store");
     return res.status(200).json(positions);
-  } catch (err) {
-    return res.status(500).json({ error: String(err) });
-  }
 }
+
+export default withGuard(handler);
 
 type AlpacaPosition = {
   asset_id?: string;

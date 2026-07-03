@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { upstreamError, withGuard } from "./_lib/guard";
 
 const DATA_URL = "https://data.alpaca.markets";
 
@@ -24,7 +25,7 @@ function dateRange(period: string): { start: string; end: string } {
   return { start: fmt(start), end: fmt(end) };
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: VercelRequest, res: VercelResponse) {
   const ticker = (req.query.ticker as string | undefined)?.toUpperCase().trim();
   const period = (req.query.period as string | undefined) ?? "1M";
 
@@ -49,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!r.ok) {
       const text = await r.text();
-      return res.status(r.status).json({ error: text });
+      return upstreamError(res, r.status, text);
     }
 
     const data = await r.json();
@@ -61,7 +62,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     res.setHeader("Cache-Control", "s-maxage=900, stale-while-revalidate=1800");
     return res.status(200).json({ ticker, points });
-  } catch (err) {
-    return res.status(500).json({ error: String(err) });
-  }
 }
+
+export default withGuard(handler);

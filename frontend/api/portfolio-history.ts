@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { upstreamError, withGuard } from "./_lib/guard";
 
 const BASE_URL =
   process.env.ALPACA_BASE_URL ?? "https://paper-api.alpaca.markets";
@@ -18,7 +19,7 @@ const HEADERS = (keyId: string, secret: string) => ({
   Accept: "application/json",
 });
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: VercelRequest, res: VercelResponse) {
   const keyId = (process.env.ALPACA_API_KEY_ID ?? process.env.ALPACA_KEY_ID ?? "").trim();
   const secret = (process.env.ALPACA_SECRET_KEY ?? "").trim();
 
@@ -27,7 +28,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const uiPeriod = String(req.query.period ?? "1W");
-  const alpaca = PERIOD_MAP[uiPeriod] ?? PERIOD_MAP["1W"];
+
+  // Validate period against allowed values
+  if (!(uiPeriod in PERIOD_MAP)) {
+    const allowedPeriods = Object.keys(PERIOD_MAP).join(", ");
+    return res.status(400).json({ error: `Invalid period. Allowed: ${allowedPeriods}` });
+  }
+
+  const alpaca = PERIOD_MAP[uiPeriod];
   const isIntraday = alpaca.timeframe !== "1D";
 
   const histUrl = `${BASE_URL}/v2/account/portfolio/history?period=${alpaca.period}&timeframe=${alpaca.timeframe}&extended_hours=false`;
@@ -41,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!histResp.ok) {
       const text = await histResp.text();
-      return res.status(histResp.status).json({ error: text });
+      return upstreamError(res, histResp.status, text);
     }
 
     const raw = await histResp.json() as {
@@ -128,9 +136,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=120");
+    res.setHeader("Cache-Control", "private, no-store");
     return res.status(200).json({ points, totalPnl: parseFloat(totalPnl.toFixed(2)), base_value: periodStartEquity });
-  } catch (err) {
-    return res.status(500).json({ error: String(err) });
-  }
 }
+
+export default withGuard(handler);
