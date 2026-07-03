@@ -899,6 +899,7 @@ async def run_once(
             max_sector_pct=settings.equity_max_sector_pct,
             daily_loss_limit_pct=settings.equity_daily_loss_limit_pct,
             drawdown_limit_pct=settings.equity_drawdown_limit_pct,
+            state_path=Path("data/kernel_state.json"),
         )
         open_positions = equity_ledger.open_positions()
         sector_lookup: dict[str, str] = {}
