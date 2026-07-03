@@ -83,6 +83,23 @@ One `tests/test_cli.py`:
 - subcommand dispatch maps to correct targets
 - `claude_cli` provider accepted by `LLMClient`
 
+## Grill-me resolutions (2026-07-04)
+
+- Remove broken `runner = "runner:main"` script entry (no `runner.py` exists — breaks install).
+- Add `[build-system]` (hatchling) + explicit package list: `cli`, `core`, `equities`,
+  `orchestrator`, `harness`, `strategies`, `broadcast`, `scripts`, plus top-level
+  `runner_equities.py` / `runner_research.py` modules.
+- Workdir resolution: `.env` + `data/` paths are CWD-relative everywhere. `sac` startup:
+  CWD has `.env` → repo mode; else mkdir+chdir `SAC_HOME` (default `~/.sac-capital/`).
+  Wizard writes `.env` there. No path refactor.
+- Wizard checks `claude` binary on PATH only (no login probe); `sac doctor --llm`
+  runs one live haiku probe.
+- `sac verify` wraps existing `scripts/export_mantle_commitments.py`.
+- PyPI name `sac-capital` confirmed free (404).
+- `sac doctor` checks Python ≥3.12 and playwright browser install; INSTALL.md documents
+  `playwright install chromium` post-step.
+- Command name: `sac`; banner reads SAC CAPITAL.
+
 ## Out of scope
 
 - Live trading enablement, extras/dep slimming, image logo, Claude Code
