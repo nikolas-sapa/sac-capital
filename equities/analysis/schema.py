@@ -152,6 +152,8 @@ class ChallengerDecision(BaseModel):
     verdict: Literal["pass", "weaken", "reject"] = "pass"
     objections: list[str] = Field(default_factory=list)
     confidence_adjustment: float = Field(default=0.0, ge=-1.0, le=0.0)
+    size_verdict: Literal["full", "half", "skip"] = "full"
+    size_rationale: str = ""
 
     @field_validator("objections", mode="before")
     @classmethod
@@ -162,6 +164,21 @@ class ChallengerDecision(BaseModel):
             return [str(item).strip() for item in value if str(item).strip()]
         text = str(value).strip()
         return [text] if text else []
+
+    @field_validator("size_verdict", mode="before")
+    @classmethod
+    def _coerce_size_verdict(cls, value: object) -> str:
+        if value is None:
+            return "full"
+        text = str(value).strip().lower()
+        if text in {"full", "half", "skip"}:
+            return text
+        return "full"  # Invalid → default to full for backward compat
+
+    @field_validator("size_rationale", mode="before")
+    @classmethod
+    def _coerce_size_rationale(cls, value: object) -> str:
+        return "" if value is None else str(value).strip()
 
     @model_validator(mode="after")
     def _validate_weaken(self) -> "ChallengerDecision":

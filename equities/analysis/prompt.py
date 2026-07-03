@@ -198,13 +198,20 @@ Output:
   "verdict": "reject" | "weaken" | "pass",
   "objections": ["specific objection 1", "specific objection 2"],
   "confidence_adjustment": <float between -0.3 and 0.0>,
+  "size_verdict": "full" | "half" | "skip",
+  "size_rationale": "one sentence sizing rationale",
   "summary": "one sentence verdict"
 }}
 
 Verdict rules:
 - "reject": thesis is fundamentally flawed or catalyst is already fully priced in
 - "weaken": 1-2 real concerns reduce the edge but do not eliminate it
-- "pass": no material objections — bull case stands"""
+- "pass": no material objections — bull case stands
+
+Sizing rules (based on volatility and thesis risk):
+- "full": vol regime and thesis risk justify standard 2% sizing
+- "half": vol elevated or thesis risk moderate → deploy 1% instead
+- "skip": vol spike or thesis risk high → do not execute this trade"""
 
 
 # ---------------------------------------------------------------------------

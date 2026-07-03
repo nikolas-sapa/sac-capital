@@ -825,6 +825,13 @@ class EquityAnalyst:
         objections = data.objections
         verdict = data.verdict
 
+        # Attach sizing verdict and rationale to recommendation
+        rec = dc_replace(
+            rec,
+            size_verdict=data.size_verdict,
+            size_rationale=data.size_rationale,
+        )
+
         if verdict == "reject":
             self._record_recommendation_artifact(
                 rec,

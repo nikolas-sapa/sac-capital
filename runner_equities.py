@@ -569,6 +569,23 @@ def _host_resolves(hostname: str) -> bool:
         return False
 
 
+def _apply_sizing_verdict(rec) -> tuple:
+    """Apply size_verdict to recommendation, return (adjusted_rec, decision).
+
+    decision: "proceed" for "full"/"half", "skip" for "skip"
+    Halves size_pct for "half" verdict.
+    """
+    verdict = getattr(rec, "size_verdict", "full")
+    if verdict == "skip":
+        return rec, "skip"
+
+    if verdict == "half":
+        rec_halved = replace(rec, size_pct=rec.size_pct * 0.5)
+        return rec_halved, "proceed"
+
+    return rec, "proceed"
+
+
 async def run_reconcile_only() -> None:
     """Run broker reconciliation when a reconciler implementation is present."""
     settings = load_config()
@@ -994,6 +1011,22 @@ async def run_once(
             print(f"=== Core DCA recommendations: {len(core_recommendations)} ===")
             for rec in all_recommendations:
                 stats.check_runtime()
+                # Apply sizing verdict from challenger debate
+                rec, sizing_decision = _apply_sizing_verdict(rec)
+                if sizing_decision == "skip":
+                    reason = f"sizing_debate: {rec.size_rationale}"
+                    print(f"  REJECTED [{rec.instrument.ticker}] ({rec.sleeve.value}): {reason}")
+                    artifact_store.append(risk_decision_artifact(
+                        rec, decision="rejected", rejection_reason=reason, stage="sizing_debate",
+                        shares=0,
+                        risk_metrics={"open_positions": len(open_positions), "current_equity": current_equity},
+                        data_cutoff_utc=run_cutoff_utc,
+                    ))
+                    continue
+
+                if sizing_decision == "proceed" and rec.size_verdict == "half":
+                    print(f"  [SIZED DOWN] [{rec.instrument.ticker}] halved to {rec.size_pct:.2%}")
+
                 sized = kernel.approve(
                     rec,
                     open_positions,
