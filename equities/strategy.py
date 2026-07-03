@@ -28,6 +28,9 @@ class Recommendation:
     memo: dict[str, Any] | None = None
     # Full structured analysis from the LLM pipeline (analyst + challenger + auditor)
     analysis: dict[str, Any] | None = None
+    # Sizing verdict from challenger debate
+    size_verdict: str = "full"  # "full" | "half" | "skip"
+    size_rationale: str = ""
 
 
 @runtime_checkable

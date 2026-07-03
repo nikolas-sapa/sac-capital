@@ -56,6 +56,7 @@ from equities.analysis.schema import (
 )
 from equities.data.fundamentals import FundamentalsProvider
 from equities.data.sentiment import build_headline_sentiment_snapshot
+from equities.data.technicals import compute_technicals
 from equities.research.artifacts import (
     EquityResearchArtifact,
     ExtractionRef,
@@ -119,6 +120,7 @@ class AnthropicLLMClient:
 
 class PriceProvider(Protocol):
     def latest_close(self, ticker: str) -> float | None: ...
+    def closes(self, ticker: str) -> list[float] | None: ...
 
 
 class NewsProvider(Protocol):
@@ -228,6 +230,7 @@ class EquityAnalyst:
         regime: str = "neutral",
         vix: float | None = None,
         yield_curve: float | None = None,
+        signal_stats_getter: Callable[[CandidateEvent], str] | None = None,
     ) -> list[Recommendation]:
         """Run the three-stage pipeline. Returns Recommendations."""
         if not candidates:
@@ -240,7 +243,16 @@ class EquityAnalyst:
         for candidate in survivors:
             if not self._budget.allow(_SONNET_COST_PER_CANDIDATE + _CHALLENGER_COST):
                 break
-            rec = self._analyse_one(candidate, regime=regime, vix=vix, yield_curve=yield_curve)
+            signal_stats_block = ""
+            if signal_stats_getter is not None:
+                try:
+                    signal_stats_block = signal_stats_getter(candidate) or ""
+                except Exception:
+                    pass
+            rec = self._analyse_one(
+                candidate, regime=regime, vix=vix, yield_curve=yield_curve,
+                signal_stats_block=signal_stats_block,
+            )
             if rec is None:
                 continue
             challenged, objections = self._challenge(rec)
@@ -292,7 +304,8 @@ class EquityAnalyst:
             return ranked[: self._max_candidates]
         except LLMFailureBudgetExceeded:
             raise
-        except Exception:
+        except Exception as exc:
+            print(f"  [PREFILTER] exception={type(exc).__name__}: {exc}")
             return candidates[: self._max_candidates]
 
     def _analyse_one(
@@ -301,6 +314,7 @@ class EquityAnalyst:
         regime: str = "neutral",
         vix: float | None = None,
         yield_curve: float | None = None,
+        signal_stats_block: str = "",
     ) -> Recommendation | None:
         ticker = candidate.instrument.ticker
         price = self._validated_price(ticker)
@@ -369,6 +383,8 @@ class EquityAnalyst:
             sentiment_block=self._sentiment_block(ticker, headlines),
             specialist_block=format_packets(specialist_packets),
             smart_money_block=self._smart_money_block,
+            technicals_block=self._technicals_block(ticker),
+            signal_stats_block=signal_stats_block,
         )
         try:
             raw_output, data, _hit = self._complete_stage(
@@ -467,6 +483,7 @@ class EquityAnalyst:
             horizon=data.horizon or "1-2 weeks",
             memo=data.memo(),
             analysis={
+                "signal_class": candidate.event_type.value,
                 "thesis": data.thesis,
                 "catalyst": data.catalyst,
                 "reason": data.reason,
@@ -536,6 +553,34 @@ class EquityAnalyst:
             if not snapshot.evidence:
                 return ""
             return format_sentiment_snapshot(snapshot)
+        except Exception:
+            return ""
+
+    def _technicals_block(self, ticker: str) -> str:
+        """Compute and format technical indicators for prompt context.
+
+        Returns formatted string like "RSI14=70.5 MACD_hist=0.25 20d_momentum=3.2% 20d_vol=15.8%"
+        or empty string if technicals unavailable.
+        """
+        if self._prices is None:
+            return ""
+        try:
+            closes = self._prices.closes(ticker)
+            if not closes:
+                return ""
+            technicals = compute_technicals(closes)
+            parts = []
+            if technicals.get("rsi_14") is not None:
+                parts.append(f"RSI14={technicals['rsi_14']:.1f}")
+            if technicals.get("macd_hist") is not None:
+                parts.append(f"MACD_hist={technicals['macd_hist']:.2f}")
+            if technicals.get("mom_20d_pct") is not None:
+                parts.append(f"20d_momentum={technicals['mom_20d_pct']:.1f}%")
+            if technicals.get("vol_20d_ann_pct") is not None:
+                parts.append(f"20d_vol={technicals['vol_20d_ann_pct']:.1f}%")
+            if parts:
+                return " ".join(parts) + ". Flag any divergence between thesis and price action."
+            return ""
         except Exception:
             return ""
 
@@ -762,6 +807,7 @@ class EquityAnalyst:
             catalyst=rec.catalyst,
             thesis=rec.thesis,
             news=headlines,
+            technicals_block=self._technicals_block(ticker),
         )
         try:
             raw_output, data, _hit = self._complete_stage(
@@ -791,6 +837,13 @@ class EquityAnalyst:
 
         objections = data.objections
         verdict = data.verdict
+
+        # Attach sizing verdict and rationale to recommendation
+        rec = dc_replace(
+            rec,
+            size_verdict=data.size_verdict,
+            size_rationale=data.size_rationale,
+        )
 
         if verdict == "reject":
             self._record_recommendation_artifact(

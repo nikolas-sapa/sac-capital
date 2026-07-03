@@ -75,8 +75,10 @@ Cap tier: {cap_tier}
 
 ## Macro context
 Regime: {macro_regime} | VIX: {vix_str} | Yield curve (10y-3m): {yield_curve_str}
+{technicals_section}
 {specialist_section}
 {sentiment_section}
+{signal_stats_section}
 {memory_section}
 {smart_money_section}
 
@@ -119,12 +121,17 @@ def build_analyst_prompt(
     sentiment_block: str = "",
     specialist_block: str = "",
     smart_money_block: str = "",
+    technicals_block: str = "",
+    signal_stats_block: str = "",
 ) -> str:
     """Build the Sonnet deep-analyst user message."""
     news_block = "\n".join(f"- {h}" for h in news[:8]) or "  (none)"
     filings_block = "\n".join(f"- {f}" for f in filings[:5]) or "  (none)"
     vix_str = f"{vix:.1f}" if vix is not None else "n/a"
     yield_curve_str = f"{yield_curve:.2f}" if yield_curve is not None else "n/a"
+    technicals_section = (
+        f"Technicals: {technicals_block}" if technicals_block.strip() else ""
+    )
     memory_section = (
         f"\n\n## Decision memory\n{memory_block.strip()}" if memory_block.strip() else ""
     )
@@ -143,6 +150,11 @@ def build_analyst_prompt(
         if smart_money_block.strip()
         else ""
     )
+    signal_stats_section = (
+        f"\n\n## Historical signal performance\n{signal_stats_block.strip()}"
+        if signal_stats_block.strip()
+        else ""
+    )
     return _ANALYST_USER.format(
         ticker=candidate.instrument.ticker,
         sector=sector or "Unknown",
@@ -156,8 +168,10 @@ def build_analyst_prompt(
         macro_regime=macro_regime,
         vix_str=vix_str,
         yield_curve_str=yield_curve_str,
+        technicals_section=technicals_section,
         specialist_section=specialist_section,
         sentiment_section=sentiment_section,
+        signal_stats_section=signal_stats_section,
         memory_section=memory_section,
         smart_money_section=smart_money_section,
     )
@@ -184,18 +198,28 @@ Bull thesis: {thesis}
 ## Recent news
 {news_block}
 
+## Price action
+{technicals_block}
+
 Output:
 {{
   "verdict": "reject" | "weaken" | "pass",
   "objections": ["specific objection 1", "specific objection 2"],
   "confidence_adjustment": <float between -0.3 and 0.0>,
+  "size_verdict": "full" | "half" | "skip",
+  "size_rationale": "one sentence sizing rationale",
   "summary": "one sentence verdict"
 }}
 
 Verdict rules:
 - "reject": thesis is fundamentally flawed or catalyst is already fully priced in
 - "weaken": 1-2 real concerns reduce the edge but do not eliminate it
-- "pass": no material objections — bull case stands"""
+- "pass": no material objections — bull case stands
+
+Sizing rules (based on volatility and thesis risk):
+- "full": vol regime and thesis risk justify standard 2% sizing
+- "half": vol elevated or thesis risk moderate → deploy 1% instead
+- "skip": vol spike or thesis risk high → do not execute this trade"""
 
 
 # ---------------------------------------------------------------------------
@@ -257,8 +281,10 @@ def build_challenger_prompt(
     catalyst: str,
     thesis: str,
     news: list[str],
+    technicals_block: str = "",
 ) -> str:
     news_block = "\n".join(f"- {h}" for h in news[:10]) or "  (none)"
+    technicals_display = technicals_block if technicals_block.strip() else "(unavailable)"
     return _CHALLENGER_USER.format(
         ticker=ticker,
         entry=entry,
@@ -267,6 +293,7 @@ def build_challenger_prompt(
         catalyst=catalyst,
         thesis=thesis,
         news_block=news_block,
+        technicals_block=technicals_display,
     )
 
 

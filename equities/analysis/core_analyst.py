@@ -119,6 +119,9 @@ class CoreDCAAnalyst:
             thesis=data.thesis,
             horizon="long-term",
             memo={"core_reviewer_checks": reviewer_block} if reviewer_block else None,
+            analysis={
+                "signal_class": "core_dca",
+            },
         )
 
     def _reviewer_block(self, candidate: QualityCandidate) -> str | None:
