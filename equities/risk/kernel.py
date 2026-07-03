@@ -114,18 +114,18 @@ class RiskKernel:
 
         # --- Drawdown check ---
         if current_equity is not None:
+            prior_hwm = self._high_water_mark
+            prior_halted = self._halted
             self._high_water_mark = max(self._high_water_mark, current_equity)
             drawdown = (self._high_water_mark - current_equity) / self._high_water_mark
             if drawdown >= self.drawdown_limit_pct:
                 self._halted = True
-                if self._state_path is not None:
-                    from equities.risk.state import save_kernel_state
-                    save_kernel_state(self._state_path, self._high_water_mark, self._halted, self.capital)
-                return SizedRecommendation(recommendation, 0.0, False, f"drawdown={drawdown:.1%}_exceeds_{self.drawdown_limit_pct:.0%}")
-            # Save HWM after update if it changed
-            if self._state_path is not None:
+            # Save state only if it changed
+            if self._state_path is not None and (self._high_water_mark != prior_hwm or self._halted != prior_halted):
                 from equities.risk.state import save_kernel_state
                 save_kernel_state(self._state_path, self._high_water_mark, self._halted, self.capital)
+            if drawdown >= self.drawdown_limit_pct:
+                return SizedRecommendation(recommendation, 0.0, False, f"drawdown={drawdown:.1%}_exceeds_{self.drawdown_limit_pct:.0%}")
 
         # --- Daily loss halt ---
         if today_realized_loss < -(self.daily_loss_limit_pct * self.capital):
