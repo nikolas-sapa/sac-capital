@@ -323,6 +323,17 @@ class _PriceAdapter:
                 self._failure_callback()
             raise
 
+    def closes(self, ticker: str) -> list[float] | None:
+        """Return list of closing prices from cached price series.
+
+        Reuses the cached PriceSeries from _latest_series to avoid new fetches.
+        """
+        try:
+            series = self._latest_series(ticker)
+            return series.closes if series.bars else None
+        except Exception:
+            return None
+
     def _latest_series(self, ticker: str):
         if ticker not in self._cache:
             series = None

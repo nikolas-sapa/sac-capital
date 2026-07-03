@@ -56,6 +56,7 @@ from equities.analysis.schema import (
 )
 from equities.data.fundamentals import FundamentalsProvider
 from equities.data.sentiment import build_headline_sentiment_snapshot
+from equities.data.technicals import compute_technicals
 from equities.research.artifacts import (
     EquityResearchArtifact,
     ExtractionRef,
@@ -119,6 +120,7 @@ class AnthropicLLMClient:
 
 class PriceProvider(Protocol):
     def latest_close(self, ticker: str) -> float | None: ...
+    def closes(self, ticker: str) -> list[float] | None: ...
 
 
 class NewsProvider(Protocol):
@@ -292,7 +294,8 @@ class EquityAnalyst:
             return ranked[: self._max_candidates]
         except LLMFailureBudgetExceeded:
             raise
-        except Exception:
+        except Exception as exc:
+            print(f"  [PREFILTER] exception={type(exc).__name__}: {exc}")
             return candidates[: self._max_candidates]
 
     def _analyse_one(
@@ -369,6 +372,7 @@ class EquityAnalyst:
             sentiment_block=self._sentiment_block(ticker, headlines),
             specialist_block=format_packets(specialist_packets),
             smart_money_block=self._smart_money_block,
+            technicals_block=self._technicals_block(ticker),
         )
         try:
             raw_output, data, _hit = self._complete_stage(
@@ -536,6 +540,34 @@ class EquityAnalyst:
             if not snapshot.evidence:
                 return ""
             return format_sentiment_snapshot(snapshot)
+        except Exception:
+            return ""
+
+    def _technicals_block(self, ticker: str) -> str:
+        """Compute and format technical indicators for prompt context.
+
+        Returns formatted string like "RSI14=70.5 MACD_hist=0.25 20d_momentum=3.2% 20d_vol=15.8%"
+        or empty string if technicals unavailable.
+        """
+        if self._prices is None:
+            return ""
+        try:
+            closes = self._prices.closes(ticker)
+            if not closes:
+                return ""
+            technicals = compute_technicals(closes)
+            parts = []
+            if technicals.get("rsi_14") is not None:
+                parts.append(f"RSI14={technicals['rsi_14']:.1f}")
+            if technicals.get("macd_hist") is not None:
+                parts.append(f"MACD_hist={technicals['macd_hist']:.2f}")
+            if technicals.get("mom_20d_pct") is not None:
+                parts.append(f"20d_momentum={technicals['mom_20d_pct']:.1f}%")
+            if technicals.get("vol_20d_ann_pct") is not None:
+                parts.append(f"20d_vol={technicals['vol_20d_ann_pct']:.1f}%")
+            if parts:
+                return " ".join(parts) + ". Flag any divergence between thesis and price action."
+            return ""
         except Exception:
             return ""
 
@@ -762,6 +794,7 @@ class EquityAnalyst:
             catalyst=rec.catalyst,
             thesis=rec.thesis,
             news=headlines,
+            technicals_block=self._technicals_block(ticker),
         )
         try:
             raw_output, data, _hit = self._complete_stage(
