@@ -50,6 +50,7 @@ from equities.ledger_equity import EquityLedger
 from equities.paper import EquityPaperTracker, PaperFill
 from equities.risk.kernel import RiskKernel
 from equities.killgate.thesis_health import ThesisHealthChecker
+from equities.pit import assert_point_in_time, LookAheadError
 from equities.research.artifacts import risk_decision_artifact
 from equities.research.run_manifest import build_run_manifest, settings_snapshot
 from equities.research.store import ResearchArtifactStore
@@ -614,6 +615,7 @@ async def run_once(
     artifact_store = ResearchArtifactStore(data_dir / "research_artifacts.jsonl")
     artifacts_before_run = len(artifact_store.read_all())
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    run_cutoff_utc = datetime.now(tz=timezone.utc).isoformat()
     checkpoint_store = AnalysisCheckpointStore(data_dir / "equity_analysis_checkpoints.jsonl")
     provider_registry = ProviderRegistry()
     if clear_analysis_checkpoints:
@@ -816,6 +818,22 @@ async def run_once(
                     print(f"  [POL] {c.instrument.ticker}: {c.evidence} (urgency={c.urgency:.2f})")
                 swing_candidates = swing_candidates + pol_candidates
 
+                # --- Point-in-time check for politician disclosures (warning-only) ---
+                if pol_candidates:
+                    try:
+                        fetch = pol_provider.fetch()
+                        if fetch.trades:
+                            most_recent_filed = max(
+                                (t.date_filed for t in fetch.trades if t.date_filed),
+                                default=None
+                            )
+                            if most_recent_filed:
+                                most_recent_utc = most_recent_filed.isoformat() + "T00:00:00Z"
+                                sources_list = [{"name": "politician_disclosure", "as_of_utc": most_recent_utc}]
+                                assert_point_in_time(run_cutoff_utc, sources_list)
+                    except LookAheadError as e:
+                        print(f"  WARNING [PIT] {e}")
+
         # --- Core screen ---
         with _stage(stats, "core_screen"):
             fundamentals_provider = _FundamentalsFailureAdapter(
@@ -978,6 +996,7 @@ async def run_once(
                         rec, decision="rejected", rejection_reason=sized.rejection_reason or "risk_kernel_rejected",
                         stage="risk", shares=sized.shares,
                         risk_metrics={"open_positions": len(open_positions), "current_equity": current_equity},
+                        data_cutoff_utc=run_cutoff_utc,
                     ))
                     continue
 
@@ -991,6 +1010,7 @@ async def run_once(
                         rec, decision="rejected", rejection_reason=reason, stage="notional",
                         shares=sized.shares, notional=order_notional,
                         risk_metrics={"max_order_usd": settings.max_order_usd},
+                        data_cutoff_utc=run_cutoff_utc,
                     ))
                     continue
                 if alpaca_executor is not None and _todays_alpaca_order_count(equity_ledger) >= settings.max_daily_order_count:
@@ -999,6 +1019,7 @@ async def run_once(
                     artifact_store.append(risk_decision_artifact(
                         rec, decision="rejected", rejection_reason=reason, stage="daily_cap",
                         shares=sized.shares, notional=order_notional,
+                        data_cutoff_utc=run_cutoff_utc,
                     ))
                     continue
 
@@ -1030,6 +1051,7 @@ async def run_once(
                         artifact_store.append(risk_decision_artifact(
                             rec, decision="rejected", rejection_reason=f"alpaca_error: {exc}",
                             stage="broker", shares=sized.shares, notional=order_notional,
+                            data_cutoff_utc=run_cutoff_utc,
                         ))
                         continue
                     local_status = _local_status_for(order.status)
@@ -1038,6 +1060,7 @@ async def run_once(
                         artifact_store.append(risk_decision_artifact(
                             rec, decision="rejected", rejection_reason=f"broker_status: {order.status}",
                             stage="broker", shares=sized.shares, notional=order_notional,
+                            data_cutoff_utc=run_cutoff_utc,
                         ))
                         continue
                     filled_shares = order.filled_qty if order.filled_qty > 0 else sized.shares
@@ -1111,6 +1134,7 @@ async def run_once(
                 artifact_store.append(risk_decision_artifact(
                     rec, decision="approved", stage="risk",
                     shares=fill.shares, notional=fill.shares * fill.entry_price,
+                    data_cutoff_utc=run_cutoff_utc,
                 ))
                 if rec.sleeve.value == "core":
                     print(

@@ -68,6 +68,7 @@ def risk_decision_artifact(
     shares: float | None = None,
     notional: float | None = None,
     risk_metrics: dict[str, Any] | None = None,
+    data_cutoff_utc: str | None = None,
 ) -> EquityResearchArtifact:
     """Build a decision artifact for the risk/execution stage of the runner.
 
@@ -96,6 +97,7 @@ def risk_decision_artifact(
         "shares": shares,
         "notional": notional,
         "risk_metrics": risk_metrics or {},
+        "data_cutoff_utc": data_cutoff_utc,
     }
     return EquityResearchArtifact(
         artifact_id=stable_hash({
