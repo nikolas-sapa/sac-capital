@@ -39,29 +39,28 @@ async function handler(req: VercelRequest, res: VercelResponse) {
   const { start, end } = dateRange(period);
   const url = `${DATA_URL}/v2/stocks/${encodeURIComponent(ticker)}/bars?timeframe=1Day&start=${start}&end=${end}&adjustment=raw`;
 
-  try {
-    const r = await fetch(url, {
-      headers: {
-        "APCA-API-KEY-ID": keyId,
-        "APCA-API-SECRET-KEY": secret,
-        Accept: "application/json",
-      },
-    });
+  const r = await fetch(url, {
+    headers: {
+      "APCA-API-KEY-ID": keyId,
+      "APCA-API-SECRET-KEY": secret,
+      Accept: "application/json",
+    },
+  });
 
-    if (!r.ok) {
-      const text = await r.text();
-      return upstreamError(res, r.status, text);
-    }
+  if (!r.ok) {
+    const text = await r.text();
+    return upstreamError(res, r.status, text);
+  }
 
-    const data = await r.json();
-    const bars: AlpacaBar[] = data.bars ?? [];
+  const data = await r.json();
+  const bars: AlpacaBar[] = data.bars ?? [];
 
-    const points = bars.map((b) => ({
-      t: b.t, o: b.o, h: b.h, l: b.l, c: b.c,
-    }));
+  const points = bars.map((b) => ({
+    t: b.t, o: b.o, h: b.h, l: b.l, c: b.c,
+  }));
 
-    res.setHeader("Cache-Control", "s-maxage=900, stale-while-revalidate=1800");
-    return res.status(200).json({ ticker, points });
+  res.setHeader("Cache-Control", "s-maxage=900, stale-while-revalidate=1800");
+  return res.status(200).json({ ticker, points });
 }
 
 export default withGuard(handler);
