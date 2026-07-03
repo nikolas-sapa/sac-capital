@@ -230,6 +230,7 @@ class EquityAnalyst:
         regime: str = "neutral",
         vix: float | None = None,
         yield_curve: float | None = None,
+        signal_stats_getter: Callable[[CandidateEvent], str] | None = None,
     ) -> list[Recommendation]:
         """Run the three-stage pipeline. Returns Recommendations."""
         if not candidates:
@@ -242,7 +243,16 @@ class EquityAnalyst:
         for candidate in survivors:
             if not self._budget.allow(_SONNET_COST_PER_CANDIDATE + _CHALLENGER_COST):
                 break
-            rec = self._analyse_one(candidate, regime=regime, vix=vix, yield_curve=yield_curve)
+            signal_stats_block = ""
+            if signal_stats_getter is not None:
+                try:
+                    signal_stats_block = signal_stats_getter(candidate) or ""
+                except Exception:
+                    pass
+            rec = self._analyse_one(
+                candidate, regime=regime, vix=vix, yield_curve=yield_curve,
+                signal_stats_block=signal_stats_block,
+            )
             if rec is None:
                 continue
             challenged, objections = self._challenge(rec)
@@ -304,6 +314,7 @@ class EquityAnalyst:
         regime: str = "neutral",
         vix: float | None = None,
         yield_curve: float | None = None,
+        signal_stats_block: str = "",
     ) -> Recommendation | None:
         ticker = candidate.instrument.ticker
         price = self._validated_price(ticker)
@@ -373,6 +384,7 @@ class EquityAnalyst:
             specialist_block=format_packets(specialist_packets),
             smart_money_block=self._smart_money_block,
             technicals_block=self._technicals_block(ticker),
+            signal_stats_block=signal_stats_block,
         )
         try:
             raw_output, data, _hit = self._complete_stage(
@@ -471,6 +483,7 @@ class EquityAnalyst:
             horizon=data.horizon or "1-2 weeks",
             memo=data.memo(),
             analysis={
+                "signal_class": candidate.event_type.value,
                 "thesis": data.thesis,
                 "catalyst": data.catalyst,
                 "reason": data.reason,

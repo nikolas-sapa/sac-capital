@@ -54,6 +54,7 @@ from equities.data.technicals import vol_20d_ann_pct
 from equities.killgate.thesis_health import ThesisHealthChecker
 from equities.pit import assert_point_in_time, LookAheadError
 from equities.research.artifacts import risk_decision_artifact
+from equities.signal_stats import signal_stats_line, update_signal_stats
 from equities.research.run_manifest import build_run_manifest, settings_snapshot
 from equities.research.store import ResearchArtifactStore
 from equities.screen.inflection_screen import InflectionScanner
@@ -588,6 +589,17 @@ def _apply_sizing_verdict(rec) -> tuple:
     return rec, "proceed"
 
 
+def _map_regime_to_vol_label(macro_regime: str) -> str:
+    """Map MacroRegimeGate output (crisis/risk_off/neutral/risk_on) to vol labels.
+
+    crisis or risk_off → high_vol
+    neutral or risk_on → low_vol
+    """
+    if macro_regime in ("crisis", "risk_off"):
+        return "high_vol"
+    return "low_vol"
+
+
 async def run_reconcile_only() -> None:
     """Run broker reconciliation when a reconciler implementation is present."""
     settings = load_config()
@@ -911,6 +923,24 @@ async def run_once(
             analyst_count = min(len(swing_candidates), 5)
             await _send_alert(alerts.format_equity_scan(swing_candidates, core_candidates, analyst_count))
 
+        # --- Signal statistics (regime-conditional win rates) ---
+        vol_regime = _map_regime_to_vol_label(regime_snap.regime)
+        with _stage(stats, "signal_stats"):
+            try:
+                update_signal_stats(equity_ledger, regime=vol_regime, window_days=30)
+                print(f"  Updated signal stats for regime={vol_regime}")
+            except Exception as exc:
+                print(f"  [SIGNAL_STATS] update failed: {exc}")
+
+        def signal_stats_getter(candidate):
+            """Returns historical win-rate line for this candidate's signal class."""
+            try:
+                signal_class = candidate.event_type.value
+                line = signal_stats_line(equity_ledger, signal_class, vol_regime, min_trades=10)
+                return line or ""
+            except Exception:
+                return ""
+
         # --- Analyst stage (Codex CLI by default; OpenAI/Claude are explicit fallbacks) ---
         budget = DailyBudget(daily_limit_usd=999.0)
         # Smart-money 13F context (portfolio-level, fetched once per run; off by default)
@@ -949,6 +979,7 @@ async def run_once(
                 regime=regime_snap.regime,
                 vix=regime_snap.vix,
                 yield_curve=regime_snap.yield_curve,
+                signal_stats_getter=signal_stats_getter,
             )
 
         # --- Core DCA analyst (risk-officer check before accumulating) ---
@@ -1111,6 +1142,7 @@ async def run_once(
                         continue
                     filled_shares = order.filled_qty if order.filled_qty > 0 else sized.shares
                     ledger_entry_price = order.filled_avg_price if order.filled_avg_price is not None else rec.entry
+                    signal_class = (rec.analysis or {}).get("signal_class", "")
                     position_id = equity_ledger.open_position(
                         rec,
                         filled_shares,
@@ -1124,6 +1156,7 @@ async def run_once(
                         broker_order_status=order.status,
                         sector=sector_lookup.get(rec.instrument.ticker, ""),
                         status=local_status,
+                        signal_class=signal_class,
                     )
                     fill = PaperFill(
                         position_id=position_id,
@@ -1154,6 +1187,7 @@ async def run_once(
                         open_positions = equity_ledger.open_positions()
                         continue
                 else:
+                    signal_class = (rec.analysis or {}).get("signal_class", "")
                     position_id = equity_ledger.open_position(
                         rec,
                         sized.shares,
@@ -1162,6 +1196,7 @@ async def run_once(
                         mode="paper",
                         strategy="equity_analyst",
                         sector=sector_lookup.get(rec.instrument.ticker, ""),
+                        signal_class=signal_class,
                     )
                     fill = PaperFill(
                         position_id=position_id,

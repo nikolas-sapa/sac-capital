@@ -78,6 +78,7 @@ Regime: {macro_regime} | VIX: {vix_str} | Yield curve (10y-3m): {yield_curve_str
 {technicals_section}
 {specialist_section}
 {sentiment_section}
+{signal_stats_section}
 {memory_section}
 {smart_money_section}
 
@@ -121,6 +122,7 @@ def build_analyst_prompt(
     specialist_block: str = "",
     smart_money_block: str = "",
     technicals_block: str = "",
+    signal_stats_block: str = "",
 ) -> str:
     """Build the Sonnet deep-analyst user message."""
     news_block = "\n".join(f"- {h}" for h in news[:8]) or "  (none)"
@@ -148,6 +150,11 @@ def build_analyst_prompt(
         if smart_money_block.strip()
         else ""
     )
+    signal_stats_section = (
+        f"\n\n## Historical signal performance\n{signal_stats_block.strip()}"
+        if signal_stats_block.strip()
+        else ""
+    )
     return _ANALYST_USER.format(
         ticker=candidate.instrument.ticker,
         sector=sector or "Unknown",
@@ -164,6 +171,7 @@ def build_analyst_prompt(
         technicals_section=technicals_section,
         specialist_section=specialist_section,
         sentiment_section=sentiment_section,
+        signal_stats_section=signal_stats_section,
         memory_section=memory_section,
         smart_money_section=smart_money_section,
     )
