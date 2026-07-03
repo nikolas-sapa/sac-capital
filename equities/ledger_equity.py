@@ -313,10 +313,11 @@ class EquityLedger:
 
     def _rewrite_csv(self) -> None:
         rows = self._con.execute("SELECT * FROM positions ORDER BY id").fetchall()
-        with open(self._csv_path, "w", newline="") as f:
+        tmp = self._csv_path.with_suffix(self._csv_path.suffix + ".tmp")
+        with open(tmp, "w", newline="") as f:
             w = csv.DictWriter(f, fieldnames=_CSV_HEADERS)
             w.writeheader()
             for row in rows:
                 d = dict(row)
-                # Only write known CSV columns
                 w.writerow({k: d.get(k, "") for k in _CSV_HEADERS})
+        tmp.replace(self._csv_path)  # atomic on POSIX
