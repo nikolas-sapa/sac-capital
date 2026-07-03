@@ -49,6 +49,8 @@ from equities.killgate.tracker import ForwardPaperTracker
 from equities.ledger_equity import EquityLedger
 from equities.paper import EquityPaperTracker, PaperFill
 from equities.risk.kernel import RiskKernel
+from equities.risk.vol_target import vol_target_shares
+from equities.data.technicals import vol_20d_ann_pct
 from equities.killgate.thesis_health import ThesisHealthChecker
 from equities.pit import assert_point_in_time, LookAheadError
 from equities.research.artifacts import risk_decision_artifact
@@ -1175,10 +1177,27 @@ async def run_once(
                         shares=fill.shares,
                         strategy="equity_analyst",
                     )
+                # Shadow sizing: compute vol-target shares for A/B analysis (never affects execution)
+                sizing_dict = {"kelly_shares": fill.shares}
+                try:
+                    closes = price_adapter.closes(rec.instrument.ticker)
+                    if closes is not None:
+                        vol_pct = vol_20d_ann_pct(closes)
+                        if vol_pct is not None:
+                            vt_shares = vol_target_shares(
+                                entry=rec.entry,
+                                vol_20d_ann_pct=vol_pct,
+                                capital=deployable_equity,
+                            )
+                            if vt_shares is not None:
+                                sizing_dict["voltarget_shares"] = vt_shares
+                except Exception:
+                    pass  # Shadow computation can never break execution
                 artifact_store.append(risk_decision_artifact(
                     rec, decision="approved", stage="risk",
                     shares=fill.shares, notional=fill.shares * fill.entry_price,
                     data_cutoff_utc=run_cutoff_utc,
+                    sizing=sizing_dict,
                 ))
                 if rec.sleeve.value == "core":
                     print(
