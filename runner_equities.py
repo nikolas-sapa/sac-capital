@@ -527,16 +527,6 @@ def _todays_alpaca_order_count(equity_ledger: EquityLedger) -> int:
     return equity_ledger.broker_orders_opened_on(today, provider="alpaca_paper")
 
 
-_TERMINAL_LOCAL_ORDER_STATUSES = {"canceled", "expired", "rejected", "void", "closed"}
-
-
-def _has_active_broker_order(row: dict | None) -> bool:
-    if row is None:
-        return False
-    status = row.get("status")
-    return status is not None and status not in _TERMINAL_LOCAL_ORDER_STATUSES
-
-
 def _should_skip_duplicate(existing_order: dict | None) -> bool:
     # ponytail: any prior row with this client_order_id blocks resubmission;
     # Alpaca idempotency on reused IDs after rejection is undefined.

@@ -36,17 +36,6 @@ def test_reconcile_only_cli_calls_reconcile_hook(monkeypatch):
     assert calls == ["reconcile"]
 
 
-def test_active_broker_order_helper_blocks_duplicate_active_statuses():
-    import runner_equities
-
-    assert runner_equities._has_active_broker_order(None) is False
-    assert runner_equities._has_active_broker_order({"status": "submitted"}) is True
-    assert runner_equities._has_active_broker_order({"status": "partially_filled"}) is True
-    assert runner_equities._has_active_broker_order({"status": "open"}) is True
-    assert runner_equities._has_active_broker_order({"status": "rejected"}) is False
-    assert runner_equities._has_active_broker_order({"status": "canceled"}) is False
-
-
 def test_llm_failure_budget_trips_cleanly():
     import runner_equities
 
