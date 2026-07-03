@@ -206,6 +206,7 @@ class EquityLedger:
             "SELECT COUNT(*) FROM positions "
             "WHERE execution_provider=? "
             "AND (broker_order_id <> '' OR broker_client_order_id <> '') "
+            "AND status NOT IN ('void','rejected') "
             "AND substr(opened_at, 1, 10)=?",
             (provider, day_iso),
         ).fetchone()
