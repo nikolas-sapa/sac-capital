@@ -528,6 +528,27 @@ def _should_skip_duplicate(existing_order: dict | None) -> bool:
     return existing_order is not None
 
 
+_TERMINAL_FAILURE_STATUSES = {"rejected", "canceled", "cancelled", "expired", "suspended", "stopped"}
+
+
+def _local_status_for(broker_status: str) -> str:
+    """Map broker status to local order status.
+
+    Terminal failure statuses map to 'rejected'. Filled orders map to 'open'.
+    Partially filled orders preserve their status. All other statuses map to 'submitted'.
+    Unknown statuses trigger a warning.
+    """
+    if broker_status == "filled":
+        return "open"
+    if broker_status == "partially_filled":
+        return "partially_filled"
+    if broker_status in _TERMINAL_FAILURE_STATUSES:
+        return "rejected"
+    if broker_status not in {"new", "accepted", "pending_new", "accepted_for_bidding"}:
+        print(f"  WARNING unknown broker status '{broker_status}', treating as submitted")
+    return "submitted"
+
+
 def _host_resolves(hostname: str) -> bool:
     try:
         socket.getaddrinfo(hostname, 443)
@@ -1011,9 +1032,14 @@ async def run_once(
                             stage="broker", shares=sized.shares, notional=order_notional,
                         ))
                         continue
-                    local_status = "open" if order.status == "filled" else (
-                        "partially_filled" if order.status == "partially_filled" else "submitted"
-                    )
+                    local_status = _local_status_for(order.status)
+                    if local_status == "rejected":
+                        print(f"  ALPACA REJECTED [{rec.instrument.ticker}]: broker_status={order.status}")
+                        artifact_store.append(risk_decision_artifact(
+                            rec, decision="rejected", rejection_reason=f"broker_status: {order.status}",
+                            stage="broker", shares=sized.shares, notional=order_notional,
+                        ))
+                        continue
                     filled_shares = order.filled_qty if order.filled_qty > 0 else sized.shares
                     ledger_entry_price = order.filled_avg_price if order.filled_avg_price is not None else rec.entry
                     position_id = equity_ledger.open_position(
