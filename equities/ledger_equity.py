@@ -280,6 +280,16 @@ class EquityLedger:
             "open_positions": [dict(r) for r in open_rows],
         }
 
+    def pending_notional(self) -> float:
+        # ponytail: reserves fully-unfilled orders only; the unfilled remainder of a
+        # partially_filled order is not reserved — add remainder tracking if partial
+        # fills become common at this order size.
+        row = self._con.execute(
+            "SELECT COALESCE(SUM(shares * entry_price), 0.0) FROM positions "
+            "WHERE status = 'submitted'"
+        ).fetchone()[0]
+        return float(row)
+
     def close(self) -> None:
         self._con.close()
 

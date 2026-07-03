@@ -930,6 +930,7 @@ async def run_once(
             + float(portfolio_stats.get("realized_pnl", 0.0))
             + float(portfolio_stats.get("unrealized_pnl", 0.0))
         )
+        deployable_equity = current_equity - equity_ledger.pending_notional()
         today_realized_loss = equity_ledger.realized_pnl_on(today)
 
         with _stage(stats, "risk_and_execution"):
@@ -941,7 +942,7 @@ async def run_once(
                     rec,
                     open_positions,
                     today_realized_loss=today_realized_loss,
-                    current_equity=current_equity,
+                    current_equity=deployable_equity,
                     sector_lookup=sector_lookup,
                 )
                 if not sized.approved:
