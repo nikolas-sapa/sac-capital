@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlparse as _urlparse
 
@@ -201,9 +202,14 @@ class AlpacaPaperExecutor:
 
 
 def client_order_id_for(recommendation: Recommendation, shares: float) -> str:
-    """Stable idempotency key for the same ticker/signal/size."""
+    """Stable idempotency key for the same ticker/signal/size, scoped by UTC date.
+
+    Day-scoped IDs ensure fresh identifiers each day, allowing legitimate identical
+    re-entry signals to be submitted without reusing a previously-rejected ID.
+    """
     payload = "|".join([
         "equity",
+        datetime.now(tz=timezone.utc).date().isoformat(),  # day-scoped idempotency
         recommendation.side,
         recommendation.instrument.ticker,
         f"{recommendation.entry:.4f}",

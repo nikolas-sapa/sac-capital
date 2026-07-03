@@ -1,10 +1,15 @@
-# Progress — Plan 08 situational-awareness-additions
+# Progress — Plan 2026-07-03 hardening-and-alpha-improvements
 
-Branch: situational-awareness-additions
-Base: d5cb4d513d7207f4ebd3415714a112168b60aaf5
+Branch: hardening-2026-07
+Base: 0e16157680c3c3aa5b4a3ed1946d57739a0f2726
 
-Task 1 (Gap 4 preflight): complete (commits d5cb4d5..162e105, review clean)
-Task 2 (Gap 1 calibration): complete (commits 162e105..7b3b434, review clean)
-Task 3 (Gap 2 citation linkage): complete (commits 7b3b434..84d3fdc, review clean)
-Task 4 (Gap 3 run manifest): complete (commits 84d3fdc..2c1fa4d, review clean)
-Task 5 (Gap 5 nightly digest): complete (commits 2c1fa4d..21cfe78, review clean)
+Task 0 (secrets rotation): USER ACTION REQUIRED (Mantle key + Telegram token) — deferred
+Task 1: complete (commits 0e16157..0e2922d, review clean)
+Task 2: complete (commits 0e2922d..b45c9c0, review clean)
+Task 3: complete (commits b45c9c0..efb6182, review clean)
+  Minor (deferred to final review): _has_active_broker_order now unused in runner_equities.py
+Task 4: complete (commits efb6182..15630ac, review clean)
+Task 5: complete (commits 15630ac..551ed24, review clean)
+Task 6: complete (commits 551ed24..217aef0, review clean) — PHASE 1 DONE
+Task 10: complete (commits 20e38d5..4d25d58, review clean)
+Task 11: complete (commits 4d25d58..ab17e0b, review clean)

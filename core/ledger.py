@@ -212,8 +212,10 @@ class Ledger:
     def _rewrite_csv(self) -> None:
         """Rewrite the entire CSV from sqlite so resolved/won/pnl are current."""
         rows = self._con.execute("SELECT * FROM fills ORDER BY id").fetchall()
-        with open(self._csv_path, "w", newline="") as f:
+        tmp = self._csv_path.with_suffix(self._csv_path.suffix + ".tmp")
+        with open(tmp, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=_CSV_HEADERS)
             writer.writeheader()
             for row in rows:
                 writer.writerow(dict(row))
+        tmp.replace(self._csv_path)  # atomic on POSIX

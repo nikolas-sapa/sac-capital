@@ -18,6 +18,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 from equities.risk.sizing import size_shares, _DEFAULT_GAP_PCT
@@ -59,6 +60,7 @@ class RiskKernel:
         daily_loss_limit_pct: float = 0.05,
         drawdown_limit_pct: float = 0.15,
         gap_pct: float = _DEFAULT_GAP_PCT,
+        state_path: Path | None = None,
     ) -> None:
         if capital <= 0:
             raise ValueError(f"RiskKernel capital must be positive, got {capital}")
@@ -71,10 +73,20 @@ class RiskKernel:
         self.drawdown_limit_pct = drawdown_limit_pct
         self.gap_pct = gap_pct
 
+        self._state_path = state_path
         self._high_water_mark = capital
         self._today = date.today().isoformat()
         self._daily_loss = 0.0
         self._halted = False  # circuit-breaker flag
+
+        # Load persisted state if available
+        if state_path is not None:
+            from equities.risk.state import load_kernel_state
+            saved = load_kernel_state(state_path)
+            if float(saved.get("capital", capital)) == capital:
+                self._high_water_mark = max(capital, float(saved.get("high_water_mark", capital)))
+                self._halted = bool(saved.get("halted", False))
+            # else: bankroll changed in config -> stale hwm/halt discarded, fresh baseline
 
     # ------------------------------------------------------------------
     # Public API
@@ -102,10 +114,17 @@ class RiskKernel:
 
         # --- Drawdown check ---
         if current_equity is not None:
+            prior_hwm = self._high_water_mark
+            prior_halted = self._halted
             self._high_water_mark = max(self._high_water_mark, current_equity)
             drawdown = (self._high_water_mark - current_equity) / self._high_water_mark
             if drawdown >= self.drawdown_limit_pct:
                 self._halted = True
+            # Save state only if it changed
+            if self._state_path is not None and (self._high_water_mark != prior_hwm or self._halted != prior_halted):
+                from equities.risk.state import save_kernel_state
+                save_kernel_state(self._state_path, self._high_water_mark, self._halted, self.capital)
+            if drawdown >= self.drawdown_limit_pct:
                 return SizedRecommendation(recommendation, 0.0, False, f"drawdown={drawdown:.1%}_exceeds_{self.drawdown_limit_pct:.0%}")
 
         # --- Daily loss halt ---

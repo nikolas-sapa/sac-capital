@@ -49,8 +49,12 @@ from equities.killgate.tracker import ForwardPaperTracker
 from equities.ledger_equity import EquityLedger
 from equities.paper import EquityPaperTracker, PaperFill
 from equities.risk.kernel import RiskKernel
+from equities.risk.vol_target import vol_target_shares
+from equities.data.technicals import vol_20d_ann_pct
 from equities.killgate.thesis_health import ThesisHealthChecker
+from equities.pit import assert_point_in_time, LookAheadError
 from equities.research.artifacts import risk_decision_artifact
+from equities.signal_stats import signal_stats_line, update_signal_stats
 from equities.research.run_manifest import build_run_manifest, settings_snapshot
 from equities.research.store import ResearchArtifactStore
 from equities.screen.inflection_screen import InflectionScanner
@@ -322,6 +326,17 @@ class _PriceAdapter:
                 self._failure_callback()
             raise
 
+    def closes(self, ticker: str) -> list[float] | None:
+        """Return list of closing prices from cached price series.
+
+        Reuses the cached PriceSeries from _latest_series to avoid new fetches.
+        """
+        try:
+            series = self._latest_series(ticker)
+            return series.closes if series.bars else None
+        except Exception:
+            return None
+
     def _latest_series(self, ticker: str):
         if ticker not in self._cache:
             series = None
@@ -512,14 +527,31 @@ def _todays_alpaca_order_count(equity_ledger: EquityLedger) -> int:
     return equity_ledger.broker_orders_opened_on(today, provider="alpaca_paper")
 
 
-_TERMINAL_LOCAL_ORDER_STATUSES = {"canceled", "expired", "rejected", "void", "closed"}
+def _should_skip_duplicate(existing_order: dict | None) -> bool:
+    # ponytail: any prior row with this client_order_id blocks resubmission;
+    # Alpaca idempotency on reused IDs after rejection is undefined.
+    return existing_order is not None
 
 
-def _has_active_broker_order(row: dict | None) -> bool:
-    if row is None:
-        return False
-    status = row.get("status")
-    return status is not None and status not in _TERMINAL_LOCAL_ORDER_STATUSES
+_TERMINAL_FAILURE_STATUSES = {"rejected", "canceled", "cancelled", "expired", "suspended", "stopped"}
+
+
+def _local_status_for(broker_status: str) -> str:
+    """Map broker status to local order status.
+
+    Terminal failure statuses map to 'rejected'. Filled orders map to 'open'.
+    Partially filled orders preserve their status. All other statuses map to 'submitted'.
+    Unknown statuses trigger a warning.
+    """
+    if broker_status == "filled":
+        return "open"
+    if broker_status == "partially_filled":
+        return "partially_filled"
+    if broker_status in _TERMINAL_FAILURE_STATUSES:
+        return "rejected"
+    if broker_status not in {"new", "accepted", "pending_new", "accepted_for_bidding"}:
+        print(f"  WARNING unknown broker status '{broker_status}', treating as submitted")
+    return "submitted"
 
 
 def _host_resolves(hostname: str) -> bool:
@@ -528,6 +560,34 @@ def _host_resolves(hostname: str) -> bool:
         return True
     except OSError:
         return False
+
+
+def _apply_sizing_verdict(rec) -> tuple:
+    """Apply size_verdict to recommendation, return (adjusted_rec, decision).
+
+    decision: "proceed" for "full"/"half", "skip" for "skip"
+    Halves size_pct for "half" verdict.
+    """
+    verdict = getattr(rec, "size_verdict", "full")
+    if verdict == "skip":
+        return rec, "skip"
+
+    if verdict == "half":
+        rec_halved = replace(rec, size_pct=rec.size_pct * 0.5)
+        return rec_halved, "proceed"
+
+    return rec, "proceed"
+
+
+def _map_regime_to_vol_label(macro_regime: str) -> str:
+    """Map MacroRegimeGate output (crisis/risk_off/neutral/risk_on) to vol labels.
+
+    crisis or risk_off → high_vol
+    neutral or risk_on → low_vol
+    """
+    if macro_regime in ("crisis", "risk_off"):
+        return "high_vol"
+    return "low_vol"
 
 
 async def run_reconcile_only() -> None:
@@ -587,6 +647,7 @@ async def run_once(
     artifact_store = ResearchArtifactStore(data_dir / "research_artifacts.jsonl")
     artifacts_before_run = len(artifact_store.read_all())
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    run_cutoff_utc = datetime.now(tz=timezone.utc).isoformat()
     checkpoint_store = AnalysisCheckpointStore(data_dir / "equity_analysis_checkpoints.jsonl")
     provider_registry = ProviderRegistry()
     if clear_analysis_checkpoints:
@@ -789,6 +850,22 @@ async def run_once(
                     print(f"  [POL] {c.instrument.ticker}: {c.evidence} (urgency={c.urgency:.2f})")
                 swing_candidates = swing_candidates + pol_candidates
 
+                # --- Point-in-time check for politician disclosures (warning-only) ---
+                if pol_candidates:
+                    try:
+                        fetch = pol_provider.fetch()
+                        if fetch.trades:
+                            most_recent_filed = max(
+                                (t.date_filed for t in fetch.trades if t.date_filed),
+                                default=None
+                            )
+                            if most_recent_filed:
+                                most_recent_utc = most_recent_filed.isoformat() + "T00:00:00Z"
+                                sources_list = [{"name": "politician_disclosure", "as_of_utc": most_recent_utc}]
+                                assert_point_in_time(run_cutoff_utc, sources_list)
+                    except LookAheadError as e:
+                        print(f"  WARNING [PIT] {e}")
+
         # --- Core screen ---
         with _stage(stats, "core_screen"):
             fundamentals_provider = _FundamentalsFailureAdapter(
@@ -836,6 +913,24 @@ async def run_once(
             analyst_count = min(len(swing_candidates), 5)
             await _send_alert(alerts.format_equity_scan(swing_candidates, core_candidates, analyst_count))
 
+        # --- Signal statistics (regime-conditional win rates) ---
+        vol_regime = _map_regime_to_vol_label(regime_snap.regime)
+        with _stage(stats, "signal_stats"):
+            try:
+                update_signal_stats(equity_ledger, regime=vol_regime, window_days=30)
+                print(f"  Updated signal stats for regime={vol_regime}")
+            except Exception as exc:
+                print(f"  [SIGNAL_STATS] update failed: {exc}")
+
+        def signal_stats_getter(candidate):
+            """Returns historical win-rate line for this candidate's signal class."""
+            try:
+                signal_class = candidate.event_type.value
+                line = signal_stats_line(equity_ledger, signal_class, vol_regime, min_trades=10)
+                return line or ""
+            except Exception:
+                return ""
+
         # --- Analyst stage (Codex CLI by default; OpenAI/Claude are explicit fallbacks) ---
         budget = DailyBudget(daily_limit_usd=999.0)
         # Smart-money 13F context (portfolio-level, fetched once per run; off by default)
@@ -874,6 +969,7 @@ async def run_once(
                 regime=regime_snap.regime,
                 vix=regime_snap.vix,
                 yield_curve=regime_snap.yield_curve,
+                signal_stats_getter=signal_stats_getter,
             )
 
         # --- Core DCA analyst (risk-officer check before accumulating) ---
@@ -899,6 +995,7 @@ async def run_once(
             max_sector_pct=settings.equity_max_sector_pct,
             daily_loss_limit_pct=settings.equity_daily_loss_limit_pct,
             drawdown_limit_pct=settings.equity_drawdown_limit_pct,
+            state_path=Path("data/kernel_state.json"),
         )
         open_positions = equity_ledger.open_positions()
         sector_lookup: dict[str, str] = {}
@@ -929,6 +1026,7 @@ async def run_once(
             + float(portfolio_stats.get("realized_pnl", 0.0))
             + float(portfolio_stats.get("unrealized_pnl", 0.0))
         )
+        deployable_equity = current_equity - equity_ledger.pending_notional()
         today_realized_loss = equity_ledger.realized_pnl_on(today)
 
         with _stage(stats, "risk_and_execution"):
@@ -936,11 +1034,27 @@ async def run_once(
             print(f"=== Core DCA recommendations: {len(core_recommendations)} ===")
             for rec in all_recommendations:
                 stats.check_runtime()
+                # Apply sizing verdict from challenger debate
+                rec, sizing_decision = _apply_sizing_verdict(rec)
+                if sizing_decision == "skip":
+                    reason = f"sizing_debate: {rec.size_rationale}"
+                    print(f"  REJECTED [{rec.instrument.ticker}] ({rec.sleeve.value}): {reason}")
+                    artifact_store.append(risk_decision_artifact(
+                        rec, decision="rejected", rejection_reason=reason, stage="sizing_debate",
+                        shares=0,
+                        risk_metrics={"open_positions": len(open_positions), "current_equity": current_equity},
+                        data_cutoff_utc=run_cutoff_utc,
+                    ))
+                    continue
+
+                if sizing_decision == "proceed" and rec.size_verdict == "half":
+                    print(f"  [SIZED DOWN] [{rec.instrument.ticker}] halved to {rec.size_pct:.2%}")
+
                 sized = kernel.approve(
                     rec,
                     open_positions,
                     today_realized_loss=today_realized_loss,
-                    current_equity=current_equity,
+                    current_equity=deployable_equity,
                     sector_lookup=sector_lookup,
                 )
                 if not sized.approved:
@@ -949,6 +1063,7 @@ async def run_once(
                         rec, decision="rejected", rejection_reason=sized.rejection_reason or "risk_kernel_rejected",
                         stage="risk", shares=sized.shares,
                         risk_metrics={"open_positions": len(open_positions), "current_equity": current_equity},
+                        data_cutoff_utc=run_cutoff_utc,
                     ))
                     continue
 
@@ -962,6 +1077,7 @@ async def run_once(
                         rec, decision="rejected", rejection_reason=reason, stage="notional",
                         shares=sized.shares, notional=order_notional,
                         risk_metrics={"max_order_usd": settings.max_order_usd},
+                        data_cutoff_utc=run_cutoff_utc,
                     ))
                     continue
                 if alpaca_executor is not None and _todays_alpaca_order_count(equity_ledger) >= settings.max_daily_order_count:
@@ -970,6 +1086,7 @@ async def run_once(
                     artifact_store.append(risk_decision_artifact(
                         rec, decision="rejected", rejection_reason=reason, stage="daily_cap",
                         shares=sized.shares, notional=order_notional,
+                        data_cutoff_utc=run_cutoff_utc,
                     ))
                     continue
 
@@ -983,7 +1100,7 @@ async def run_once(
                 if alpaca_executor is not None:
                     client_order_id = client_order_id_for(rec, sized.shares)
                     existing_order = equity_ledger.position_by_broker_client_order_id(client_order_id)
-                    if _has_active_broker_order(existing_order):
+                    if _should_skip_duplicate(existing_order):
                         print(
                             f"  SKIPPED [{rec.instrument.ticker}] duplicate_client_order_id="
                             f"{client_order_id} status={existing_order.get('status')}"
@@ -1001,13 +1118,21 @@ async def run_once(
                         artifact_store.append(risk_decision_artifact(
                             rec, decision="rejected", rejection_reason=f"alpaca_error: {exc}",
                             stage="broker", shares=sized.shares, notional=order_notional,
+                            data_cutoff_utc=run_cutoff_utc,
                         ))
                         continue
-                    local_status = "open" if order.status == "filled" else (
-                        "partially_filled" if order.status == "partially_filled" else "submitted"
-                    )
+                    local_status = _local_status_for(order.status)
+                    if local_status == "rejected":
+                        print(f"  ALPACA REJECTED [{rec.instrument.ticker}]: broker_status={order.status}")
+                        artifact_store.append(risk_decision_artifact(
+                            rec, decision="rejected", rejection_reason=f"broker_status: {order.status}",
+                            stage="broker", shares=sized.shares, notional=order_notional,
+                            data_cutoff_utc=run_cutoff_utc,
+                        ))
+                        continue
                     filled_shares = order.filled_qty if order.filled_qty > 0 else sized.shares
                     ledger_entry_price = order.filled_avg_price if order.filled_avg_price is not None else rec.entry
+                    signal_class = (rec.analysis or {}).get("signal_class", "")
                     position_id = equity_ledger.open_position(
                         rec,
                         filled_shares,
@@ -1021,6 +1146,7 @@ async def run_once(
                         broker_order_status=order.status,
                         sector=sector_lookup.get(rec.instrument.ticker, ""),
                         status=local_status,
+                        signal_class=signal_class,
                     )
                     fill = PaperFill(
                         position_id=position_id,
@@ -1051,6 +1177,7 @@ async def run_once(
                         open_positions = equity_ledger.open_positions()
                         continue
                 else:
+                    signal_class = (rec.analysis or {}).get("signal_class", "")
                     position_id = equity_ledger.open_position(
                         rec,
                         sized.shares,
@@ -1059,6 +1186,7 @@ async def run_once(
                         mode="paper",
                         strategy="equity_analyst",
                         sector=sector_lookup.get(rec.instrument.ticker, ""),
+                        signal_class=signal_class,
                     )
                     fill = PaperFill(
                         position_id=position_id,
@@ -1074,9 +1202,27 @@ async def run_once(
                         shares=fill.shares,
                         strategy="equity_analyst",
                     )
+                # Shadow sizing: compute vol-target shares for A/B analysis (never affects execution)
+                sizing_dict = {"kelly_shares": fill.shares}
+                try:
+                    closes = price_adapter.closes(rec.instrument.ticker)
+                    if closes is not None:
+                        vol_pct = vol_20d_ann_pct(closes)
+                        if vol_pct is not None:
+                            vt_shares = vol_target_shares(
+                                entry=rec.entry,
+                                vol_20d_ann_pct=vol_pct,
+                                capital=deployable_equity,
+                            )
+                            if vt_shares is not None:
+                                sizing_dict["voltarget_shares"] = vt_shares
+                except Exception:
+                    pass  # Shadow computation can never break execution
                 artifact_store.append(risk_decision_artifact(
                     rec, decision="approved", stage="risk",
                     shares=fill.shares, notional=fill.shares * fill.entry_price,
+                    data_cutoff_utc=run_cutoff_utc,
+                    sizing=sizing_dict,
                 ))
                 if rec.sleeve.value == "core":
                     print(

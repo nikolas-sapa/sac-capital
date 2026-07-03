@@ -68,12 +68,25 @@ def risk_decision_artifact(
     shares: float | None = None,
     notional: float | None = None,
     risk_metrics: dict[str, Any] | None = None,
+    data_cutoff_utc: str | None = None,
+    sizing: dict[str, Any] | None = None,
 ) -> EquityResearchArtifact:
     """Build a decision artifact for the risk/execution stage of the runner.
 
     Captures *why a recommendation was traded or skipped* after analyst approval —
     the kernel/notional/daily-cap/broker rejections that previously only printed.
     Feeds the self-improvement harness and the on-chain commitment exporter.
+
+    Args:
+        recommendation: The Recommendation object being decided.
+        decision: "approved" or "rejected".
+        rejection_reason: Reason for rejection (if rejected).
+        stage: Stage name (e.g. "risk", "notional", "daily_cap").
+        shares: Number of shares executed.
+        notional: Order notional (shares * entry).
+        risk_metrics: Additional risk context.
+        data_cutoff_utc: ISO timestamp of analysis cutoff.
+        sizing: Optional dict with sizing variants (e.g. {"kelly_shares": X, "voltarget_shares": Y}).
     """
     inst = recommendation.instrument
     ticker = inst.ticker
@@ -96,7 +109,10 @@ def risk_decision_artifact(
         "shares": shares,
         "notional": notional,
         "risk_metrics": risk_metrics or {},
+        "data_cutoff_utc": data_cutoff_utc,
     }
+    if sizing:
+        output_json["sizing"] = sizing
     return EquityResearchArtifact(
         artifact_id=stable_hash({
             "ticker": ticker,
