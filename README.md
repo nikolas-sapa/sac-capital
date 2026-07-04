@@ -14,9 +14,25 @@
 
 ## Install the CLI
 
-`uv tool install sac-capital` → `sac setup` → `sac run`. Runs on your
-Claude subscription via the `claude` CLI (no API key required) — API
-keys optional. Full guide: [INSTALL.md](INSTALL.md).
+```sh
+uv tool install sac-capital   # or: pip install sac-capital
+sac setup                     # step-by-step wizard — connect LLM, broker, alerts
+sac doctor                    # verify config
+sac run                       # equities pipeline (paper trading)
+```
+
+Runs on your Claude subscription via the `claude` CLI (no API key
+required) — Anthropic/OpenAI API keys and Codex optional. Every wizard
+step is skippable; config lives in `~/.sac-capital/`. Full guide:
+[INSTALL.md](INSTALL.md).
+
+| Command | Does |
+|---|---|
+| `sac setup` | interactive setup wizard (subscription-first, paper-only) |
+| `sac run` | full equities screen → analyst → risk kernel → paper orders |
+| `sac research` | supplier-lag research runner (`--static-only` etc.) |
+| `sac doctor` | preflight checks; `--llm` adds a live LLM probe |
+| `sac verify` | export deterministic decision commitment hashes |
 
 ---
 
@@ -107,7 +123,8 @@ npm run dev
 ## Repository Layout
 
 ```
-core/             Config, ledgers, alerts, LLM adapters
+cli/              `sac` CLI — banner, setup wizard, workdir, dispatcher
+core/             Config, ledgers, alerts, LLM adapters (incl. claude_cli subscription provider)
 equities/
   analysis/       Equity analyst, typed LLM schemas, budget controls
   data/           Prices, fundamentals, calendar, filings, news, macro, VIX
@@ -121,7 +138,7 @@ contracts/        AgentDecisionRegistry.sol (Mantle)
 scripts/          Commitment exporter, Mantle submission, nightly maintenance
 runner_research.py Paper-only supplier-lag research runner
 frontend/         React/Vite verification dashboard
-tests/            485-test regression suite
+tests/            790-test regression suite
 docs/             Operator runbooks
 deploy/           macOS launchd plists
 ```
