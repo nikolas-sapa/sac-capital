@@ -34,3 +34,49 @@ class TestWorkdir:
         monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
         result = resolve_workdir(cwd=tmp_path / "elsewhere")
         assert result == tmp_path / ".sac-capital"
+
+
+def make_answers(answers):
+    it = iter(answers)
+    return lambda prompt="": next(it, "")
+
+
+class TestWizard:
+    def test_subscription_default_when_claude_on_path(self):
+        from cli.setup import run_wizard
+        # accept every default: press enter through all prompts
+        env = run_wizard(input_fn=make_answers([""] * 20),
+                         which=lambda cmd: "/usr/local/bin/claude")
+        assert env["LLM_PROVIDER"] == "claude_cli"
+        assert "LIVE_TRADING_ENABLED" not in env
+        assert env["BANKROLL_USD"] == "1000"
+
+    def test_api_key_fallback_when_no_claude(self):
+        from cli.setup import run_wizard
+        # provider menu: 1=anthropic key, then the key, then defaults
+        env = run_wizard(input_fn=make_answers(["1", "sk-ant-xyz"] + [""] * 20),
+                         which=lambda cmd: None)
+        assert env["LLM_PROVIDER"] == "anthropic"
+        assert env["ANTHROPIC_API_KEY"] == "sk-ant-xyz"
+
+    def test_alpaca_skip_uses_internal_paper(self):
+        from cli.setup import run_wizard
+        env = run_wizard(input_fn=make_answers([""] * 20),
+                         which=lambda cmd: "/bin/claude")
+        assert env["EXECUTION_PROVIDER"] == "internal_paper"
+        assert "ALPACA_API_KEY_ID" not in env
+
+    def test_write_env_refuses_overwrite(self, tmp_path):
+        from cli.setup import write_env
+        target = tmp_path / ".env"
+        target.write_text("OLD=1\n")
+        ok = write_env({"A": "1"}, target, input_fn=make_answers(["n"]))
+        assert ok is False
+        assert target.read_text() == "OLD=1\n"
+
+    def test_write_env_writes_pairs(self, tmp_path):
+        from cli.setup import write_env
+        target = tmp_path / ".env"
+        ok = write_env({"A": "1", "B": "two"}, target)
+        assert ok is True
+        assert target.read_text() == "A=1\nB=two\n"
