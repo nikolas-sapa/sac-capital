@@ -299,6 +299,8 @@ class ClaudeCodeClient:
 
     def complete(self, system: str, user: str, model: str) -> LLMResponse:
         """Send a prompt and return the response."""
+        if self._provider == "claude_cli":
+            return self._complete_with_claude_cli(system, user, model)
         if self._openai is not None:
             return self._openai.complete(system, user, model)
         if self._provider == "anthropic":
