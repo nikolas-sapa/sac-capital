@@ -80,3 +80,17 @@ class TestWizard:
         ok = write_env({"A": "1", "B": "two"}, target)
         assert ok is True
         assert target.read_text() == "A=1\nB=two\n"
+
+    def test_write_env_rejects_newline_injection(self, tmp_path):
+        import pytest
+        from cli.setup import write_env
+        target = tmp_path / ".env"
+        with pytest.raises(ValueError):
+            write_env({"A": "sk-ant-x\nLIVE_TRADING_ENABLED=true"}, target)
+        assert not target.exists()
+
+    def test_write_env_sets_permissions_0600(self, tmp_path):
+        from cli.setup import write_env
+        target = tmp_path / ".env"
+        write_env({"A": "1"}, target)
+        assert (target.stat().st_mode & 0o777) == 0o600

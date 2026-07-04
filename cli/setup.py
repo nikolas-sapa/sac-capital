@@ -2,6 +2,7 @@
 """Interactive `sac setup` wizard. Stdlib only; every step skippable."""
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
@@ -80,11 +81,17 @@ def run_wizard(input_fn=input, which=shutil.which) -> dict[str, str]:
 
 
 def write_env(env: dict[str, str], path: Path, input_fn=input) -> bool:
+    for k, v in env.items():
+        if "\n" in k or "\r" in k or "=" in k:
+            raise ValueError(f"invalid env key: {k!r}")
+        if "\n" in v or "\r" in v:
+            raise ValueError(f"invalid env value for {k!r}: contains newline")
     if path.exists():
         if _ask(input_fn, f"{path} exists — overwrite? [y/N]", "n").lower() != "y":
             print("Keeping existing .env.")
             return False
     path.write_text("".join(f"{k}={v}\n" for k, v in env.items()))
+    os.chmod(path, 0o600)
     print(f"Wrote {path}")
     return True
 
