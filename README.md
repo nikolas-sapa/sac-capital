@@ -12,6 +12,12 @@
 | Contract | [`0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`](https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887) |
 | Deploy tx | [`0x46bbaa...`](https://explorer.mantle.xyz/tx/0x46bbaa02a9e7fd1025f00896c70405978cc3596e04d0559e07c5c1b0cac1222b) |
 
+## Install the CLI
+
+`uv tool install sac-capital` → `sac setup` → `sac run`. Runs on your
+Claude subscription via the `claude` CLI (no API key required) — API
+keys optional. Full guide: [INSTALL.md](INSTALL.md).
+
 ---
 
 ## How It Works

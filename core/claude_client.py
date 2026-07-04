@@ -253,7 +253,7 @@ class ClaudeCodeClient:
     Provider selection:
       - LLM_PROVIDER=codex     -> local Codex CLI / ChatGPT login
       - LLM_PROVIDER=openai    -> OpenAI API (requires OPENAI_API_KEY)
-      - LLM_PROVIDER=claude    -> Claude CLI
+      - LLM_PROVIDER=claude_cli -> Claude CLI
       - LLM_PROVIDER=anthropic -> Anthropic SDK
       - blank / auto           -> Codex CLI
 
@@ -299,6 +299,8 @@ class ClaudeCodeClient:
 
     def complete(self, system: str, user: str, model: str) -> LLMResponse:
         """Send a prompt and return the response."""
+        if self._provider == "claude_cli":
+            return self._complete_with_claude_cli(system, user, model)
         if self._openai is not None:
             return self._openai.complete(system, user, model)
         if self._provider == "anthropic":

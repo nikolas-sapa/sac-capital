@@ -197,3 +197,52 @@ def test_codex_fallback_on_exec_failure_uses_claude_cli(monkeypatch):
     client = ClaudeCodeClient()
     resp = client.complete("sys", "user", "sonnet")
     assert resp.content == "fallback-response"
+
+
+def test_claude_cli_provider_is_first_class(monkeypatch):
+    """LLM_PROVIDER=claude_cli must route to the claude CLI without codex or keys."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("LLM_PROVIDER", "claude_cli")
+    from core.claude_client import ClaudeCodeClient, LLMResponse
+
+    client = ClaudeCodeClient()
+    assert client._codex is None
+    assert client._openai is None
+    assert client._anthropic is None
+    assert client._provider == "claude_cli"
+
+    calls = {}
+
+    def fake_cli(system, user, model):
+        calls["model"] = model
+        return LLMResponse(content="ok", input_tokens=1, output_tokens=1)
+
+    client._complete_with_claude_cli = fake_cli
+    resp = client.complete("sys", "usr", "fast")
+    assert resp.content == "ok"
+    assert calls["model"] == "fast"
+
+
+def test_claude_cli_provider_invokes_claude_binary_via_subprocess(monkeypatch):
+    """LLM_PROVIDER=claude_cli must shell out to `claude -p --model <mapped>` via
+    subprocess, pass the prompt via `input`, and raise on nonzero returncode."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("LLM_PROVIDER", "claude_cli")
+
+    calls = {}
+
+    def fake_run(args, input, capture_output, text, timeout, start_new_session=False):
+        calls["args"] = args
+        calls["input"] = input
+        return SimpleNamespace(returncode=1, stderr="boom", stdout="")
+
+    monkeypatch.setattr("core.claude_client.subprocess.run", fake_run)
+    client = ClaudeCodeClient()
+
+    with pytest.raises(RuntimeError, match="boom"):
+        client.complete("sys", "usr", "strong")
+
+    assert calls["args"][:4] == ["claude", "-p", "--model", "claude-sonnet-4-6"]
+    assert "sys" in calls["input"] and "usr" in calls["input"]
