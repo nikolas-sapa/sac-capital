@@ -1,4 +1,4 @@
-"""ASCII wordmark for the sac CLI."""
+"""ASCII wordmark for the SAC Capital CLI."""
 from __future__ import annotations
 
 BANNER = r"""
@@ -9,7 +9,7 @@ BANNER = r"""
   ███████║██║  ██║╚██████╗    ╚██████╗██║  ██║██║     ██║   ██║   ██║  ██║███████╗
   ╚══════╝╚═╝  ╚═╝ ╚═════╝     ╚═════╝╚═╝  ╚═╝╚═╝     ╚═╝   ╚═╝   ╚═╝  ╚═╝╚══════╝
 
-  SAC — sapa fund capital
+  SAC CAPITAL
 """
 
 DISCLAIMER = "AI trading research agent — paper-only by default. Not financial advice."
