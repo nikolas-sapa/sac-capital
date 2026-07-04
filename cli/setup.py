@@ -90,8 +90,10 @@ def write_env(env: dict[str, str], path: Path, input_fn=input) -> bool:
         if _ask(input_fn, f"{path} exists — overwrite? [y/N]", "n").lower() != "y":
             print("Keeping existing .env.")
             return False
-    path.write_text("".join(f"{k}={v}\n" for k, v in env.items()))
-    os.chmod(path, 0o600)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write("".join(f"{k}={v}\n" for k, v in env.items()))
+    os.chmod(path, 0o600)  # pre-existing file keeps old mode from os.open — force it
     print(f"Wrote {path}")
     return True
 

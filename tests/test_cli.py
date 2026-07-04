@@ -94,3 +94,13 @@ class TestWizard:
         target = tmp_path / ".env"
         write_env({"A": "1"}, target)
         assert (target.stat().st_mode & 0o777) == 0o600
+
+    def test_write_env_tightens_perms_on_preexisting_0644_file(self, tmp_path):
+        import os
+        from cli.setup import write_env
+        target = tmp_path / ".env"
+        target.write_text("OLD=1\n")
+        os.chmod(target, 0o644)
+        ok = write_env({"A": "1"}, target, input_fn=make_answers(["y"]))
+        assert ok is True
+        assert (target.stat().st_mode & 0o777) == 0o600
