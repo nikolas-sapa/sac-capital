@@ -104,3 +104,33 @@ class TestWizard:
         ok = write_env({"A": "1"}, target, input_fn=make_answers(["y"]))
         assert ok is True
         assert (target.stat().st_mode & 0o777) == 0o600
+
+
+class TestDispatch:
+    def test_no_args_prints_banner_and_help(self, capsys, monkeypatch, tmp_path):
+        from cli.main import main
+        monkeypatch.setenv("SAC_HOME", str(tmp_path))
+        rc = main([])
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert "SAC" in out
+        assert "setup" in out
+
+    def test_research_passthrough_args(self, monkeypatch, tmp_path):
+        import cli.main as m
+        monkeypatch.setenv("SAC_HOME", str(tmp_path))
+        seen = {}
+
+        def fake_research_main():
+            import sys
+            seen["argv"] = sys.argv[1:]
+
+        monkeypatch.setattr(m, "_research_main", lambda: fake_research_main())
+        rc = m.main(["research", "--static-only"])
+        assert rc == 0
+
+    def test_setup_dispatch(self, monkeypatch, tmp_path):
+        import cli.main as m
+        monkeypatch.setenv("SAC_HOME", str(tmp_path))
+        monkeypatch.setattr(m, "run_setup", lambda: 0)
+        assert m.main(["setup"]) == 0

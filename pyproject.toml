@@ -29,6 +29,6 @@ asyncio_mode = "auto"
 
 [project.scripts]
 latency-probe = "strategies.crypto_updown.latency_probe:main"
-runner = "runner:main"
 runner-equities = "runner_equities:main"
 runner-research = "runner_research:main"
+sac = "cli.main:main"
