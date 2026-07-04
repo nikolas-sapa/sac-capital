@@ -12,3 +12,25 @@ class TestBanner:
         print_banner()
         out = capsys.readouterr().out
         assert "paper-only" in out.lower()
+
+
+class TestWorkdir:
+    def test_repo_mode_when_env_in_cwd(self, tmp_path):
+        from cli.workdir import resolve_workdir
+        (tmp_path / ".env").write_text("X=1\n")
+        assert resolve_workdir(cwd=tmp_path) == tmp_path
+
+    def test_home_mode_creates_dirs(self, tmp_path, monkeypatch):
+        from cli.workdir import resolve_workdir
+        home = tmp_path / "sachome"
+        monkeypatch.setenv("SAC_HOME", str(home))
+        result = resolve_workdir(cwd=tmp_path)  # no .env in cwd
+        assert result == home
+        assert (home / "data").is_dir()
+
+    def test_default_home_under_user_home(self, tmp_path, monkeypatch):
+        from cli.workdir import resolve_workdir
+        monkeypatch.delenv("SAC_HOME", raising=False)
+        monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+        result = resolve_workdir(cwd=tmp_path / "elsewhere")
+        assert result == tmp_path / ".sac-capital"
