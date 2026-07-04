@@ -1,7 +1,19 @@
 [project]
 name = "sac-capital"
-version = "0.1.0"
-description = "AI trading agent with verifiable on-chain decision commitments (Mantle)"
+version = "0.1.1"
+description = "AI trading research agent — paper trading on your Claude subscription, with verifiable on-chain decision commitments (Mantle)"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Nikolas Sapalidis" }]
+keywords = ["trading", "ai-agent", "claude", "paper-trading", "equities", "research"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+urls = { Homepage = "https://github.com/nikolas-sapa/sac-capital", Documentation = "https://github.com/nikolas-sapa/sac-capital/blob/main/INSTALL.md" }
 requires-python = ">=3.12"
 dependencies = [
     "aiogram>=3.28.2",

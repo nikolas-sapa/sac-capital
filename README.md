@@ -1,4 +1,4 @@
-<p align="center"><img src="frontend/public/sac-capital.png" width="320" /></p>
+<p align="center"><img src="https://raw.githubusercontent.com/nikolas-sapa/sac-capital/main/frontend/public/sac-capital.png" width="320" /></p>
 
 # SAC Capital
 
@@ -24,7 +24,7 @@ sac run                       # equities pipeline (paper trading)
 Runs on your Claude subscription via the `claude` CLI (no API key
 required) — Anthropic/OpenAI API keys and Codex optional. Every wizard
 step is skippable; config lives in `~/.sac-capital/`. Full guide:
-[INSTALL.md](INSTALL.md).
+[INSTALL.md](https://github.com/nikolas-sapa/sac-capital/blob/main/INSTALL.md).
 
 | Command | Does |
 |---|---|
