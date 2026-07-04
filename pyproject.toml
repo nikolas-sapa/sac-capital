@@ -32,3 +32,20 @@ latency-probe = "strategies.crypto_updown.latency_probe:main"
 runner-equities = "runner_equities:main"
 runner-research = "runner_research:main"
 sac = "cli.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "cli", "core", "equities", "orchestrator", "harness",
+    "strategies", "broadcast", "scripts", "hackathon",
+]
+
+[tool.hatch.build.targets.wheel.force-include]
+"runner_equities.py" = "runner_equities.py"
+"runner_research.py" = "runner_research.py"
+
+[tool.hatch.build.targets.sdist]
+exclude = ["frontend", "contracts", "docs", "spike", "tests", "cache", "data", ".env*"]
