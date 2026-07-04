@@ -253,7 +253,7 @@ class ClaudeCodeClient:
     Provider selection:
       - LLM_PROVIDER=codex     -> local Codex CLI / ChatGPT login
       - LLM_PROVIDER=openai    -> OpenAI API (requires OPENAI_API_KEY)
-      - LLM_PROVIDER=claude    -> Claude CLI
+      - LLM_PROVIDER=claude_cli -> Claude CLI
       - LLM_PROVIDER=anthropic -> Anthropic SDK
       - blank / auto           -> Codex CLI
 
