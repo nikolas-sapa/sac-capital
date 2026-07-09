@@ -1006,9 +1006,11 @@ async def run_once(
                 return sector_lookup[ticker]
             try:
                 sector_lookup[ticker] = fundamentals_provider.fetch(ticker).sector
-            except (RuntimeError, TimeoutError):
+            except RuntimeError:
                 raise
             except Exception as exc:
+                # Sector is only used for the concentration cap — a flaky/timed-out
+                # fundamentals fetch must not abort the whole run. Default to "".
                 print(f"  [PROVIDER] source=yfinance_fundamentals ticker={ticker} error={exc}")
                 sector_lookup[ticker] = ""
             return sector_lookup[ticker]
@@ -1055,7 +1057,10 @@ async def run_once(
                     rec,
                     open_positions,
                     today_realized_loss=today_realized_loss,
-                    current_equity=deployable_equity,
+                    # Drawdown breaker needs mark-to-market equity, NOT deployable_equity
+                    # (which nets out capital in open positions and falsely reads as a
+                    # huge drawdown the moment the book is invested → permanent halt).
+                    current_equity=current_equity,
                     sector_lookup=sector_lookup,
                 )
                 if not sized.approved:

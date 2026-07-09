@@ -282,6 +282,7 @@ class ClaudeCodeClient:
             self._provider in {"", "auto"} and bool(os.getenv("OPENAI_API_KEY"))
         )
         use_anthropic = self._provider == "anthropic"
+        claude_primary = self._provider in {"claude", "claude_cli"}
         use_codex = self._provider in {"", "codex", "auto"}
         self._openai: OpenAIResponsesClient | None = None
         self._anthropic: AnthropicResponsesClient | None = None
@@ -294,13 +295,28 @@ class ClaudeCodeClient:
             if not (anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")):
                 raise RuntimeError("LLM_PROVIDER=anthropic requires ANTHROPIC_API_KEY")
             self._anthropic = AnthropicResponsesClient(api_key=anthropic_api_key, timeout=timeout)
+        # Codex CLI: primary when provider=codex, or BACKUP for the claude-primary
+        # path (built only if the codex CLI is actually installed on this machine).
         if use_codex and not use_openai:
+            self._codex = CodexCLIClient(timeout=max(timeout, 300))
+        elif claude_primary and shutil.which("codex") is not None:
             self._codex = CodexCLIClient(timeout=max(timeout, 300))
 
     def complete(self, system: str, user: str, model: str) -> LLMResponse:
         """Send a prompt and return the response."""
-        if self._provider == "claude_cli":
-            return self._complete_with_claude_cli(system, user, model)
+        if self._provider in ("claude", "claude_cli"):
+            # Claude CLI primary (bills the Claude subscription — no metered API);
+            # Codex CLI is the automatic backup on any Claude failure/timeout.
+            try:
+                return self._complete_with_claude_cli(system, user, model)
+            except (RuntimeError, subprocess.TimeoutExpired) as exc:
+                if self._codex is not None:
+                    _logger.warning(
+                        "claude CLI failed (%s) — falling back to Codex CLI.",
+                        str(exc)[:120],
+                    )
+                    return self._codex.complete(system, user, model)
+                raise
         if self._openai is not None:
             return self._openai.complete(system, user, model)
         if self._provider == "anthropic":
