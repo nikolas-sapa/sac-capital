@@ -43,7 +43,8 @@ def run_wizard(input_fn=input, which=shutil.which) -> dict[str, str]:
     elif choice == "3":
         env["LLM_PROVIDER"] = "codex"
     else:
-        env["LLM_PROVIDER"] = "claude_cli"
+        # Claude subscription primary, Codex CLI automatic backup.
+        env["LLM_PROVIDER"] = "claude"
 
     # 2. Alpaca paper keys (optional)
     key_id = _ask(input_fn, "Alpaca paper API key id (Enter to skip — internal paper ledger)")
@@ -98,11 +99,38 @@ def write_env(env: dict[str, str], path: Path, input_fn=input) -> bool:
     return True
 
 
-def run_setup(input_fn=input) -> int:
+def quick_start_env(which=shutil.which) -> dict[str, str]:
+    """Zero-question paper profile: subscription LLM if available, internal ledger."""
+    env: dict[str, str] = {
+        "LLM_PROVIDER": "claude" if which("claude") else "codex",
+        "EXECUTION_PROVIDER": "internal_paper",
+    }
+    env.update(RISK_DEFAULTS)
+    return env
+
+
+def run_setup(input_fn=input, first_run: bool = False) -> int:
     print_banner()
     workdir = resolve_workdir()
     print(f"Working directory: {workdir}")
-    env = run_wizard(input_fn=input_fn)
+    if first_run:
+        print("\nWelcome to SAC Capital — let's get you set up (paper-only by default).")
+
+    profile = _ask(
+        input_fn,
+        "Choose a profile — 1=Quick start (paper, sensible defaults, no keys), "
+        "2=Custom (full wizard), 3=Skip",
+        "1",
+    )
+    if profile == "3":
+        print("Skipped. Run `sac setup` any time.")
+        return 1
+    if profile == "2":
+        env = run_wizard(input_fn=input_fn)
+    else:
+        env = quick_start_env()
+        print("Quick start: internal paper ledger + subscription LLM (if `claude` found) + default risk caps.")
+
     if not write_env(env, workdir / ".env", input_fn=input_fn):
         return 1
     print("Setup complete. Next: `sac doctor` to verify, then `sac run`.")

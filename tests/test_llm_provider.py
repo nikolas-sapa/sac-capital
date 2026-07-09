@@ -125,6 +125,41 @@ def test_codex_fallback_on_token_expired_uses_claude_cli(monkeypatch):
     assert resp.content == "claude-cli-response"
 
 
+def test_claude_provider_falls_back_to_codex(monkeypatch):
+    """LLM_PROVIDER=claude → claude CLI primary; on failure, fall back to Codex CLI."""
+    monkeypatch.setenv("LLM_PROVIDER", "claude")
+    monkeypatch.setattr("core.claude_client.shutil.which", lambda name: f"/usr/bin/{name}")
+
+    def failing_claude(self, system, user, model):
+        raise RuntimeError("claude -p failed (exit 1): overloaded")
+
+    def fake_codex(self, system, user, model):
+        return LLMResponse(content="codex-backup", input_tokens=1, output_tokens=1)
+
+    monkeypatch.setattr("core.claude_client.ClaudeCodeClient._complete_with_claude_cli", failing_claude)
+    monkeypatch.setattr("core.claude_client.CodexCLIClient.complete", fake_codex)
+
+    client = ClaudeCodeClient()
+    assert client._codex is not None  # backup built  # type: ignore[attr-defined]
+    resp = client.complete("sys", "user", "strong")
+    assert resp.content == "codex-backup"
+
+
+def test_claude_provider_raises_when_no_codex_backup(monkeypatch):
+    """LLM_PROVIDER=claude with no codex CLI installed → claude failure re-raises."""
+    monkeypatch.setenv("LLM_PROVIDER", "claude")
+    monkeypatch.setattr("core.claude_client.shutil.which", lambda name: None)
+
+    def failing_claude(self, system, user, model):
+        raise RuntimeError("claude -p failed (exit 1): overloaded")
+
+    monkeypatch.setattr("core.claude_client.ClaudeCodeClient._complete_with_claude_cli", failing_claude)
+    client = ClaudeCodeClient()
+    assert client._codex is None  # type: ignore[attr-defined]
+    with pytest.raises(RuntimeError, match="overloaded"):
+        client.complete("sys", "user", "strong")
+
+
 def test_codex_fallback_never_uses_metered_anthropic_api(monkeypatch):
     """Guard: even with ANTHROPIC_API_KEY set, the fallback must NOT hit the metered SDK."""
     monkeypatch.setenv("LLM_PROVIDER", "codex")

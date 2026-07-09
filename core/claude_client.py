@@ -282,7 +282,7 @@ class ClaudeCodeClient:
             self._provider in {"", "auto"} and bool(os.getenv("OPENAI_API_KEY"))
         )
         use_anthropic = self._provider == "anthropic"
-        claude_primary = self._provider in {"claude", "claude_cli"}
+        claude_primary = self._provider == "claude"  # claude_cli stays pure (no backup)
         use_codex = self._provider in {"", "codex", "auto"}
         self._openai: OpenAIResponsesClient | None = None
         self._anthropic: AnthropicResponsesClient | None = None
@@ -304,7 +304,9 @@ class ClaudeCodeClient:
 
     def complete(self, system: str, user: str, model: str) -> LLMResponse:
         """Send a prompt and return the response."""
-        if self._provider in ("claude", "claude_cli"):
+        if self._provider == "claude_cli":
+            return self._complete_with_claude_cli(system, user, model)
+        if self._provider == "claude":
             # Claude CLI primary (bills the Claude subscription — no metered API);
             # Codex CLI is the automatic backup on any Claude failure/timeout.
             try:

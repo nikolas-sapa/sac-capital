@@ -84,6 +84,15 @@ def main(argv: list[str] | None = None) -> int:
 
     if cmd == "setup":
         return run_setup()
+
+    # First run: no config yet → guide setup before running a command that needs it.
+    if cmd in ("run", "research") and not (workdir / ".env").exists():
+        print("First run — no configuration found. Launching setup.\n")
+        rc = run_setup(first_run=True)
+        if rc == 0:
+            print(f"\nConfig saved to {workdir / '.env'}. Re-run `sac {cmd}` to continue.")
+        return rc
+
     passthrough = [a for a in rest if a != "--"]
     if cmd == "run":
         return _run_module_main(_equities_main, passthrough, "runner-equities")

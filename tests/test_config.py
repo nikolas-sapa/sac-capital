@@ -83,7 +83,7 @@ class TestDefaults:
         assert s.openai_strong_model == "gpt-5.5"
         assert s.codex_fast_model == "gpt-5.4-mini"
         assert s.codex_strong_model == "gpt-5.5"
-        assert s.llm_provider == "codex"
+        assert s.llm_provider == "claude"
 
     def test_alpaca_defaults(self, monkeypatch):
         monkeypatch.delenv("ALPACA_API_KEY_ID", raising=False)

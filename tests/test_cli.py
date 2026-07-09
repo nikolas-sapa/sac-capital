@@ -41,13 +41,29 @@ def make_answers(answers):
     return lambda prompt="": next(it, "")
 
 
+class TestQuickStart:
+    def test_quick_start_prefers_claude_when_present(self):
+        from cli.setup import quick_start_env
+        env = quick_start_env(which=lambda c: "/usr/local/bin/claude")
+        assert env["LLM_PROVIDER"] == "claude"
+        assert env["EXECUTION_PROVIDER"] == "internal_paper"
+        assert env["BANKROLL_USD"] == "1000"
+        assert "LIVE_TRADING_ENABLED" not in env
+
+    def test_quick_start_falls_back_to_codex_without_claude(self):
+        from cli.setup import quick_start_env
+        env = quick_start_env(which=lambda c: None)
+        assert env["LLM_PROVIDER"] == "codex"
+
+
 class TestWizard:
     def test_subscription_default_when_claude_on_path(self):
         from cli.setup import run_wizard
         # accept every default: press enter through all prompts
         env = run_wizard(input_fn=make_answers([""] * 20),
                          which=lambda cmd: "/usr/local/bin/claude")
-        assert env["LLM_PROVIDER"] == "claude_cli"
+        # subscription default now = claude primary + codex backup
+        assert env["LLM_PROVIDER"] == "claude"
         assert "LIVE_TRADING_ENABLED" not in env
         assert env["BANKROLL_USD"] == "1000"
 
