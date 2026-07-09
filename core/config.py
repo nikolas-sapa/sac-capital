@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     openai_strong_model: str = "gpt-5.5"
     codex_fast_model: str = "gpt-5.4-mini"
     codex_strong_model: str = "gpt-5.5"
-    llm_provider: str = "codex"  # codex | openai | anthropic | claude
+    llm_provider: str = "claude"  # claude (Claude CLI + Codex backup) | codex | openai | anthropic
     bankroll_usd: float = 1000.0
     kelly_fraction: float = 0.5
     max_position_pct: float = 0.02

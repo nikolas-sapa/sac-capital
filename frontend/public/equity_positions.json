@@ -217,10 +217,10 @@
     "status": "open",
     "shares": 4.405713,
     "entry_price": 567.734735,
-    "mark_price": 557.0900268554688,
+    "mark_price": 603.1199951171875,
     "stop_loss": null,
     "take_profit": null,
-    "unrealized_pnl": -46.89753,
+    "unrealized_pnl": 155.897299,
     "realized_pnl": null,
     "exit_price": null,
     "exit_reason": null,
@@ -255,10 +255,10 @@
     "status": "open",
     "shares": 10.866903,
     "entry_price": 202.332214,
-    "mark_price": 196.58999633789062,
+    "mark_price": 204.1199951171875,
     "stop_loss": null,
     "take_profit": null,
-    "unrealized_pnl": -62.400124,
+    "unrealized_pnl": 19.427642,
     "realized_pnl": null,
     "exit_price": null,
     "exit_reason": null,
@@ -288,10 +288,10 @@
     "status": "open",
     "shares": 1.75435,
     "entry_price": 1139.71696,
-    "mark_price": 1215.0,
+    "mark_price": 1215.8299560546875,
     "stop_loss": null,
     "take_profit": null,
-    "unrealized_pnl": 132.072801,
+    "unrealized_pnl": 133.528834,
     "realized_pnl": null,
     "exit_price": null,
     "exit_reason": null,
@@ -321,10 +321,10 @@
     "status": "open",
     "shares": 5.601443,
     "entry_price": 390.401491,
-    "mark_price": 372.0950012207031,
+    "mark_price": 383.3399963378906,
     "stop_loss": null,
     "take_profit": null,
-    "unrealized_pnl": -102.542759,
+    "unrealized_pnl": -39.554559,
     "realized_pnl": null,
     "exit_price": null,
     "exit_reason": null,
@@ -352,9 +352,9 @@
     "ticker": "META",
     "side": "buy",
     "status": "submitted",
-    "shares": 30.124738,
-    "entry_price": 564.320239,
-    "mark_price": 550.0499877929688,
+    "shares": 35.875708,
+    "entry_price": 568.629863,
+    "mark_price": 603.1199951171875,
     "stop_loss": null,
     "take_profit": null,
     "unrealized_pnl": null,
@@ -366,7 +366,9 @@
     "mode": "paper",
     "opened_at": "2026-06-15T13:27:24.191930+00:00",
     "closed_at": null,
-    "analysis": null,
+    "analysis": {
+      "signal_class": "core_dca"
+    },
     "entries": [
       {
         "price": 566.97998046875,
@@ -442,6 +444,21 @@
         "price": 550.0499877929688,
         "date": "2026-06-26T19:38:40.632863+00:00",
         "shares": 2.18162
+      },
+      {
+        "price": 563.2899780273438,
+        "date": "2026-07-01T04:58:48.886827+00:00",
+        "shares": 2.130341
+      },
+      {
+        "price": 613.1300048828125,
+        "date": "2026-07-01T14:39:38.799710+00:00",
+        "shares": 1.630975
+      },
+      {
+        "price": 603.1199951171875,
+        "date": "2026-07-09T05:43:53.836626+00:00",
+        "shares": 1.989654
       }
     ]
   },
@@ -450,9 +467,9 @@
     "ticker": "NVDA",
     "side": "buy",
     "status": "submitted",
-    "shares": 77.925946,
-    "entry_price": 204.039876,
-    "mark_price": 195.74000549316406,
+    "shares": 101.37726,
+    "entry_price": 203.201391,
+    "mark_price": 204.1199951171875,
     "stop_loss": null,
     "take_profit": null,
     "unrealized_pnl": null,
@@ -464,7 +481,9 @@
     "mode": "paper",
     "opened_at": "2026-06-15T13:27:24.551734+00:00",
     "closed_at": null,
-    "analysis": null,
+    "analysis": {
+      "signal_class": "core_dca"
+    },
     "entries": [
       {
         "price": 205.19000244140625,
@@ -535,6 +554,26 @@
         "price": 195.74000549316406,
         "date": "2026-06-27T14:53:20.849718+00:00",
         "shares": 5.108818
+      },
+      {
+        "price": 200.08999633789062,
+        "date": "2026-07-01T04:58:49.181873+00:00",
+        "shares": 5.997301
+      },
+      {
+        "price": 200.08999633789062,
+        "date": "2026-07-01T12:08:52.637890+00:00",
+        "shares": 4.997751
+      },
+      {
+        "price": 195.78500366210938,
+        "date": "2026-07-01T14:39:39.115493+00:00",
+        "shares": 5.107643
+      },
+      {
+        "price": 204.1199951171875,
+        "date": "2026-07-09T05:43:54.127013+00:00",
+        "shares": 7.348619
       }
     ]
   },
@@ -543,9 +582,9 @@
     "ticker": "LLY",
     "side": "buy",
     "status": "submitted",
-    "shares": 8.997141,
-    "entry_price": 1111.464363,
-    "mark_price": 1127.68994140625,
+    "shares": 10.838454,
+    "entry_price": 1125.621941,
+    "mark_price": 1189.2900390625,
     "stop_loss": null,
     "take_profit": null,
     "unrealized_pnl": null,
@@ -608,6 +647,16 @@
         "price": 1127.68994140625,
         "date": "2026-06-26T13:21:52.592241+00:00",
         "shares": 0.886769
+      },
+      {
+        "price": 1199.4300537109375,
+        "date": "2026-07-01T04:58:49.936264+00:00",
+        "shares": 1.000475
+      },
+      {
+        "price": 1189.2900390625,
+        "date": "2026-07-01T14:39:39.849389+00:00",
+        "shares": 0.840838
       }
     ]
   },
@@ -616,9 +665,9 @@
     "ticker": "MSFT",
     "side": "buy",
     "status": "submitted",
-    "shares": 31.468188,
-    "entry_price": 374.98188,
-    "mark_price": 352.8299865722656,
+    "shares": 34.598568,
+    "entry_price": 375.738098,
+    "mark_price": 383.3399963378906,
     "stop_loss": null,
     "take_profit": null,
     "unrealized_pnl": null,
@@ -630,7 +679,9 @@
     "mode": "paper",
     "opened_at": "2026-06-15T13:27:25.315703+00:00",
     "closed_at": null,
-    "analysis": null,
+    "analysis": {
+      "signal_class": "core_dca"
+    },
     "entries": [
       {
         "price": 390.739990234375,
@@ -686,6 +737,51 @@
         "price": 352.8299865722656,
         "date": "2026-06-26T13:21:53.004875+00:00",
         "shares": 2.834226
+      },
+      {
+        "price": 383.3399963378906,
+        "date": "2026-07-09T05:43:54.697709+00:00",
+        "shares": 3.13038
+      }
+    ]
+  },
+  {
+    "id": "73",
+    "ticker": "SCHW",
+    "side": "buy",
+    "status": "submitted",
+    "shares": 33.576984,
+    "entry_price": 95.303377,
+    "mark_price": 101.69999694824219,
+    "stop_loss": null,
+    "take_profit": null,
+    "unrealized_pnl": null,
+    "realized_pnl": null,
+    "exit_price": null,
+    "exit_reason": null,
+    "confidence": 0.7357,
+    "strategy": "equity_analyst",
+    "mode": "paper",
+    "opened_at": "2026-07-01T04:58:49.565118+00:00",
+    "closed_at": null,
+    "analysis": {
+      "signal_class": "core_dca"
+    },
+    "entries": [
+      {
+        "price": 92.2699966430664,
+        "date": "2026-07-01T04:58:49.565118+00:00",
+        "shares": 13.005311
+      },
+      {
+        "price": 93.12000274658203,
+        "date": "2026-07-01T14:39:39.487071+00:00",
+        "shares": 10.738831
+      },
+      {
+        "price": 101.69999694824219,
+        "date": "2026-07-09T05:43:54.411480+00:00",
+        "shares": 9.832842
       }
     ]
   }

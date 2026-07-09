@@ -16,6 +16,7 @@ import asyncio
 import inspect
 import json
 import socket
+import subprocess
 import sys
 import time
 from contextlib import contextmanager
@@ -1005,9 +1006,11 @@ async def run_once(
                 return sector_lookup[ticker]
             try:
                 sector_lookup[ticker] = fundamentals_provider.fetch(ticker).sector
-            except (RuntimeError, TimeoutError):
+            except RuntimeError:
                 raise
             except Exception as exc:
+                # Sector is only used for the concentration cap — a flaky/timed-out
+                # fundamentals fetch must not abort the whole run. Default to "".
                 print(f"  [PROVIDER] source=yfinance_fundamentals ticker={ticker} error={exc}")
                 sector_lookup[ticker] = ""
             return sector_lookup[ticker]
@@ -1054,7 +1057,10 @@ async def run_once(
                     rec,
                     open_positions,
                     today_realized_loss=today_realized_loss,
-                    current_equity=deployable_equity,
+                    # Drawdown breaker needs mark-to-market equity, NOT deployable_equity
+                    # (which nets out capital in open positions and falsely reads as a
+                    # huge drawdown the moment the book is invested → permanent halt).
+                    current_equity=current_equity,
                     sector_lookup=sector_lookup,
                 )
                 if not sized.approved:
@@ -1302,6 +1308,16 @@ def main() -> None:
             clear_analysis_checkpoints=args.clear_analysis_checkpoints,
         )
     )
+
+    # Refresh the frontend's static snapshots so the website isn't stale.
+    # Only when running from the repo (skips silently for the pip-installed CLI,
+    # which has no frontend/ dir). ponytail: regen only; deploy stays manual.
+    regen = Path("scripts/generate_frontend_data.py")
+    if not args.dry_run and regen.is_file() and Path("frontend/public").is_dir():
+        try:
+            subprocess.run([sys.executable, str(regen)], check=True)
+        except Exception as exc:  # never fail the pipeline on a frontend-export hiccup
+            print(f"WARN: frontend data regen failed: {exc}")
 
 
 if __name__ == "__main__":
