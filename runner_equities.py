@@ -1310,14 +1310,12 @@ def main() -> None:
     )
 
     # Refresh the frontend's static snapshots so the website isn't stale.
-    # ponytail: regen only; deploy stays manual (`vercel deploy --prod`) — wire a
-    # git commit+push here if the Vercel project auto-deploys on push.
-    if not args.dry_run:
+    # Only when running from the repo (skips silently for the pip-installed CLI,
+    # which has no frontend/ dir). ponytail: regen only; deploy stays manual.
+    regen = Path("scripts/generate_frontend_data.py")
+    if not args.dry_run and regen.is_file() and Path("frontend/public").is_dir():
         try:
-            subprocess.run(
-                [sys.executable, "scripts/generate_frontend_data.py"],
-                check=True,
-            )
+            subprocess.run([sys.executable, str(regen)], check=True)
         except Exception as exc:  # never fail the pipeline on a frontend-export hiccup
             print(f"WARN: frontend data regen failed: {exc}")
 
