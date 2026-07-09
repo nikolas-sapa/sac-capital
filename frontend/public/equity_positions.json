@@ -215,9 +215,9 @@
     "ticker": "META",
     "side": "buy",
     "status": "open",
-    "shares": 4.405713,
-    "entry_price": 567.734735,
-    "mark_price": 603.1199951171875,
+    "shares": 32.27882,
+    "entry_price": 565.669035,
+    "mark_price": 612.85,
     "stop_loss": null,
     "take_profit": null,
     "unrealized_pnl": 155.897299,
@@ -245,6 +245,76 @@
         "price": 570.81,
         "date": "2026-06-12T16:37:35.457658+00:00",
         "shares": 2.102165
+      },
+      {
+        "price": 569.73,
+        "date": "2026-06-17T19:34:26.921130+00:00",
+        "shares": 1.755187
+      },
+      {
+        "price": 567.48,
+        "date": "2026-06-18T13:36:12.039839+00:00",
+        "shares": 1.761866
+      },
+      {
+        "price": 567.51,
+        "date": "2026-06-19T14:06:02.004426+00:00",
+        "shares": 2.114239
+      },
+      {
+        "price": 569.902165,
+        "date": "2026-06-19T19:54:50.765138+00:00",
+        "shares": 2.07893
+      },
+      {
+        "price": 573.26,
+        "date": "2026-06-22T14:08:08.679563+00:00",
+        "shares": 2.088809
+      },
+      {
+        "price": 564.684706,
+        "date": "2026-06-22T19:35:41.191916+00:00",
+        "shares": 2.124947
+      },
+      {
+        "price": 563.82,
+        "date": "2026-06-23T13:08:59.910426+00:00",
+        "shares": 1.773521
+      },
+      {
+        "price": 568.91,
+        "date": "2026-06-23T14:20:46.056209+00:00",
+        "shares": 1.753002
+      },
+      {
+        "price": 562.2,
+        "date": "2026-06-24T13:05:17.731527+00:00",
+        "shares": 2.134472
+      },
+      {
+        "price": 561.27,
+        "date": "2026-06-24T14:05:55.871760+00:00",
+        "shares": 2.134946
+      },
+      {
+        "price": 549.601722,
+        "date": "2026-06-25T13:08:51.048854+00:00",
+        "shares": 2.15181
+      },
+      {
+        "price": 548.235431,
+        "date": "2026-06-25T14:07:43.848871+00:00",
+        "shares": 2.188783
+      },
+      {
+        "price": 549.304584,
+        "date": "2026-06-26T19:38:40.632863+00:00",
+        "shares": 2.18162
+      },
+      {
+        "price": 612.85,
+        "date": "2026-07-01T14:39:38.799710+00:00",
+        "shares": 1.630975
       }
     ]
   },
@@ -253,9 +323,9 @@
     "ticker": "NVDA",
     "side": "buy",
     "status": "open",
-    "shares": 10.866903,
-    "entry_price": 202.332214,
-    "mark_price": 204.1199951171875,
+    "shares": 88.297244,
+    "entry_price": 201.039881,
+    "mark_price": 195.75,
     "stop_loss": null,
     "take_profit": null,
     "unrealized_pnl": 19.427642,
@@ -278,6 +348,76 @@
         "price": 204.727704,
         "date": "2026-06-12T16:37:36.184494+00:00",
         "shares": 4.879477
+      },
+      {
+        "price": 204.669526,
+        "date": "2026-06-17T19:34:27.225991+00:00",
+        "shares": 5.861092
+      },
+      {
+        "price": 210.675619,
+        "date": "2026-06-20T13:13:14.341106+00:00",
+        "shares": 7.119465
+      },
+      {
+        "price": 210.68,
+        "date": "2026-06-20T14:11:28.261188+00:00",
+        "shares": 5.695572
+      },
+      {
+        "price": 210.68,
+        "date": "2026-06-21T14:23:18.090125+00:00",
+        "shares": 4.74631
+      },
+      {
+        "price": 212.77,
+        "date": "2026-06-22T14:08:09.207084+00:00",
+        "shares": 4.699911
+      },
+      {
+        "price": 200.455605,
+        "date": "2026-06-23T13:09:00.257775+00:00",
+        "shares": 5.751258
+      },
+      {
+        "price": 200.020004,
+        "date": "2026-06-24T13:05:18.033101+00:00",
+        "shares": 4.999
+      },
+      {
+        "price": 198.95388,
+        "date": "2026-06-25T13:08:51.401935+00:00",
+        "shares": 5.025126
+      },
+      {
+        "price": 192.090768,
+        "date": "2026-06-26T13:21:52.248902+00:00",
+        "shares": 6.130581
+      },
+      {
+        "price": 193.833538,
+        "date": "2026-06-26T19:38:41.117432+00:00",
+        "shares": 6.190513
+      },
+      {
+        "price": 193.65,
+        "date": "2026-06-27T14:53:20.849718+00:00",
+        "shares": 5.108818
+      },
+      {
+        "price": 194.016787,
+        "date": "2026-07-01T04:58:49.181873+00:00",
+        "shares": 5.997301
+      },
+      {
+        "price": 194.156214,
+        "date": "2026-07-01T12:08:52.637890+00:00",
+        "shares": 4.997751
+      },
+      {
+        "price": 195.75,
+        "date": "2026-07-01T14:39:39.115493+00:00",
+        "shares": 5.107643
       }
     ]
   },
@@ -286,9 +426,9 @@
     "ticker": "LLY",
     "side": "buy",
     "status": "open",
-    "shares": 1.75435,
-    "entry_price": 1139.71696,
-    "mark_price": 1215.8299560546875,
+    "shares": 11.706035,
+    "entry_price": 1126.542463,
+    "mark_price": 1183.56,
     "stop_loss": null,
     "take_profit": null,
     "unrealized_pnl": 133.528834,
@@ -311,6 +451,61 @@
         "price": 1143.162,
         "date": "2026-06-12T16:37:37.269178+00:00",
         "shares": 0.874355
+      },
+      {
+        "price": 1132.656,
+        "date": "2026-06-15T13:27:24.904121+00:00",
+        "shares": 0.70609
+      },
+      {
+        "price": 1109.896,
+        "date": "2026-06-17T19:34:27.523811+00:00",
+        "shares": 0.900804
+      },
+      {
+        "price": 1111.38,
+        "date": "2026-06-18T13:36:13.044353+00:00",
+        "shares": 1.079137
+      },
+      {
+        "price": 1110.998,
+        "date": "2026-06-19T13:04:46.561878+00:00",
+        "shares": 0.899281
+      },
+      {
+        "price": 1098.512,
+        "date": "2026-06-20T13:13:15.677297+00:00",
+        "shares": 0.910274
+      },
+      {
+        "price": 1099.61,
+        "date": "2026-06-22T14:08:09.514709+00:00",
+        "shares": 0.909087
+      },
+      {
+        "price": 1102.04,
+        "date": "2026-06-23T13:09:00.577099+00:00",
+        "shares": 0.907375
+      },
+      {
+        "price": 1106.806,
+        "date": "2026-06-24T13:05:18.361276+00:00",
+        "shares": 0.903277
+      },
+      {
+        "price": 1117.084,
+        "date": "2026-06-25T13:08:51.748672+00:00",
+        "shares": 0.895047
+      },
+      {
+        "price": 1195.0,
+        "date": "2026-07-01T04:58:49.936264+00:00",
+        "shares": 1.000475
+      },
+      {
+        "price": 1183.56,
+        "date": "2026-07-01T14:39:39.849389+00:00",
+        "shares": 0.840838
       }
     ]
   },
@@ -319,9 +514,9 @@
     "ticker": "MSFT",
     "side": "buy",
     "status": "open",
-    "shares": 5.601443,
-    "entry_price": 390.401491,
-    "mark_price": 383.3399963378906,
+    "shares": 28.40943,
+    "entry_price": 377.675566,
+    "mark_price": 361.33,
     "stop_loss": null,
     "take_profit": null,
     "unrealized_pnl": -39.554559,
@@ -344,6 +539,46 @@
         "price": 387.36,
         "date": "2026-06-12T16:37:37.774923+00:00",
         "shares": 2.581511
+      },
+      {
+        "price": 378.85,
+        "date": "2026-06-17T19:34:27.838723+00:00",
+        "shares": 2.638731
+      },
+      {
+        "price": 375.24,
+        "date": "2026-06-18T13:36:13.420815+00:00",
+        "shares": 2.639149
+      },
+      {
+        "price": 375.339976,
+        "date": "2026-06-19T13:04:46.938400+00:00",
+        "shares": 3.166979
+      },
+      {
+        "price": 376.35,
+        "date": "2026-06-20T13:13:16.154614+00:00",
+        "shares": 3.162889
+      },
+      {
+        "price": 375.65,
+        "date": "2026-06-20T19:36:53.051041+00:00",
+        "shares": 2.635741
+      },
+      {
+        "price": 379.17,
+        "date": "2026-06-22T14:08:09.851438+00:00",
+        "shares": 3.153994
+      },
+      {
+        "price": 373.557024,
+        "date": "2026-06-24T13:05:18.655364+00:00",
+        "shares": 2.674226
+      },
+      {
+        "price": 361.33,
+        "date": "2026-06-25T13:08:52.109337+00:00",
+        "shares": 2.736278
       }
     ]
   },
@@ -351,24 +586,22 @@
     "id": "21",
     "ticker": "META",
     "side": "buy",
-    "status": "submitted",
-    "shares": 35.875708,
-    "entry_price": 568.629863,
-    "mark_price": 603.1199951171875,
+    "status": "expired",
+    "shares": 6.012947,
+    "entry_price": 565.446488,
+    "mark_price": 563.2899780273438,
     "stop_loss": null,
     "take_profit": null,
     "unrealized_pnl": null,
     "realized_pnl": null,
     "exit_price": null,
-    "exit_reason": null,
+    "exit_reason": "broker_expired_unfilled",
     "confidence": 0.8626,
     "strategy": "equity_analyst",
     "mode": "paper",
     "opened_at": "2026-06-15T13:27:24.191930+00:00",
-    "closed_at": null,
-    "analysis": {
-      "signal_class": "core_dca"
-    },
+    "closed_at": "2026-07-09T07:36:50.549584+00:00",
+    "analysis": null,
     "entries": [
       {
         "price": 566.97998046875,
@@ -376,89 +609,14 @@
         "shares": 2.116477
       },
       {
-        "price": 569.7399291992188,
-        "date": "2026-06-17T19:34:26.921130+00:00",
-        "shares": 1.755187
-      },
-      {
-        "price": 567.5800170898438,
-        "date": "2026-06-18T13:36:12.039839+00:00",
-        "shares": 1.761866
-      },
-      {
         "price": 566.2100219726562,
         "date": "2026-06-18T14:05:45.854999+00:00",
         "shares": 1.766129
       },
       {
-        "price": 567.5800170898438,
-        "date": "2026-06-19T14:06:02.004426+00:00",
-        "shares": 2.114239
-      },
-      {
-        "price": 577.219970703125,
-        "date": "2026-06-19T19:54:50.765138+00:00",
-        "shares": 2.07893
-      },
-      {
-        "price": 574.489990234375,
-        "date": "2026-06-22T14:08:08.679563+00:00",
-        "shares": 2.088809
-      },
-      {
-        "price": 564.719970703125,
-        "date": "2026-06-22T19:35:41.191916+00:00",
-        "shares": 2.124947
-      },
-      {
-        "price": 563.8499755859375,
-        "date": "2026-06-23T13:08:59.910426+00:00",
-        "shares": 1.773521
-      },
-      {
-        "price": 570.4500122070312,
-        "date": "2026-06-23T14:20:46.056209+00:00",
-        "shares": 1.753002
-      },
-      {
-        "price": 562.2000122070312,
-        "date": "2026-06-24T13:05:17.731527+00:00",
-        "shares": 2.134472
-      },
-      {
-        "price": 562.0750122070312,
-        "date": "2026-06-24T14:05:55.871760+00:00",
-        "shares": 2.134946
-      },
-      {
-        "price": 557.6699829101562,
-        "date": "2026-06-25T13:08:51.048854+00:00",
-        "shares": 2.15181
-      },
-      {
-        "price": 548.2498779296875,
-        "date": "2026-06-25T14:07:43.848871+00:00",
-        "shares": 2.188783
-      },
-      {
-        "price": 550.0499877929688,
-        "date": "2026-06-26T19:38:40.632863+00:00",
-        "shares": 2.18162
-      },
-      {
         "price": 563.2899780273438,
         "date": "2026-07-01T04:58:48.886827+00:00",
         "shares": 2.130341
-      },
-      {
-        "price": 613.1300048828125,
-        "date": "2026-07-01T14:39:38.799710+00:00",
-        "shares": 1.630975
-      },
-      {
-        "price": 603.1199951171875,
-        "date": "2026-07-09T05:43:53.836626+00:00",
-        "shares": 1.989654
       }
     ]
   },
@@ -466,34 +624,27 @@
     "id": "22",
     "ticker": "NVDA",
     "side": "buy",
-    "status": "submitted",
-    "shares": 101.37726,
-    "entry_price": 203.201391,
-    "mark_price": 204.1199951171875,
+    "status": "expired",
+    "shares": 16.5983,
+    "entry_price": 204.84026,
+    "mark_price": 204.64999389648438,
     "stop_loss": null,
     "take_profit": null,
     "unrealized_pnl": null,
     "realized_pnl": null,
     "exit_price": null,
-    "exit_reason": null,
+    "exit_reason": "broker_expired_unfilled",
     "confidence": 0.7905,
     "strategy": "equity_analyst",
     "mode": "paper",
     "opened_at": "2026-06-15T13:27:24.551734+00:00",
-    "closed_at": null,
-    "analysis": {
-      "signal_class": "core_dca"
-    },
+    "closed_at": "2026-07-09T07:36:45.029575+00:00",
+    "analysis": null,
     "entries": [
       {
         "price": 205.19000244140625,
         "date": "2026-06-15T13:27:24.551734+00:00",
         "shares": 5.848238
-      },
-      {
-        "price": 204.74000549316406,
-        "date": "2026-06-17T19:34:27.225991+00:00",
-        "shares": 5.861092
       },
       {
         "price": 204.64999389648438,
@@ -504,159 +655,6 @@
         "price": 204.64999389648438,
         "date": "2026-06-19T14:06:02.354554+00:00",
         "shares": 4.886392
-      },
-      {
-        "price": 210.69000244140625,
-        "date": "2026-06-20T13:13:14.341106+00:00",
-        "shares": 7.119465
-      },
-      {
-        "price": 210.69000244140625,
-        "date": "2026-06-20T14:11:28.261188+00:00",
-        "shares": 5.695572
-      },
-      {
-        "price": 210.69000244140625,
-        "date": "2026-06-21T14:23:18.090125+00:00",
-        "shares": 4.74631
-      },
-      {
-        "price": 212.77000427246094,
-        "date": "2026-06-22T14:08:09.207084+00:00",
-        "shares": 4.699911
-      },
-      {
-        "price": 208.64999389648438,
-        "date": "2026-06-23T13:09:00.257775+00:00",
-        "shares": 5.751258
-      },
-      {
-        "price": 200.0399932861328,
-        "date": "2026-06-24T13:05:18.033101+00:00",
-        "shares": 4.999
-      },
-      {
-        "price": 199.0,
-        "date": "2026-06-25T13:08:51.401935+00:00",
-        "shares": 5.025126
-      },
-      {
-        "price": 195.74000549316406,
-        "date": "2026-06-26T13:21:52.248902+00:00",
-        "shares": 6.130581
-      },
-      {
-        "price": 193.84500122070312,
-        "date": "2026-06-26T19:38:41.117432+00:00",
-        "shares": 6.190513
-      },
-      {
-        "price": 195.74000549316406,
-        "date": "2026-06-27T14:53:20.849718+00:00",
-        "shares": 5.108818
-      },
-      {
-        "price": 200.08999633789062,
-        "date": "2026-07-01T04:58:49.181873+00:00",
-        "shares": 5.997301
-      },
-      {
-        "price": 200.08999633789062,
-        "date": "2026-07-01T12:08:52.637890+00:00",
-        "shares": 4.997751
-      },
-      {
-        "price": 195.78500366210938,
-        "date": "2026-07-01T14:39:39.115493+00:00",
-        "shares": 5.107643
-      },
-      {
-        "price": 204.1199951171875,
-        "date": "2026-07-09T05:43:54.127013+00:00",
-        "shares": 7.348619
-      }
-    ]
-  },
-  {
-    "id": "23",
-    "ticker": "LLY",
-    "side": "buy",
-    "status": "submitted",
-    "shares": 10.838454,
-    "entry_price": 1125.621941,
-    "mark_price": 1189.2900390625,
-    "stop_loss": null,
-    "take_profit": null,
-    "unrealized_pnl": null,
-    "realized_pnl": null,
-    "exit_price": null,
-    "exit_reason": null,
-    "confidence": 0.7312,
-    "strategy": "equity_analyst",
-    "mode": "paper",
-    "opened_at": "2026-06-15T13:27:24.904121+00:00",
-    "closed_at": null,
-    "analysis": null,
-    "entries": [
-      {
-        "price": 1133.0,
-        "date": "2026-06-15T13:27:24.904121+00:00",
-        "shares": 0.70609
-      },
-      {
-        "price": 1110.1199951171875,
-        "date": "2026-06-17T19:34:27.523811+00:00",
-        "shares": 0.900804
-      },
-      {
-        "price": 1112.0,
-        "date": "2026-06-18T13:36:13.044353+00:00",
-        "shares": 1.079137
-      },
-      {
-        "price": 1112.0,
-        "date": "2026-06-19T13:04:46.561878+00:00",
-        "shares": 0.899281
-      },
-      {
-        "price": 1098.5699462890625,
-        "date": "2026-06-20T13:13:15.677297+00:00",
-        "shares": 0.910274
-      },
-      {
-        "price": 1100.0050048828125,
-        "date": "2026-06-22T14:08:09.514709+00:00",
-        "shares": 0.909087
-      },
-      {
-        "price": 1102.0799560546875,
-        "date": "2026-06-23T13:09:00.577099+00:00",
-        "shares": 0.907375
-      },
-      {
-        "price": 1107.0799560546875,
-        "date": "2026-06-24T13:05:18.361276+00:00",
-        "shares": 0.903277
-      },
-      {
-        "price": 1117.260009765625,
-        "date": "2026-06-25T13:08:51.748672+00:00",
-        "shares": 0.895047
-      },
-      {
-        "price": 1127.68994140625,
-        "date": "2026-06-26T13:21:52.592241+00:00",
-        "shares": 0.886769
-      },
-      {
-        "price": 1199.4300537109375,
-        "date": "2026-07-01T04:58:49.936264+00:00",
-        "shares": 1.000475
-      },
-      {
-        "price": 1189.2900390625,
-        "date": "2026-07-01T14:39:39.849389+00:00",
-        "shares": 0.840838
       }
     ]
   },
@@ -664,24 +662,22 @@
     "id": "24",
     "ticker": "MSFT",
     "side": "buy",
-    "status": "submitted",
-    "shares": 34.598568,
-    "entry_price": 375.738098,
-    "mark_price": 383.3399963378906,
+    "status": "expired",
+    "shares": 8.660201,
+    "entry_price": 369.506426,
+    "mark_price": 352.8299865722656,
     "stop_loss": null,
     "take_profit": null,
     "unrealized_pnl": null,
     "realized_pnl": null,
     "exit_price": null,
-    "exit_reason": null,
+    "exit_reason": "broker_expired_unfilled",
     "confidence": 0.7086,
     "strategy": "equity_analyst",
     "mode": "paper",
     "opened_at": "2026-06-15T13:27:25.315703+00:00",
-    "closed_at": null,
-    "analysis": {
-      "signal_class": "core_dca"
-    },
+    "closed_at": "2026-07-09T07:36:49.889758+00:00",
+    "analysis": null,
     "entries": [
       {
         "price": 390.739990234375,
@@ -689,59 +685,42 @@
         "shares": 2.559247
       },
       {
-        "price": 378.9700012207031,
-        "date": "2026-06-17T19:34:27.838723+00:00",
-        "shares": 2.638731
-      },
-      {
-        "price": 378.9100036621094,
-        "date": "2026-06-18T13:36:13.420815+00:00",
-        "shares": 2.639149
-      },
-      {
-        "price": 378.9100036621094,
-        "date": "2026-06-19T13:04:46.938400+00:00",
-        "shares": 3.166979
-      },
-      {
-        "price": 379.3999938964844,
-        "date": "2026-06-20T13:13:16.154614+00:00",
-        "shares": 3.162889
-      },
-      {
-        "price": 379.3999938964844,
-        "date": "2026-06-20T19:36:53.051041+00:00",
-        "shares": 2.635741
-      },
-      {
-        "price": 380.4700012207031,
-        "date": "2026-06-22T14:08:09.851438+00:00",
-        "shares": 3.153994
-      },
-      {
         "price": 367.3399963378906,
         "date": "2026-06-23T13:09:00.955001+00:00",
         "shares": 3.266728
       },
       {
-        "price": 373.94000244140625,
-        "date": "2026-06-24T13:05:18.655364+00:00",
-        "shares": 2.674226
-      },
-      {
-        "price": 365.4599914550781,
-        "date": "2026-06-25T13:08:52.109337+00:00",
-        "shares": 2.736278
-      },
-      {
         "price": 352.8299865722656,
         "date": "2026-06-26T13:21:53.004875+00:00",
         "shares": 2.834226
-      },
+      }
+    ]
+  },
+  {
+    "id": "66",
+    "ticker": "LLY",
+    "side": "buy",
+    "status": "expired",
+    "shares": 0.886769,
+    "entry_price": 1127.689941,
+    "mark_price": 1127.68994140625,
+    "stop_loss": null,
+    "take_profit": null,
+    "unrealized_pnl": null,
+    "realized_pnl": null,
+    "exit_price": null,
+    "exit_reason": "broker_expired_unfilled",
+    "confidence": 0.7333,
+    "strategy": "equity_analyst",
+    "mode": "paper",
+    "opened_at": "2026-06-26T13:21:52.592241+00:00",
+    "closed_at": "2026-07-09T07:36:49.745375+00:00",
+    "analysis": null,
+    "entries": [
       {
-        "price": 383.3399963378906,
-        "date": "2026-07-09T05:43:54.697709+00:00",
-        "shares": 3.13038
+        "price": 1127.68994140625,
+        "date": "2026-06-26T13:21:52.592241+00:00",
+        "shares": 0.886769
       }
     ]
   },
@@ -749,24 +728,22 @@
     "id": "73",
     "ticker": "SCHW",
     "side": "buy",
-    "status": "submitted",
-    "shares": 33.576984,
-    "entry_price": 95.303377,
-    "mark_price": 101.69999694824219,
+    "status": "expired",
+    "shares": 23.744142,
+    "entry_price": 92.654431,
+    "mark_price": 93.12000274658203,
     "stop_loss": null,
     "take_profit": null,
     "unrealized_pnl": null,
     "realized_pnl": null,
     "exit_price": null,
-    "exit_reason": null,
+    "exit_reason": "broker_expired_unfilled",
     "confidence": 0.7357,
     "strategy": "equity_analyst",
     "mode": "paper",
     "opened_at": "2026-07-01T04:58:49.565118+00:00",
-    "closed_at": null,
-    "analysis": {
-      "signal_class": "core_dca"
-    },
+    "closed_at": "2026-07-09T07:36:51.832613+00:00",
+    "analysis": null,
     "entries": [
       {
         "price": 92.2699966430664,
@@ -777,11 +754,126 @@
         "price": 93.12000274658203,
         "date": "2026-07-01T14:39:39.487071+00:00",
         "shares": 10.738831
-      },
+      }
+    ]
+  },
+  {
+    "id": "80",
+    "ticker": "META",
+    "side": "buy",
+    "status": "submitted",
+    "shares": 1.989654,
+    "entry_price": 603.119995,
+    "mark_price": 603.1199951171875,
+    "stop_loss": null,
+    "take_profit": null,
+    "unrealized_pnl": null,
+    "realized_pnl": null,
+    "exit_price": null,
+    "exit_reason": null,
+    "confidence": 0.8509,
+    "strategy": "equity_analyst",
+    "mode": "paper",
+    "opened_at": "2026-07-09T05:43:53.836626+00:00",
+    "closed_at": null,
+    "analysis": {
+      "signal_class": "core_dca"
+    },
+    "entries": [
+      {
+        "price": 603.1199951171875,
+        "date": "2026-07-09T05:43:53.836626+00:00",
+        "shares": 1.989654
+      }
+    ]
+  },
+  {
+    "id": "81",
+    "ticker": "NVDA",
+    "side": "buy",
+    "status": "submitted",
+    "shares": 7.348619,
+    "entry_price": 204.119995,
+    "mark_price": 204.1199951171875,
+    "stop_loss": null,
+    "take_profit": null,
+    "unrealized_pnl": null,
+    "realized_pnl": null,
+    "exit_price": null,
+    "exit_reason": null,
+    "confidence": 0.7993,
+    "strategy": "equity_analyst",
+    "mode": "paper",
+    "opened_at": "2026-07-09T05:43:54.127013+00:00",
+    "closed_at": null,
+    "analysis": {
+      "signal_class": "core_dca"
+    },
+    "entries": [
+      {
+        "price": 204.1199951171875,
+        "date": "2026-07-09T05:43:54.127013+00:00",
+        "shares": 7.348619
+      }
+    ]
+  },
+  {
+    "id": "82",
+    "ticker": "SCHW",
+    "side": "buy",
+    "status": "submitted",
+    "shares": 9.832842,
+    "entry_price": 101.699997,
+    "mark_price": 101.69999694824219,
+    "stop_loss": null,
+    "take_profit": null,
+    "unrealized_pnl": null,
+    "realized_pnl": null,
+    "exit_price": null,
+    "exit_reason": null,
+    "confidence": 0.7232,
+    "strategy": "equity_analyst",
+    "mode": "paper",
+    "opened_at": "2026-07-09T05:43:54.411480+00:00",
+    "closed_at": null,
+    "analysis": {
+      "signal_class": "core_dca"
+    },
+    "entries": [
       {
         "price": 101.69999694824219,
         "date": "2026-07-09T05:43:54.411480+00:00",
         "shares": 9.832842
+      }
+    ]
+  },
+  {
+    "id": "83",
+    "ticker": "MSFT",
+    "side": "buy",
+    "status": "submitted",
+    "shares": 3.13038,
+    "entry_price": 383.339996,
+    "mark_price": 383.3399963378906,
+    "stop_loss": null,
+    "take_profit": null,
+    "unrealized_pnl": null,
+    "realized_pnl": null,
+    "exit_price": null,
+    "exit_reason": null,
+    "confidence": 0.7094,
+    "strategy": "equity_analyst",
+    "mode": "paper",
+    "opened_at": "2026-07-09T05:43:54.697709+00:00",
+    "closed_at": null,
+    "analysis": {
+      "signal_class": "core_dca"
+    },
+    "entries": [
+      {
+        "price": 383.3399963378906,
+        "date": "2026-07-09T05:43:54.697709+00:00",
+        "shares": 3.13038
       }
     ]
   }
