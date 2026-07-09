@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { upstreamError, withGuard } from "./_lib/guard";
+import { upstreamError, withGuard } from "./_lib/guard.js";
 
 const DATA_URL = "https://data.alpaca.markets";
 
