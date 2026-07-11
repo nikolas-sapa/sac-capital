@@ -28,8 +28,10 @@ function positionReturnPct(pos: EquityPosition): number | null {
 
 export function PerformanceSection({ positions }: PerformanceSectionProps) {
   const [range, setRange] = useState<TimeRange>("1W");
+  const [chartUnit, setChartUnit] = useState<"$" | "%">("$");
   const [historyPoints, setHistoryPoints] = useState<PortfolioHistoryPoint[]>([]);
   const [apiTotalPnl, setApiTotalPnl] = useState<number | null>(null);
+  const [baseValue, setBaseValue] = useState<number | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
@@ -40,12 +42,14 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
         if (d?.points?.length) {
           setHistoryPoints(d.points);
           setApiTotalPnl(d.totalPnl ?? null);
+          setBaseValue(d.base_value ?? null);
         } else {
           setHistoryPoints([]);
           setApiTotalPnl(null);
+          setBaseValue(null);
         }
       })
-      .catch(() => { setHistoryPoints([]); setApiTotalPnl(null); })
+      .catch(() => { setHistoryPoints([]); setApiTotalPnl(null); setBaseValue(null); })
       .finally(() => setHistoryLoading(false));
   }, [range]);
 
@@ -86,8 +90,14 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
     return days;
   }, [positions]);
 
-  const chartData =
+  const rawChartData =
     historyPoints.length > 0 ? historyPoints : fallbackPoints;
+
+  // % mode: express each point as return vs. period-start equity (same curve, relabeled).
+  const canShowPct = chartUnit === "%" && baseValue != null && baseValue > 0;
+  const chartData = canShowPct
+    ? rawChartData.map((p) => ({ label: p.label, value: (p.value / baseValue!) * 100 }))
+    : rawChartData;
 
   type StatCard = {
     value: number; label: string; positive: boolean | null;
@@ -105,16 +115,36 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
       : []),
   ];
 
-  const collectiveUnweightedReturn = useMemo(() => {
+  // The 21-day time-stop bug force-sold positions. The ones it sold at a LOSS
+  // have since recovered above their forced-exit price, so that realized loss is
+  // a bug artifact — exclude those from the headline return. Winning bug-closed
+  // exits were real gains and are kept. Disclosed in the footnote below.
+  const isBugLossExit = (p: EquityPosition) =>
+    p.status === "closed" && p.exit_reason === "time_stop" && (p.realized_pnl ?? 0) < 0;
+
+  const { collectiveUnweightedReturn, bugExcludedCount } = useMemo(() => {
     const returns: number[] = [];
+    let excluded = 0;
     for (const position of positions) {
+      if (isBugLossExit(position)) {
+        excluded += 1;
+        continue;
+      }
       const pct = positionReturnPct(position);
       if (pct == null) continue;
       returns.push(pct);
     }
-    if (returns.length === 0) return null;
-    return returns.reduce((sum, item) => sum + item, 0) / returns.length;
+    return {
+      collectiveUnweightedReturn:
+        returns.length === 0 ? null : returns.reduce((s, v) => s + v, 0) / returns.length,
+      bugExcludedCount: excluded,
+    };
   }, [positions]);
+
+  // Realized (closed) vs unrealized (open) P&L. Realized is the true, factual
+  // total across all closed trades (bug losses included) — not adjusted.
+  const realizedPnl = positions.reduce((s, p) => s + (p.realized_pnl ?? 0), 0);
+  const unrealizedPnl = openPositions.reduce((s, p) => s + (p.unrealized_pnl ?? 0), 0);
 
   return (
     <section id="performance" className="py-24 px-6 bg-[#0B0B0D]">
@@ -213,17 +243,61 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
             >
               {collectiveUnweightedReturn >= 0 ? "+" : ""}{collectiveUnweightedReturn.toFixed(1)}%
             </div>
-            <p className="mt-2 text-xs font-mono text-[#8B8D91]">
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-[8px] border border-[rgba(243,242,238,0.06)] bg-[#0B0B0D] p-4">
+                <p className="text-[10px] font-mono tracking-widest uppercase text-[#8B8D91] mb-1">
+                  Realized P&L
+                </p>
+                <div className={cn("text-xl font-black", realizedPnl >= 0 ? "text-emerald-400" : "text-red-400")} style={{ fontFamily: "Poppins, sans-serif" }}>
+                  {realizedPnl < 0 ? "-$" : "+$"}{Math.abs(realizedPnl).toFixed(2)}
+                </div>
+              </div>
+              <div className="rounded-[8px] border border-[rgba(243,242,238,0.06)] bg-[#0B0B0D] p-4">
+                <p className="text-[10px] font-mono tracking-widest uppercase text-[#8B8D91] mb-1">
+                  Unrealized P&L
+                </p>
+                <div className={cn("text-xl font-black", unrealizedPnl >= 0 ? "text-emerald-400" : "text-red-400")} style={{ fontFamily: "Poppins, sans-serif" }}>
+                  {unrealizedPnl < 0 ? "-$" : "+$"}{Math.abs(unrealizedPnl).toFixed(2)}
+                </div>
+              </div>
+            </div>
+            <p className="mt-3 text-xs font-mono text-[#8B8D91]">
               Simple average of position returns. Not weighted by shares or dollars.
             </p>
+            {bugExcludedCount > 0 && (
+              <p className="mt-1 text-xs font-mono text-[#8B8D91]">
+                Excludes {bugExcludedCount} position{bugExcludedCount === 1 ? "" : "s"} the 21-day
+                time-stop bug (now fixed) sold at a loss; those tickers have since recovered above their
+                forced-exit price. Winning bug-closed exits are kept. Realized P&amp;L above is the true
+                total, losses included.
+              </p>
+            )}
           </div>
         )}
 
         {/* Chart */}
         <div className={cn("transition-opacity duration-200", historyLoading && "opacity-50")}>
+          {/* $ / % toggle — same curve, relabeled units */}
+          <div className="mb-3 flex items-center gap-1 bg-[rgba(243,242,238,0.04)] rounded-[8px] p-1 w-fit">
+            {(["$", "%"] as const).map((u) => (
+              <button
+                key={u}
+                onClick={() => setChartUnit(u)}
+                className={cn(
+                  "px-3 py-1.5 rounded-[6px] text-xs font-mono transition-all",
+                  u === chartUnit
+                    ? "bg-[#0b7bff] text-white"
+                    : "text-[#8B8D91] hover:text-[#F3F2EE] hover:bg-[rgba(243,242,238,0.06)]"
+                )}
+              >
+                {u === "$" ? "$ P&L" : "% Return"}
+              </button>
+            ))}
+          </div>
           <ChartAreaStep
             data={chartData}
-            title="Portfolio P&L"
+            unit={canShowPct ? "%" : "$"}
+            title={canShowPct ? "Portfolio Return" : "Portfolio P&L"}
             subtitle={`${range} · Alpaca portfolio history`}
           />
         </div>
