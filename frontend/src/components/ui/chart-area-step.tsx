@@ -54,21 +54,29 @@ function areaPath(data: ChartPoint[], scale: Scale) {
   return `${stepPath(data, scale)} L ${points[points.length - 1].x} ${baseY} H ${points[0].x} Z`;
 }
 
-function fmtTick(v: number) {
+function fmtTick(v: number, unit: "$" | "%" = "$") {
+  if (unit === "%") return `${v.toFixed(v % 1 === 0 ? 0 : 1)}%`;
   if (Math.abs(v) >= 1000) return `$${(v / 1000).toFixed(1)}k`;
   return `$${v.toFixed(v % 1 === 0 ? 0 : 2)}`;
+}
+
+function fmtValue(v: number, unit: "$" | "%") {
+  const sign = v >= 0 ? "+" : "";
+  return unit === "%" ? `${sign}${v.toFixed(2)}%` : `${sign}$${v.toFixed(2)}`;
 }
 
 interface ChartAreaStepProps {
   data: ChartPoint[];
   title?: string;
   subtitle?: string;
+  unit?: "$" | "%";
 }
 
 export default function ChartAreaStep({
   data,
   title = "Performance",
   subtitle = "Step Area Chart",
+  unit = "$",
 }: ChartAreaStepProps) {
   const [activeIndex, setActiveIndex] = React.useState(data.length - 1);
 
@@ -104,7 +112,7 @@ export default function ChartAreaStep({
               className="font-mono font-bold"
               style={{ color: active.value >= 0 ? "#0b7bff" : "#f87171" }}
             >
-              {active.value >= 0 ? "+" : ""}${active.value.toFixed(2)}
+              {fmtValue(active.value, unit)}
             </span>
           </div>
         )}
@@ -141,7 +149,7 @@ export default function ChartAreaStep({
               <line x1={PAD.left} x2={WIDTH - PAD.right} y1={y} y2={y}
                 stroke="rgba(243,242,238,0.07)" strokeDasharray="6 6" />
               <text x={PAD.left - 6} y={y + 4} textAnchor="end" fontSize="9" fill="#8B8D91">
-                {fmtTick(tick)}
+                {fmtTick(tick, unit)}
               </text>
             </g>
           );

@@ -110,8 +110,8 @@ async function handler(req: VercelRequest, res: VercelResponse) {
     }
     totalPnl = points.length > 0 ? points[points.length - 1].value : 0;
 
-  } else {
-    // Multi-day: one bar per day = that day's individual P&L (not cumulative).
+  } else if (uiPeriod === "1W") {
+    // 1W: one bar per day = that day's individual P&L (not cumulative).
     // This way today starts at 0 and moves as the market opens.
     points = raw.timestamp
       .map((ts, i) => {
@@ -133,6 +133,46 @@ async function handler(req: VercelRequest, res: VercelResponse) {
     if (lastLabel !== todayLabel) {
       points.push({ label: todayLabel, value: 0 });
     }
+  } else {
+    // 1M → weekly buckets ("Week 1"…), longer ranges → monthly buckets ("Jun"…).
+    // Each bucket value = equity gain across that bucket (endEquity - startEquity),
+    // so the chart shows how much it went up per week / per month.
+    const byWeek = uiPeriod === "1M";
+    const fmtMonth = new Intl.DateTimeFormat("en-US", { timeZone: TZ, month: "short" });
+    const fmtYearWeek = new Intl.DateTimeFormat("en-US", {
+      timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
+    });
+
+    // Bucket key: ISO-ish week (year + week-of-year) or calendar month.
+    const weekKey = (d: Date) => {
+      const parts = fmtYearWeek.formatToParts(d);
+      const get = (t: string) => parts.find((p) => p.type === t)!.value;
+      const local = new Date(`${get("year")}-${get("month")}-${get("day")}T00:00:00Z`);
+      const week = Math.floor((local.getTime() / 86400000 + 4) / 7); // continuous week index
+      return String(week);
+    };
+
+    type Bucket = { key: string; first: number; last: number; monthLabel: string };
+    const buckets: Bucket[] = [];
+    raw.timestamp.forEach((ts, i) => {
+      const equity = raw.equity[i];
+      if (equity == null) return;
+      const d = new Date(ts * 1000);
+      const key = byWeek ? weekKey(d) : fmtMonth.format(d) + " " + d.getUTCFullYear();
+      const existing = buckets.find((b) => b.key === key);
+      if (existing) {
+        existing.last = equity;
+      } else {
+        buckets.push({ key, first: equity, last: equity, monthLabel: fmtMonth.format(d) });
+      }
+    });
+
+    points = buckets.map((b, i) => ({
+      label: byWeek ? `Week ${i + 1}` : b.monthLabel,
+      value: parseFloat((b.last - b.first).toFixed(2)),
+    }));
+
+    totalPnl = points.reduce((s, p) => s + p.value, 0);
   }
 
   res.setHeader("Cache-Control", "private, no-store");
