@@ -130,6 +130,10 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
         excluded += 1;
         continue;
       }
+      // Equal-weight the actual stock positions only. Skip unfilled orders
+      // (`submitted`) and expired contracts — they sit near 0% and dilute the
+      // real per-stock performance the average is meant to show.
+      if (position.status !== "open" && position.status !== "closed") continue;
       const pct = positionReturnPct(position);
       if (pct == null) continue;
       returns.push(pct);
@@ -262,7 +266,8 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
               </div>
             </div>
             <p className="mt-3 text-xs font-mono text-[#8B8D91]">
-              Simple average of position returns. Not weighted by shares or dollars.
+              Equal-weighted average of filled stock positions — each stock counts the same regardless
+              of position size. Excludes unfilled orders and expired contracts.
             </p>
             {bugExcludedCount > 0 && (
               <p className="mt-1 text-xs font-mono text-[#8B8D91]">
