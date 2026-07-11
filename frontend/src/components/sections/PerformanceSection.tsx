@@ -115,17 +115,18 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
       : []),
   ];
 
-  // A 21-day time-stop bug force-sold positions that have since recovered.
-  // Exclude those bug-forced exits from the headline return so it reflects the
-  // strategy, not the bug — and disclose it transparently below the number.
-  const isBugForcedExit = (p: EquityPosition) =>
-    p.status === "closed" && p.exit_reason === "time_stop";
+  // The 21-day time-stop bug force-sold positions. The ones it sold at a LOSS
+  // have since recovered above their forced-exit price, so that realized loss is
+  // a bug artifact — exclude those from the headline return. Winning bug-closed
+  // exits were real gains and are kept. Disclosed in the footnote below.
+  const isBugLossExit = (p: EquityPosition) =>
+    p.status === "closed" && p.exit_reason === "time_stop" && (p.realized_pnl ?? 0) < 0;
 
   const { collectiveUnweightedReturn, bugExcludedCount } = useMemo(() => {
     const returns: number[] = [];
     let excluded = 0;
     for (const position of positions) {
-      if (isBugForcedExit(position)) {
+      if (isBugLossExit(position)) {
         excluded += 1;
         continue;
       }
@@ -140,10 +141,9 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
     };
   }, [positions]);
 
-  // Realized (closed) vs unrealized (open) P&L, split out.
-  const realizedPnl = positions
-    .filter((p) => !isBugForcedExit(p))
-    .reduce((s, p) => s + (p.realized_pnl ?? 0), 0);
+  // Realized (closed) vs unrealized (open) P&L. Realized is the true, factual
+  // total across all closed trades (bug losses included) — not adjusted.
+  const realizedPnl = positions.reduce((s, p) => s + (p.realized_pnl ?? 0), 0);
   const unrealizedPnl = openPositions.reduce((s, p) => s + (p.unrealized_pnl ?? 0), 0);
 
   return (
@@ -266,9 +266,10 @@ export function PerformanceSection({ positions }: PerformanceSectionProps) {
             </p>
             {bugExcludedCount > 0 && (
               <p className="mt-1 text-xs font-mono text-[#8B8D91]">
-                Excludes {bugExcludedCount} position{bugExcludedCount === 1 ? "" : "s"} force-closed by a
-                21-day time-stop bug (now fixed). Several have since recovered above their forced-exit
-                price, so this return reflects the strategy rather than the bug.
+                Excludes {bugExcludedCount} position{bugExcludedCount === 1 ? "" : "s"} the 21-day
+                time-stop bug (now fixed) sold at a loss; those tickers have since recovered above their
+                forced-exit price. Winning bug-closed exits are kept. Realized P&amp;L above is the true
+                total, losses included.
               </p>
             )}
           </div>
