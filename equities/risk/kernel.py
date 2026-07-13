@@ -21,7 +21,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from equities.risk.sizing import size_shares, _DEFAULT_GAP_PCT
+from equities.risk.sizing import empirical_kelly_risk_pct, size_shares, _DEFAULT_GAP_PCT
 
 
 @dataclass(frozen=True)
@@ -48,6 +48,14 @@ class RiskKernel:
         drawdown_limit_pct:  Circuit-breaker: halt ALL trading when drawdown from high-
                              water-mark exceeds this fraction (default 0.15 = 15%).
         gap_pct:             Stop-order gap penalty for sizing (default 2%).
+        min_rr:              Minimum (take_profit-entry)/(entry-stop_loss) to approve a
+                             swing trade (default 2.0). 0 disables the gate.
+        kelly_fraction:      Fractional Kelly applied to swing risk once a confidence
+                             band has enough closed trades (default 0.0 = disabled).
+        kelly_min_trades:    Closed trades required in a band before Kelly sizing
+                             replaces flat risk_pct (default 30).
+        win_stats_lookup:    Callable[[float], tuple[int, float]] mapping confidence ->
+                             (n_closed_in_band, win_rate). Required for Kelly sizing.
     """
 
     def __init__(
@@ -60,6 +68,10 @@ class RiskKernel:
         daily_loss_limit_pct: float = 0.05,
         drawdown_limit_pct: float = 0.15,
         gap_pct: float = _DEFAULT_GAP_PCT,
+        min_rr: float = 2.0,
+        kelly_fraction: float = 0.0,
+        kelly_min_trades: int = 30,
+        win_stats_lookup: Any = None,
         state_path: Path | None = None,
     ) -> None:
         if capital <= 0:
@@ -72,6 +84,10 @@ class RiskKernel:
         self.daily_loss_limit_pct = daily_loss_limit_pct
         self.drawdown_limit_pct = drawdown_limit_pct
         self.gap_pct = gap_pct
+        self.min_rr = min_rr
+        self.kelly_fraction = kelly_fraction
+        self.kelly_min_trades = kelly_min_trades
+        self._win_stats_lookup = win_stats_lookup
 
         self._state_path = state_path
         self._high_water_mark = capital
@@ -176,9 +192,51 @@ class RiskKernel:
         if recommendation.stop_loss is None or recommendation.entry is None:
             return SizedRecommendation(recommendation, 0.0, False, "missing_stop_or_entry")
 
+        take_profit = getattr(recommendation, "take_profit", None)
+
+        # --- Minimum reward:risk asymmetry gate ---
+        if self.min_rr > 0 and take_profit is not None:
+            risk = recommendation.entry - recommendation.stop_loss
+            reward = take_profit - recommendation.entry
+            if risk > 0:
+                rr = reward / risk
+                if rr < self.min_rr:
+                    return SizedRecommendation(
+                        recommendation, 0.0, False,
+                        f"rr_{rr:.2f}_below_min_{self.min_rr:.1f}",
+                    )
+
+        # Build-tier / challenger sizing finally binds: scale risk by the
+        # analyst chain's size_pct relative to the 2% GRADUAL_BUILD baseline.
+        # Clamped so a bad size_pct can never 10x risk or zero it silently.
+        size_pct = getattr(recommendation, "size_pct", 0.0) or 0.0
+        if size_pct > 0:
+            scale = max(0.25, min(2.0, size_pct / 0.02))
+            effective_risk_pct = self.risk_pct * scale
+        else:
+            effective_risk_pct = self.risk_pct
+
+        # Empirical Kelly: replaces flat risk only when this confidence band
+        # has enough closed trades to estimate p honestly (>= kelly_min_trades).
+        if self.kelly_fraction > 0 and self._win_stats_lookup is not None:
+            try:
+                n, win_rate = self._win_stats_lookup(recommendation.confidence)
+            except Exception:
+                n, win_rate = 0, 0.0
+            if n >= self.kelly_min_trades and take_profit is not None:
+                b = (take_profit - recommendation.entry) / (
+                    recommendation.entry - recommendation.stop_loss
+                )
+                kelly = empirical_kelly_risk_pct(win_rate, b, self.kelly_fraction)
+                if kelly is not None:
+                    effective_risk_pct = min(kelly, 2.0 * self.risk_pct)
+                else:
+                    # measured edge <= 0 in this band: floor to NIBBLE-scale risk
+                    effective_risk_pct = min(effective_risk_pct, 0.5 * self.risk_pct)
+
         shares = size_shares(
             capital=self.capital,
-            risk_pct=self.risk_pct,
+            risk_pct=effective_risk_pct,
             entry=recommendation.entry,
             stop_loss=recommendation.stop_loss,
             gap_pct=self.gap_pct,

@@ -1,4 +1,6 @@
 """Tests for RiskKernel fuses."""
+import pytest
+
 from core.assets.instrument import CapTier, Instrument
 from equities.risk.kernel import RiskKernel, SizedRecommendation
 from equities.strategy import Recommendation, Sleeve
@@ -27,6 +29,58 @@ def _rec(
 
 def _open_pos(ticker: str = "X", shares: float = 10.0, price: float = 50.0) -> dict:
     return {"ticker": ticker, "sleeve": "swing", "shares": shares, "entry_price": price, "status": "open"}
+
+
+def _swing_rec(
+    ticker: str = "ARWR",
+    entry: float = 100.0,
+    stop_loss: float = 95.0,
+    take_profit: float = 115.0,
+    size_pct: float = 0.02,
+    confidence: float = 0.72,
+) -> Recommendation:
+    """Swing Recommendation factory keyed to the R:R / sizing gate tests below.
+
+    Default take_profit=115 clears the 2:1 min_rr gate for entry=100/stop=95
+    (rr=3.0) so tests targeting the sizing scale, not the R:R gate, don't
+    need to think about asymmetry unless they override take_profit.
+    """
+    return Recommendation(
+        instrument=Instrument(ticker, ticker, "NASDAQ", CapTier.SMALL),
+        sleeve=Sleeve.SWING,
+        side="buy",
+        entry=entry,
+        stop_loss=stop_loss,
+        take_profit=take_profit,
+        size_pct=size_pct,
+        confidence=confidence,
+        catalyst="test",
+        thesis="test thesis",
+        horizon="2 weeks",
+    )
+
+
+@pytest.fixture
+def make_swing_rec():
+    return _swing_rec
+
+
+@pytest.fixture
+def kernel_factory():
+    """Callable[..., RiskKernel]; capital/max_name_pct default large enough that the
+    max-position-size cap never clips the share-count ratios these tests assert on."""
+    def _factory(**kwargs) -> RiskKernel:
+        params = {"capital": 100_000.0, "max_name_pct": 1.0}
+        params.update(kwargs)
+        return RiskKernel(**params)
+    return _factory
+
+
+@pytest.fixture
+def kernel_and_rec_factory(kernel_factory, make_swing_rec):
+    # capital=100_000, risk_pct=0.02, min_rr=2.0 (kernel default)
+    kernel = kernel_factory(risk_pct=0.02)
+    return kernel, make_swing_rec
 
 
 def test_approves_valid_recommendation():
@@ -68,7 +122,9 @@ def test_circuit_breaker_stays_halted():
 
 
 def test_shares_positive_on_valid_input():
-    kernel = RiskKernel(capital=10_000.0, risk_pct=0.01)
+    # min_rr=0: this rec keeps the default tp=88.0 (below entry=100), which
+    # only pre-dates the R:R gate — not what this test is exercising.
+    kernel = RiskKernel(capital=10_000.0, risk_pct=0.01, min_rr=0)
     result = kernel.approve(_rec(entry=100.0, stop=90.0), open_positions=[])
     assert result.approved is True
     assert result.shares > 0
@@ -82,3 +138,45 @@ def test_rejects_missing_stop_loss():
     no_stop = dataclasses.replace(rec, stop_loss=None)
     result = kernel.approve(no_stop, open_positions=[])
     assert result.approved is False
+
+
+def test_min_rr_gate_rejects_poor_asymmetry(kernel_and_rec_factory):
+    kernel, make_rec = kernel_and_rec_factory  # construct kernel with min_rr=2.0
+    # risk $5, reward $2.50 -> rr 0.5 -> reject
+    bad = make_rec(entry=100.0, stop_loss=95.0, take_profit=102.5)
+    sized = kernel.approve(bad, [], today_realized_loss=0.0, current_equity=100_000)
+    assert not sized.approved
+    assert "rr_" in (sized.rejection_reason or "")
+
+    # risk $5, reward $12 -> rr 2.4 -> passes the gate
+    good = make_rec(entry=100.0, stop_loss=95.0, take_profit=112.0)
+    sized = kernel.approve(good, [], today_realized_loss=0.0, current_equity=100_000)
+    assert sized.approved
+
+
+def test_size_pct_scales_swing_risk(kernel_and_rec_factory):
+    """AGGRESSIVE (0.04) sizes 2x the GRADUAL baseline (0.02); NIBBLE (0.01) sizes 0.5x."""
+    kernel, make_rec = kernel_and_rec_factory  # capital=100_000, risk_pct=0.02
+    rec_gradual = make_rec(entry=100.0, stop_loss=95.0, size_pct=0.02)
+    rec_aggressive = make_rec(entry=100.0, stop_loss=95.0, size_pct=0.04)
+    rec_nibble = make_rec(entry=100.0, stop_loss=95.0, size_pct=0.01)
+
+    s_gradual = kernel.approve(rec_gradual, [], today_realized_loss=0.0, current_equity=100_000)
+    s_aggr = kernel.approve(rec_aggressive, [], today_realized_loss=0.0, current_equity=100_000)
+    s_nibble = kernel.approve(rec_nibble, [], today_realized_loss=0.0, current_equity=100_000)
+
+    assert s_aggr.shares == pytest.approx(2.0 * s_gradual.shares, rel=1e-6)
+    assert s_nibble.shares == pytest.approx(0.5 * s_gradual.shares, rel=1e-6)
+
+
+def test_kelly_used_only_with_sufficient_band_history(kernel_factory, make_swing_rec):
+    rich = kernel_factory(risk_pct=0.02, kelly_fraction=0.5, kelly_min_trades=30,
+                          win_stats_lookup=lambda conf: (40, 0.6), min_rr=0)
+    poor = kernel_factory(risk_pct=0.02, kelly_fraction=0.5, kelly_min_trades=30,
+                          win_stats_lookup=lambda conf: (5, 0.9), min_rr=0)
+    rec = make_swing_rec(entry=100.0, stop_loss=95.0, take_profit=110.0, size_pct=0.02)
+    s_rich = rich.approve(rec, [], today_realized_loss=0.0, current_equity=100_000)
+    s_poor = poor.approve(rec, [], today_realized_loss=0.0, current_equity=100_000)
+    # b = 10/5 = 2, p = 0.6 -> kelly risk = 0.5*0.4 = 0.20, clamped to 2x base = 0.04
+    # poor history -> base path risk 0.02. Rich sizes exactly 2x poor.
+    assert s_rich.shares == pytest.approx(2.0 * s_poor.shares, rel=1e-6)
