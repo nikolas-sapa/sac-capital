@@ -46,12 +46,19 @@ def _verify(passthrough: list[str]) -> int:
     return _run_module_main(export_main, passthrough, "export-mantle-commitments")
 
 
+def _attribution() -> int:
+    from equities.analysis.attribution import attribute, format_report
+    print(format_report(attribute()))
+    return 0
+
+
 _COMMANDS = [
     ("setup", "interactive setup wizard"),
     ("run", "run the equities pipeline"),
     ("research", "run the research runner (flags pass through)"),
     ("doctor", "preflight checks (--llm adds a live LLM probe)"),
     ("verify", "export/verify decision commitments"),
+    ("attribution", "grade past decisions by realized PnL"),
 ]
 
 
@@ -102,6 +109,8 @@ def main(argv: list[str] | None = None) -> int:
         return _doctor(passthrough)
     if cmd == "verify":
         return _verify(passthrough)
+    if cmd == "attribution":
+        return _attribution()
     return 2
 
 

@@ -200,6 +200,7 @@ class EquityAnalyst:
             if memory_enabled and artifact_store is not None
             else None
         )
+        self._attribution_cache: list[str] | None = None
         if sentiment_enabled is None:
             sentiment_enabled = os.getenv("EQUITY_SENTIMENT_ENABLED", "true").lower() in {
                 "1",
@@ -538,12 +539,38 @@ class EquityAnalyst:
         return price
 
     def _memory_block(self, ticker: str) -> str:
-        if self._memory is None:
-            return ""
+        block = ""
+        if self._memory is not None:
+            try:
+                block = format_ticker_memory(self._memory.for_ticker(ticker, limit=5))
+            except Exception:
+                block = ""
+        lessons = self._attribution_lessons()
+        if lessons:
+            section = "Book-wide calibration (realized PnL):\n" + "\n".join(
+                f"- {line}" for line in lessons
+            )
+            block = f"{block}\n{section}" if block else section
+        return block
+
+    def _attribution_lessons(self) -> list[str]:
+        """Ticker-independent PnL-graded lessons, computed once per run.
+
+        Off by default — flip EQUITY_ATTRIBUTION_LESSONS=true to feed the
+        analyst its own calibration. Gated because it changes what every live
+        decision sees.
+        """
+        if os.getenv("EQUITY_ATTRIBUTION_LESSONS", "false").lower() not in {"1", "true", "yes"}:
+            return []
+        if self._attribution_cache is not None:
+            return self._attribution_cache
         try:
-            return format_ticker_memory(self._memory.for_ticker(ticker, limit=5))
+            from equities.analysis.attribution import attribute, graded_lessons
+
+            self._attribution_cache = graded_lessons(attribute())
         except Exception:
-            return ""
+            self._attribution_cache = []
+        return self._attribution_cache
 
     def _sentiment_block(self, ticker: str, headlines: list[str]) -> str:
         if not self._sentiment_enabled:
