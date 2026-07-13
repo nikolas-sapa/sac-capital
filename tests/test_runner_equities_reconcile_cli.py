@@ -11,6 +11,21 @@ import pytest
 from core.assets.bar import Bar, PriceSeries
 
 
+@pytest.fixture(autouse=True)
+def _stub_preflight(monkeypatch):
+    """These tests exercise main() CLI routing, not the preflight safety gate
+    (that is covered in tests/test_preflight.py). Stub preflight so dispatch
+    tests don't depend on the developer's live .env or ledger calibration state.
+    """
+    import scripts.preflight
+
+    monkeypatch.setattr(
+        scripts.preflight,
+        "run_preflight",
+        lambda cfg: SimpleNamespace(ok=True, failures=[]),
+    )
+
+
 class SlowFundamentals:
     def fetch(self, ticker: str):
         time.sleep(5)
