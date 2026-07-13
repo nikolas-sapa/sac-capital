@@ -84,6 +84,7 @@ class EquityLedger:
         self._con.execute(_CREATE_TABLE)
         for name, ddl in _BROKER_COLUMNS.items():
             self._ensure_column(name, ddl)
+        self._ensure_column("high_water_price", "REAL")
         self._con.commit()
         self._ensure_csv_header()
 
@@ -96,7 +97,9 @@ class EquityLedger:
                       sector: str = "",
                       status: str = "open",
                       signal_class: str = "") -> int:
-        analysis_json = json.dumps(rec.analysis or {}, ensure_ascii=False)
+        analysis_json = json.dumps(
+            {**(rec.analysis or {}), "horizon": rec.horizon}, ensure_ascii=False
+        )
         row = (
             rec.instrument.ticker, sector, rec.sleeve.value, rec.side, shares, fill_price,
             rec.stop_loss, rec.take_profit, fill_price, 0.0,
@@ -132,16 +135,33 @@ class EquityLedger:
             (ticker,),
         ).fetchall()
         updates = [
-            (price, (price - r["entry_price"]) * r["shares"], r["id"])
+            (price, (price - r["entry_price"]) * r["shares"], price, r["id"])
             for r in rows
         ]
         self._con.executemany(
-            "UPDATE positions SET mark_price = ?, unrealized_pnl = ? WHERE id = ?",
+            "UPDATE positions SET mark_price = ?, unrealized_pnl = ?, "
+            "high_water_price = MAX(COALESCE(high_water_price, entry_price), ?) "
+            "WHERE id = ?",
             updates,
         )
         self._con.commit()
         self._rewrite_csv()
         return len(updates)
+
+    def update_analysis_field(self, position_id: int, key: str, value) -> None:
+        row = self._con.execute(
+            "SELECT analysis_json FROM positions WHERE id = ?", (position_id,)
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"Position {position_id} not found")
+        data = json.loads(row["analysis_json"] or "{}")
+        data[key] = value
+        self._con.execute(
+            "UPDATE positions SET analysis_json = ? WHERE id = ?",
+            (json.dumps(data, ensure_ascii=False), position_id),
+        )
+        self._con.commit()
+        self._rewrite_csv()
 
     def update_broker_order(
         self,

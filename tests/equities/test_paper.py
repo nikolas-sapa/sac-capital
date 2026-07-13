@@ -24,11 +24,14 @@ def _rec(ticker: str = "ARWR", entry: float = 74.0, stop: float = 68.0, tp: floa
 
 
 class FakePrices:
-    def __init__(self, prices: dict[str, float]):
-        self._prices = prices
+    def __init__(self, prices: dict[str, float] | None = None):
+        self._prices = dict(prices or {})
 
     def latest_close(self, ticker: str) -> float | None:
         return self._prices.get(ticker)
+
+    def set(self, ticker: str, price: float) -> None:
+        self._prices[ticker] = price
 
 
 def test_mark_uses_fallback_price_when_live_price_missing(tmp_path):
@@ -63,13 +66,14 @@ def test_stop_hit_fires_exit(tmp_path):
     assert len(ledger.open_positions()) == 0
 
 
-def test_target_hit_fires_exit(tmp_path):
+def test_target_touch_activates_trail_not_exit(tmp_path):
+    """A take_profit touch is now the trail activator, not an exit (exit engine v2)."""
     ledger = EquityLedger(tmp_path / "e.db")
     tracker = EquityPaperTracker(ledger, FakePrices({"ARWR": 90.0}))
     tracker.open_position(_rec("ARWR", tp=88.0), shares=1.0, fill_price=74.0)
     exits = tracker.mark_and_check_exits()
-    assert len(exits) == 1
-    assert exits[0].reason == "target_hit"
+    assert exits == []
+    assert len(ledger.open_positions()) == 1
 
 
 def test_no_exit_within_bands(tmp_path):
@@ -89,3 +93,22 @@ def test_mark_updates_unrealized_pnl(tmp_path):
     pos = ledger.open_positions()[0]
     assert pos["mark_price"] == pytest.approx(80.0)
     assert pos["unrealized_pnl"] == pytest.approx((80.0 - 74.0) * 2.0)
+
+
+def test_winner_trails_instead_of_capping(tmp_path):
+    """Price rides through take_profit; tracker holds, then exits on the trail."""
+    ledger = EquityLedger(tmp_path / "e.db")
+    prices = FakePrices()
+    tracker = EquityPaperTracker(ledger, prices, trail_r=1.5)
+    rec = _rec("TEST", entry=100.0, stop=90.0, tp=120.0)
+    tracker.open_position(rec, shares=10.0, fill_price=100.0)
+
+    prices.set("TEST", 125.0)          # through target: NO exit (trail activates)
+    assert tracker.mark_and_check_exits() == []
+
+    prices.set("TEST", 130.0)          # new high water 130
+    assert tracker.mark_and_check_exits() == []
+
+    prices.set("TEST", 114.0)          # 130 - 1.5*10 = 115 trail -> exit
+    fired = tracker.mark_and_check_exits()
+    assert len(fired) == 1 and fired[0].reason == "trailing_stop_hit"

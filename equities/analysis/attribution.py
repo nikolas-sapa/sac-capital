@@ -152,3 +152,30 @@ def format_report(report: AttributionReport) -> str:
         lines += ["", "Graded lessons (min 3 trades):"]
         lines += [f"  - {line}" for line in lessons]
     return "\n".join(lines)
+
+
+def confidence_band_stats(db_path: str | Path = "data/equity.db") -> dict[str, "Bucket"]:
+    """Realized outcome stats keyed by confidence band label."""
+    report = attribute(db_path)
+    return {b.label: b for b in report.buckets if b.dimension == "confidence"}
+
+
+def calibration_size_cap(
+    confidence: float,
+    db_path: str | Path = "data/equity.db",
+    min_n: int = 3,
+    cap: float = 0.01,
+) -> float | None:
+    """Max size_pct for a trade whose confidence band has proven unprofitable.
+
+    Returns `cap` (NIBBLE) when the band has >= min_n closed trades with a
+    negative average PnL — the bot's own ledger says this band's conviction
+    is miscalibrated. Returns None when there is no evidence against the band.
+    """
+    band = _conf_band(confidence)
+    bucket = confidence_band_stats(db_path).get(band)
+    if bucket is None or bucket.n < min_n:
+        return None
+    if bucket.avg_pnl < 0:
+        return cap
+    return None

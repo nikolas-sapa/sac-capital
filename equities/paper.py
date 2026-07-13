@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 
 from equities.ledger_equity import EquityLedger
-from equities.risk.exits import ExitSignal, check_exit
+from equities.risk.exits import ExitSignal, check_exit, evaluate_exit
 from equities.strategy import Recommendation, Sleeve
 
 
@@ -37,10 +37,12 @@ class EquityPaperTracker:
         ledger: EquityLedger,
         prices: Any,
         price_fallback: Callable[[str], float | None] | None = None,
+        trail_r: float = 1.5,
     ) -> None:
         self._ledger = ledger
         self._prices = prices
         self._price_fallback = price_fallback
+        self._trail_r = trail_r
 
     def open_position(
         self,
@@ -81,15 +83,18 @@ class EquityPaperTracker:
             if price is None:
                 continue
 
-            # Update mark price
+            # Update mark price + high-water first so tonight's high counts
             self._ledger.mark(ticker, price)
+            hw = max(
+                pos.get("high_water_price") or pos.get("entry_price") or price,
+                price,
+            )
 
-            # Check exit conditions
-            signal = check_exit(
-                position_id=pos["id"],
+            signal = evaluate_exit(
+                {**pos, "high_water_price": hw},
                 current_price=price,
-                stop_loss=pos.get("stop_loss"),
-                take_profit=pos.get("take_profit"),
+                today=now.date(),
+                trail_r=self._trail_r,
             )
 
             if signal is not None:

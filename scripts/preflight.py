@@ -106,6 +106,20 @@ def run_preflight(settings: Settings) -> PreflightResult:
                 "in live mode without explicit confirmation"
             )
 
+    # Risk escalation requires calibration: refuse elevated per-trade risk
+    # while the ledger shows inverted confidence (the n=10 lesson).
+    if settings.equity_risk_pct > 0.005:
+        try:
+            from equities.eval.calibration import calibration_inverted
+
+            if calibration_inverted(settings.equity_ledger_path):
+                result.add(
+                    "equity_risk_pct escalated while confidence calibration is "
+                    "inverted — run `sac attribution`, fix calibration, then escalate"
+                )
+        except Exception:
+            pass  # missing/empty ledger never blocks preflight
+
     return result
 
 

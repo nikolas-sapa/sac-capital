@@ -47,3 +47,25 @@ def size_shares(
 
     max_loss_usd = capital * risk_pct
     return max_loss_usd / stop_distance
+
+
+def empirical_kelly_risk_pct(
+    win_rate: float,
+    payoff_b: float,
+    kelly_fraction: float,
+    hard_cap: float = 0.5,
+) -> float | None:
+    """Fractional-Kelly risk (fraction of capital at the stop) from MEASURED stats.
+
+    f* = (b*p - q) / b. Returns None when the measured edge is non-positive —
+    Kelly of a negative edge is a short position in your own strategy.
+    kelly_fraction is hard-capped: growth is zero at 2x Kelly and estimation
+    error makes intended-full-Kelly an overbet, so >hard_cap is never honored.
+    """
+    if payoff_b <= 0 or not (0.0 <= win_rate <= 1.0):
+        return None
+    q = 1.0 - win_rate
+    f_star = (payoff_b * win_rate - q) / payoff_b
+    if f_star <= 0:
+        return None
+    return min(kelly_fraction, hard_cap) * f_star

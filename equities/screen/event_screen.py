@@ -9,6 +9,8 @@ Events detected (in urgency order):
    (post-earnings-announcement drift window)
 3. MATERIAL_FILING — fresh 8-K with material items (1.01 / 5.02 / 8.01 / 7.01)
    within `filing_window_days`
+4. ACTIVIST_13D — SC 13D / 13D-A filed within ~14 calendar days (activist
+   stake disclosed; strongest still-alive event edge, Brav et al. 2008)
 
 Only SMALL and MID cap instruments are eligible (configurable via `cap_tiers`).
 """
@@ -27,6 +29,7 @@ class EventType(Enum):
     EARNINGS_SURPRISE_DRIFT = "earnings_surprise_drift"
     MATERIAL_FILING = "material_filing"
     POLITICIAN_DISCLOSURE = "politician_disclosure"
+    ACTIVIST_13D = "activist_13d"
 
 
 @dataclass(frozen=True)
@@ -49,6 +52,10 @@ class EarningsDateProvider(Protocol):
 class FilingsProvider(Protocol):
     def recent_8k_items(self, ticker: str, days: int) -> list[tuple[date, list[str]]]:
         """Return list of (filed_date, item_codes) for recent 8-Ks."""
+        ...
+
+    def recent_activist_filings(self, ticker: str, days: int) -> list[tuple[date, str]]:
+        """Return list of (filed_date, form_type) for recent SC 13D / SC 13D/A filings."""
         ...
 
 
@@ -95,12 +102,30 @@ class FilingsAdapter:
             if f.form_type == "8-K"
         ]
 
+    def recent_activist_filings(self, ticker: str, days: int) -> list[tuple[date, str]]:
+        try:
+            filings = self._client.recent(ticker, days=days)  # type: ignore[attr-defined]
+        except Exception as exc:
+            print(f"  [PROVIDER] source=sec_filings ticker={ticker} error={exc}")
+            if self._failure_callback is not None:
+                self._failure_callback()
+            return []
+        return [
+            (f.filed_date, f.form_type)
+            for f in filings
+            if f.form_type.startswith("SC 13D")
+        ]
+
 
 # ---------------------------------------------------------------------------
 # Material item codes that warrant flagging (non-earnings)
 # ---------------------------------------------------------------------------
 
 _MATERIAL_ITEMS = frozenset({"1.01", "5.02", "8.01", "7.01", "1.02", "2.01"})
+
+# SC 13D / 13D-A window: ~10 trading sessions (Brav et al. 2008 — abnormal
+# return clusters in the days around filing, no reversal).
+_ACTIVIST_FILING_WINDOW_DAYS = 14
 
 
 class EventScreen:
@@ -142,6 +167,7 @@ class EventScreen:
 
             candidates.extend(self._check_earnings(inst, today))
             candidates.extend(self._check_filings(inst, today))
+            candidates.extend(self._check_activist_13d(inst, today))
 
         candidates.sort(key=lambda c: c.urgency, reverse=True)
         return candidates
@@ -201,5 +227,32 @@ class EventScreen:
                         urgency=round(base_urgency * 0.8, 4),  # slightly lower than earnings
                     )
                 )
+
+        return events
+
+    def _check_activist_13d(
+        self, inst: Instrument, today: date
+    ) -> list[CandidateEvent]:
+        events: list[CandidateEvent] = []
+        filings = self._filings.recent_activist_filings(
+            inst.ticker, _ACTIVIST_FILING_WINDOW_DAYS
+        )
+
+        for filed_date, form_type in filings:
+            age_days = (today - filed_date).days
+            if age_days < 0 or age_days > _ACTIVIST_FILING_WINDOW_DAYS:
+                continue
+            events.append(
+                CandidateEvent(
+                    instrument=inst,
+                    event_type=EventType.ACTIVIST_13D,
+                    evidence=(
+                        f"{form_type} filed {filed_date.isoformat()}"
+                        " — activist stake disclosed"
+                    ),
+                    urgency=1.0,
+                    days_to_event=None,
+                )
+            )
 
         return events
