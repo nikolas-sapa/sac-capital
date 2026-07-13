@@ -1236,6 +1236,20 @@ async def run_once(
                     ))
                     continue
 
+                # Idempotency: never stack a second same-day buy of a name already
+                # held from a run earlier today (survives share-count drift that
+                # defeats the client_order_id guard). DCA adds on later days are fine.
+                _today_iso = datetime.now(tz=timezone.utc).date().isoformat()
+                if equity_ledger.ticker_active_today(rec.instrument.ticker, _today_iso):
+                    reason = "already_opened_today"
+                    print(f"  SKIPPED [{rec.instrument.ticker}] ({rec.sleeve.value}): {reason}")
+                    artifact_store.append(risk_decision_artifact(
+                        rec, decision="rejected", rejection_reason=reason, stage="same_day_guard",
+                        shares=sized.shares, notional=order_notional,
+                        data_cutoff_utc=run_cutoff_utc,
+                    ))
+                    continue
+
                 if dry_run:
                     print(
                         f"  [DRY RUN] would_open [{rec.instrument.ticker}] "

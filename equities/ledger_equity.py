@@ -234,6 +234,22 @@ class EquityLedger:
         ).fetchone()
         return int(row[0] or 0)
 
+    def ticker_active_today(self, ticker: str, day_iso: str) -> bool:
+        """True if `ticker` already has an active position opened on `day_iso`.
+
+        Idempotency guard against re-runs: prevents a second same-day buy of a
+        name already held from a run earlier today, independent of share count
+        (the client_order_id guard misses when sizing shifts the qty). DCA adds
+        on a later day are unaffected — this is scoped to the same calendar day.
+        """
+        row = self._con.execute(
+            "SELECT 1 FROM positions WHERE ticker = ? "
+            "AND status IN ('open','submitted','partially_filled') "
+            "AND substr(opened_at, 1, 10)=? LIMIT 1",
+            (ticker, day_iso),
+        ).fetchone()
+        return row is not None
+
     def close_position(self, position_id: int, exit_price: float,
                        exit_reason: str, closed_at: datetime) -> None:
         row = self._con.execute(
