@@ -1,6 +1,6 @@
 [project]
 name = "sac-capital"
-version = "0.1.3"
+version = "0.1.4"
 description = "AI trading research agent — paper trading on your Claude subscription, with verifiable on-chain decision commitments (Mantle)"
 readme = "README.md"
 license = { text = "MIT" }
