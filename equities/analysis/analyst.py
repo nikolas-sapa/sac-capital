@@ -269,6 +269,14 @@ class EquityAnalyst:
             )
             if size_pct == 0.0:
                 continue  # WAIT — skip
+            size_pct, calibration_capped = _apply_calibration_cap(
+                size_pct, audited.confidence
+            )
+            if calibration_capped:
+                print(
+                    f"  [CALIBRATION CAP] {audited.instrument.ticker}: "
+                    f"band has negative realized PnL — size capped at {size_pct:.0%}"
+                )
             final = dc_replace(audited, size_pct=size_pct)
             self._record_recommendation_artifact(
                 final,
@@ -966,6 +974,27 @@ class EquityAnalyst:
                 "auditor_consistency_penalty": consistency_penalty,
             },
         )
+
+
+def _apply_calibration_cap(size_pct: float, confidence: float) -> tuple[float, bool]:
+    """Cap size_pct at NIBBLE when this confidence band has negative realized PnL.
+
+    The ledger is the authority on whether the analyst's conviction is
+    calibrated — stated confidence never overrides measured outcomes.
+    Gated by EQUITY_CALIBRATION_SIZING (default on).
+    """
+    if os.getenv("EQUITY_CALIBRATION_SIZING", "true").lower() not in {"1", "true", "yes", "on"}:
+        return size_pct, False
+    try:
+        from equities.analysis.attribution import calibration_size_cap
+
+        db_path = os.getenv("EQUITY_LEDGER_PATH_FOR_CALIBRATION", "data/equity.db")
+        cap = calibration_size_cap(confidence, db_path)
+    except Exception:
+        return size_pct, False
+    if cap is not None and size_pct > cap:
+        return cap, True
+    return size_pct, False
 
 
 def _compute_build_action(

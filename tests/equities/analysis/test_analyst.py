@@ -396,3 +396,38 @@ def test_core_dca_rejects_invalid_output():
     analyst = CoreDCAAnalyst(llm, FakeCorePrice(), FakeNews())
 
     assert analyst.analyse([candidate]) == []
+
+
+def test_apply_calibration_cap_caps_inverted_band(tmp_path, monkeypatch):
+    import sqlite3
+    from equities.analysis.analyst import _apply_calibration_cap
+
+    db = str(tmp_path / "equity.db")
+    con = sqlite3.connect(db)
+    con.execute(
+        "CREATE TABLE positions (confidence REAL, strategy TEXT, sector TEXT, "
+        "exit_reason TEXT, realized_pnl REAL, status TEXT)"
+    )
+    con.executemany(
+        "INSERT INTO positions VALUES (?,?,?,?,?,'closed')",
+        [(0.85, "equity_analyst", "Tech", "time_stop", -5.0),
+         (0.80, "equity_analyst", "Tech", "time_stop", -4.0),
+         (0.90, "equity_analyst", "Tech", "stop_hit", -6.0)],
+    )
+    con.commit(); con.close()
+    monkeypatch.setenv("EQUITY_CALIBRATION_SIZING", "true")
+    monkeypatch.setenv("EQUITY_LEDGER_PATH_FOR_CALIBRATION", db)
+
+    size, capped = _apply_calibration_cap(0.04, confidence=0.85)
+    assert size == 0.01 and capped is True
+
+    # band without adverse evidence passes through untouched
+    size, capped = _apply_calibration_cap(0.02, confidence=0.55)
+    assert size == 0.02 and capped is False
+
+
+def test_apply_calibration_cap_disabled_by_env(monkeypatch):
+    from equities.analysis.analyst import _apply_calibration_cap
+    monkeypatch.setenv("EQUITY_CALIBRATION_SIZING", "false")
+    size, capped = _apply_calibration_cap(0.04, confidence=0.85)
+    assert size == 0.04 and capped is False
