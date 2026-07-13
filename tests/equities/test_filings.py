@@ -29,6 +29,13 @@ def test_recent_uses_cached_company_ticker_map(monkeypatch):
 
     calls: list[str] = []
 
+    # Dates relative to today so the test does not rot: recent 8-K inside the
+    # 30-day window, older 10-Q outside it.
+    from datetime import date, timedelta
+
+    recent_date = (date.today() - timedelta(days=10)).isoformat()
+    old_date = (date.today() - timedelta(days=45)).isoformat()
+
     def fake_get(url, headers=None, timeout=None):  # noqa: ANN001
         calls.append(url)
         if url.endswith("CIK0000320193.json"):
@@ -37,7 +44,7 @@ def test_recent_uses_cached_company_ticker_map(monkeypatch):
                     "filings": {
                         "recent": {
                             "form": ["8-K", "10-Q"],
-                            "filingDate": ["2026-06-08", "2026-05-01"],
+                            "filingDate": [recent_date, old_date],
                             "items": ["2.02, 9.01", ""],
                         }
                     }
