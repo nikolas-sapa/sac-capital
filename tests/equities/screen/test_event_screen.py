@@ -24,11 +24,19 @@ class FakeEarnings:
 
 
 class FakeFilings:
-    def __init__(self, data: dict[str, list[tuple[date, list[str]]]] | None = None):
+    def __init__(
+        self,
+        data: dict[str, list[tuple[date, list[str]]]] | None = None,
+        activist: dict[str, list[tuple[date, str]]] | None = None,
+    ):
         self._data = data or {}
+        self._activist = activist or {}
 
     def recent_8k_items(self, ticker: str, days: int) -> list[tuple[date, list[str]]]:
         return self._data.get(ticker, [])
+
+    def recent_activist_filings(self, ticker: str, days: int) -> list[tuple[date, str]]:
+        return self._activist.get(ticker, [])
 
 
 def _inst(ticker: str, cap: CapTier = CapTier.SMALL) -> Instrument:
@@ -135,6 +143,43 @@ def test_routine_filing_not_flagged():
         filing_window_days=10,
     )
     # 9.01 alone is not in _MATERIAL_ITEMS
+    assert screen.scan([inst]) == []
+
+
+# ---------------------------------------------------------------------------
+# Activist 13D tests
+# ---------------------------------------------------------------------------
+
+def test_13d_emits_activist_candidate():
+    inst = _inst("ACME")
+    screen = EventScreen(
+        earnings=FakeEarnings(),
+        filings=FakeFilings(activist={"ACME": [(_today(-2), "SC 13D")]}),
+    )
+    results = screen.scan([inst])
+    activist = [c for c in results if c.event_type == EventType.ACTIVIST_13D]
+    assert len(activist) == 1
+    assert activist[0].urgency == 1.0
+    assert "SC 13D" in activist[0].evidence
+
+
+def test_13d_amendment_also_flagged():
+    inst = _inst("ACME")
+    screen = EventScreen(
+        earnings=FakeEarnings(),
+        filings=FakeFilings(activist={"ACME": [(_today(-1), "SC 13D/A")]}),
+    )
+    results = screen.scan([inst])
+    activist = [c for c in results if c.event_type == EventType.ACTIVIST_13D]
+    assert len(activist) == 1
+
+
+def test_stale_13d_not_flagged():
+    inst = _inst("ACME")
+    screen = EventScreen(
+        earnings=FakeEarnings(),
+        filings=FakeFilings(activist={"ACME": [(_today(-20), "SC 13D")]}),
+    )
     assert screen.scan([inst]) == []
 
 

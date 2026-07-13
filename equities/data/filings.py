@@ -76,7 +76,7 @@ class SECEdgarFilings:
                 continue
             if filed < cutoff:
                 break  # EDGAR returns newest-first; stop when older than cutoff
-            if form not in ("8-K", "10-Q", "10-K"):
+            if form not in ("8-K", "10-Q", "10-K", "SC 13D", "SC 13D/A"):
                 continue
             items = [i.strip() for i in (item_str or "").split(",") if i.strip()]
             result.append(Filing(form_type=form, filed_date=filed, items=items))
