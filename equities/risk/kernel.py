@@ -223,7 +223,11 @@ class RiskKernel:
                 n, win_rate = self._win_stats_lookup(recommendation.confidence)
             except Exception:
                 n, win_rate = 0, 0.0
-            if n >= self.kelly_min_trades and take_profit is not None:
+            if (
+                n >= self.kelly_min_trades
+                and take_profit is not None
+                and recommendation.entry > recommendation.stop_loss
+            ):
                 b = (take_profit - recommendation.entry) / (
                     recommendation.entry - recommendation.stop_loss
                 )

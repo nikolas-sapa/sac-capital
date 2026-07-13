@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     equity_runner_max_provider_failures: int = 20
     equity_runner_max_llm_failures: int = 5
     equity_runner_dry_run: bool = False
+    # evidence-based risk engine (2026-07)
+    equity_min_rr: float = 2.0  # min (take_profit-entry)/(entry-stop); 0 disables
+    equity_hard_tech_gate: bool = True  # drop do_not_chase/trend-fail pre-LLM
+    equity_trail_r: float = 1.5  # trail distance in R multiples once target reached
+    equity_kelly_min_trades: int = 30  # closed trades per band before Kelly sizing
+    equity_pyramid_enabled: bool = False  # probe 1/3, add on confirmation (dark ship)
     finnhub_api_key: str = ""
     politician_signal_enabled: bool = False
     politician_lookback_days: int = 45

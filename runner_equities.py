@@ -27,6 +27,7 @@ from typing import Iterator
 
 from core.alerts.telegram import TelegramAlerts
 from core.assets.instrument import CapTier, Instrument
+from equities.strategy import Recommendation, Sleeve
 from core.config import load_config
 from core.claude_client import ClaudeCodeClient
 from equities.analysis.analyst import EquityAnalyst, LLMFailureBudgetExceeded, LLMResponse
@@ -580,6 +581,73 @@ def _apply_sizing_verdict(rec) -> tuple:
     return rec, "proceed"
 
 
+def _passes_tech_gate(evidence) -> tuple[bool, str]:
+    """Hard technical gate: post-spike chases and broken trends never reach the LLM.
+
+    MAX-effect evidence: buying post-spike names is the counterparty's trade.
+    Missing evidence passes — the gate only acts on affirmative red flags.
+    """
+    if evidence is None:
+        return True, ""
+    if getattr(evidence, "do_not_chase", False):
+        return False, "do_not_chase"
+    if not getattr(evidence, "trend_ok", True):
+        return False, "trend_fail"
+    return True, ""
+
+
+def _execute_thesis_exit(health, pos, equity_ledger, fp_tracker, alpaca_executor, now) -> bool:
+    """Close a position whose thesis the health checker invalidated.
+
+    Ledger close is authoritative and never blocked by broker failures —
+    the paper record must reflect the decision even if the sell errors.
+    """
+    if health.action != "exit":
+        return False
+    exit_price = float(pos.get("mark_price") or pos.get("entry_price") or 0.0)
+    equity_ledger.close_position(
+        position_id=pos["id"],
+        exit_price=exit_price,
+        exit_reason="thesis_invalidated",
+        closed_at=now,
+    )
+    if alpaca_executor is not None and pos.get("execution_provider") == "alpaca_paper":
+        try:
+            order = alpaca_executor.sell(pos["ticker"], float(pos["shares"]))
+            print(f"  ALPACA SELL [{pos['ticker']}] (thesis exit) order_id={order.id} status={order.status}")
+        except Exception as exc:
+            print(f"  ALPACA SELL FAILED [{pos['ticker']}] (thesis exit): {exc}")
+    fp_tracker.record_exit_for_open_trade(
+        ticker=pos["ticker"],
+        sleeve=pos.get("sleeve"),
+        strategy=pos.get("strategy"),
+        exit_price=exit_price,
+        is_gap_stop=False,
+    )
+    return True
+
+
+def _pyramid_addon_candidates(open_positions: list[dict]) -> list[dict]:
+    """Open swing positions eligible for a confirm-then-size add-on tranche."""
+    out = []
+    for pos in open_positions:
+        if pos.get("sleeve") != "swing" or pos.get("status") != "open":
+            continue
+        try:
+            analysis = json.loads(pos.get("analysis_json") or "{}")
+        except ValueError:
+            continue
+        tranche = int(analysis.get("tranche") or 0)
+        if tranche < 1 or tranche >= 3:
+            continue  # not a pyramid position, or already full
+        mark = pos.get("mark_price")
+        entry = pos.get("entry_price")
+        if mark is None or entry is None or mark <= entry:
+            continue  # only add to winners — that is the whole point
+        out.append(pos)
+    return out
+
+
 def _map_regime_to_vol_label(macro_regime: str) -> str:
     """Map MacroRegimeGate output (crisis/risk_off/neutral/risk_on) to vol labels.
 
@@ -692,6 +760,7 @@ async def run_once(
         equity_ledger,
         prices,
         price_fallback=fallback_mark_price,
+        trail_r=settings.equity_trail_r,
     )
     alpaca_executor = _make_alpaca_executor(settings)
 
@@ -777,11 +846,48 @@ async def run_once(
         with _stage(stats, "thesis_health"):
             open_swing = [p for p in equity_ledger.open_positions() if p.get("sleeve") == "swing"]
             if open_swing and not mark_only:
+                by_id = {p["id"]: p for p in open_swing}
                 health_checker = ThesisHealthChecker()
                 for health in health_checker.check_all(open_swing, news):
                     print(f"  [HEALTH] {health.ticker}: {health.status} -> {health.action} | {health.reason}")
-                    if health.action == "exit" and alerts is not None and _telegram_allows("exit"):
-                        await _send_alert(f"Thesis exit signal: {health.ticker} — {health.reason}")
+                    pos = by_id.get(health.position_id)
+                    if pos is None:
+                        continue
+                    executed = _execute_thesis_exit(
+                        health, pos, equity_ledger, fp_tracker,
+                        alpaca_executor, datetime.now(tz=timezone.utc),
+                    )
+                    if executed:
+                        print(f"  [THESIS EXIT] {health.ticker}: closed — {health.reason}")
+                        if alerts is not None and _telegram_allows("exit"):
+                            await _send_alert(f"Thesis exit EXECUTED: {health.ticker} — {health.reason}")
+
+        # --- Scale-in: add tranches to confirmed winners (dark ship) ---
+        if settings.equity_pyramid_enabled and not mark_only:
+            with _stage(stats, "scale_in"):
+                for pos in _pyramid_addon_candidates(equity_ledger.open_positions()):
+                    analysis = json.loads(pos["analysis_json"])
+                    add_shares = float(analysis["planned_shares"]) / 3.0
+                    next_tranche = int(analysis["tranche"]) + 1
+                    if alpaca_executor is not None and pos.get("execution_provider") == "alpaca_paper":
+                        # buy() needs a Recommendation; reconstruct the minimum it reads
+                        # (instrument.ticker + entry). ponytail: ledger keeps probe shares,
+                        # reconcile round-trips the true broker qty.
+                        add_rec = Recommendation(
+                            instrument=Instrument(pos["ticker"], pos["ticker"], "", CapTier.LARGE),
+                            sleeve=Sleeve.SWING, side="buy",
+                            entry=float(pos.get("mark_price") or pos["entry_price"]),
+                            stop_loss=pos.get("stop_loss"), take_profit=pos.get("take_profit"),
+                            size_pct=0.0, confidence=float(pos.get("confidence") or 0.5),
+                            catalyst="pyramid_add", thesis=pos.get("thesis", ""), horizon="",
+                        )
+                        try:
+                            order = alpaca_executor.buy(add_rec, add_shares, max_notional=settings.max_order_usd)
+                            print(f"  [SCALE IN] {pos['ticker']} tranche {next_tranche}: +{add_shares:.4f} sh order={order.id}")
+                        except Exception as exc:
+                            print(f"  [SCALE IN FAILED] {pos['ticker']}: {exc}")
+                            continue
+                    equity_ledger.update_analysis_field(pos["id"], "tranche", next_tranche)
 
         # --- Thematic concentration check ---
         with _stage(stats, "thematic_concentration"):
@@ -810,11 +916,20 @@ async def run_once(
             for ticker, reason in coverage.failed.items():
                 print(f"  ticker={ticker} reason={reason}")
             enriched_candidates = []
+            hard_gate = getattr(settings, "equity_hard_tech_gate", True)
             for candidate in swing_candidates:
                 evidence = rs_evidence.get(candidate.instrument.ticker)
                 if evidence is None:
                     enriched_candidates.append(candidate)
                     continue
+                if hard_gate:
+                    ok, gate_reason = _passes_tech_gate(evidence)
+                    if not ok:
+                        print(
+                            f"  [TECH GATE] {candidate.instrument.ticker}: "
+                            f"dropped ({gate_reason})"
+                        )
+                        continue
                 enriched_candidates.append(
                     replace(
                         candidate,
@@ -988,6 +1103,15 @@ async def run_once(
         all_recommendations = swing_recommendations + core_recommendations
 
         # --- Risk kernel + paper open ---
+        def _win_stats_lookup(confidence: float) -> tuple[int, float]:
+            from equities.analysis.attribution import _conf_band, confidence_band_stats
+            bucket = confidence_band_stats(str(settings.equity_ledger_path)).get(
+                _conf_band(confidence)
+            )
+            if bucket is None:
+                return (0, 0.0)
+            return (bucket.n, bucket.win_rate)
+
         kernel = RiskKernel(
             capital=settings.bankroll_usd,
             risk_pct=settings.equity_risk_pct,
@@ -996,6 +1120,10 @@ async def run_once(
             max_sector_pct=settings.equity_max_sector_pct,
             daily_loss_limit_pct=settings.equity_daily_loss_limit_pct,
             drawdown_limit_pct=settings.equity_drawdown_limit_pct,
+            min_rr=settings.equity_min_rr,
+            kelly_fraction=settings.kelly_fraction,
+            kelly_min_trades=settings.equity_kelly_min_trades,
+            win_stats_lookup=_win_stats_lookup,
             state_path=Path("data/kernel_state.json"),
         )
         open_positions = equity_ledger.open_positions()
@@ -1072,6 +1200,18 @@ async def run_once(
                         data_cutoff_utc=run_cutoff_utc,
                     ))
                     continue
+
+                # Probe-then-pyramid (dark ship): open 1/3, stamp tranche so the
+                # scale_in stage can add on confirmation. Replacing `sized` once
+                # propagates the probe size to every downstream sized.shares use.
+                if settings.equity_pyramid_enabled and rec.sleeve.value == "swing":
+                    _full_shares = sized.shares
+                    sized = replace(sized, shares=_full_shares / 3.0)
+                    rec = replace(rec, analysis={
+                        **(rec.analysis or {}),
+                        "tranche": 1,
+                        "planned_shares": _full_shares,
+                    })
 
                 order_notional = sized.shares * rec.entry
                 if order_notional > settings.max_order_usd:
@@ -1211,7 +1351,7 @@ async def run_once(
                 # Shadow sizing: compute vol-target shares for A/B analysis (never affects execution)
                 sizing_dict = {"kelly_shares": fill.shares}
                 try:
-                    closes = price_adapter.closes(rec.instrument.ticker)
+                    closes = prices.closes(rec.instrument.ticker)
                     if closes is not None:
                         vol_pct = vol_20d_ann_pct(closes)
                         if vol_pct is not None:
