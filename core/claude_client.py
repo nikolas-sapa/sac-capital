@@ -353,6 +353,11 @@ class ClaudeCodeClient:
         mapped = self._MODEL_MAP.get(model, model)
         full_prompt = f"{system}\n\n---\n\n{user}"
 
+        # ponytail: claude CLI refuses subscription auth ("connectors disabled")
+        # if ANTHROPIC_API_KEY/AUTH_TOKEN is in env (from .env or a parent Claude
+        # Code session). Scrub them so the Max subscription is used, not metered API.
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
         result = subprocess.run(
             [
                 "claude", "-p", "--model", mapped,
@@ -365,6 +370,7 @@ class ClaudeCodeClient:
             text=True,
             timeout=self._timeout,
             start_new_session=True,
+            env=env,
         )
 
         if result.returncode != 0:

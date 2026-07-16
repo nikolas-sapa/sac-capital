@@ -262,15 +262,18 @@ def test_claude_cli_provider_is_first_class(monkeypatch):
 def test_claude_cli_provider_invokes_claude_binary_via_subprocess(monkeypatch):
     """LLM_PROVIDER=claude_cli must shell out to `claude -p --model <mapped>` via
     subprocess, pass the prompt via `input`, and raise on nonzero returncode."""
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    # ANTHROPIC_API_KEY set on purpose: the claude CLI must be invoked with it
+    # scrubbed from the subprocess env, else it refuses subscription auth.
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-should-be-scrubbed")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setenv("LLM_PROVIDER", "claude_cli")
 
     calls = {}
 
-    def fake_run(args, input, capture_output, text, timeout, start_new_session=False):
+    def fake_run(args, input, capture_output, text, timeout, start_new_session=False, env=None):
         calls["args"] = args
         calls["input"] = input
+        calls["env"] = env
         return SimpleNamespace(returncode=1, stderr="boom", stdout="")
 
     monkeypatch.setattr("core.claude_client.subprocess.run", fake_run)
@@ -281,3 +284,5 @@ def test_claude_cli_provider_invokes_claude_binary_via_subprocess(monkeypatch):
 
     assert calls["args"][:4] == ["claude", "-p", "--model", "claude-sonnet-4-6"]
     assert "sys" in calls["input"] and "usr" in calls["input"]
+    # regression: subscription auth requires the API key stripped from child env
+    assert calls["env"] is not None and "ANTHROPIC_API_KEY" not in calls["env"]

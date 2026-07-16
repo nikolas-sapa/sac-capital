@@ -64,11 +64,17 @@ from equities.screen.relative_strength import RelativeStrengthScanner
 from equities.screen.thematic_monitor import ThematicMonitor
 from equities.screen.event_screen import (
     CalendarAdapter,
+    CandidateEvent,
     EventScreen,
+    EventType,
     FilingsAdapter,
 )
 from equities.screen.quality_screen import QualityScreen
 from equities.screen.politician_screen import PoliticianScreen
+from equities.screen.supply_chain_lag_screen import (
+    SupplyChainLagCandidate,
+    SupplyChainLagScreen,
+)
 from equities.data.house_clerk_disclosures import HouseClerkDisclosureProvider
 from equities.data.senate_efd_disclosures import SenateEFDDisclosureProvider
 from equities.data.executive_disclosures import ExecutiveDisclosureProvider
@@ -596,6 +602,45 @@ def _passes_tech_gate(evidence) -> tuple[bool, str]:
     return True, ""
 
 
+def _lag_candidate_to_event(
+    c: SupplyChainLagCandidate,
+    universe: list[Instrument] | None = None,
+) -> CandidateEvent:
+    """Convert a supply-chain-lag candidate into the swing pipeline's CandidateEvent."""
+    instrument = None
+    for inst in universe or DEFAULT_SWING_UNIVERSE:
+        if inst.ticker == c.ticker:
+            instrument = inst
+            break
+    if instrument is None:
+        instrument = Instrument(c.ticker, c.ticker, "NASDAQ", CapTier.MID)
+
+    lag_1y = c.features.get("lag_1y")
+    bottleneck = c.features.get("bottleneck_score", c.features.get("min_bottleneck_score"))
+    lag_part = f"lag1y={lag_1y:.0f}% " if isinstance(lag_1y, int | float) else ""
+    bottleneck_part = f"bottleneck={bottleneck:.2f} " if isinstance(bottleneck, int | float) else ""
+    evidence = f"{c.thesis} [{lag_part}{bottleneck_part}opp={c.opportunity_score:.2f}]"
+    return CandidateEvent(
+        instrument=instrument,
+        event_type=EventType.SUPPLY_CHAIN_LAG,
+        evidence=evidence,
+        urgency=round(min(1.0, c.opportunity_score), 4),
+    )
+
+
+def _dedup_union(*lists: list[Instrument]) -> list[Instrument]:
+    """Deduped union of instrument lists, preserving order (first occurrence wins)."""
+    seen: set[str] = set()
+    result: list[Instrument] = []
+    for lst in lists:
+        for inst in lst:
+            if inst.ticker in seen:
+                continue
+            seen.add(inst.ticker)
+            result.append(inst)
+    return result
+
+
 def _execute_thesis_exit(health, pos, equity_ledger, fp_tracker, alpaca_executor, now) -> bool:
     """Close a position whose thesis the health checker invalidated.
 
@@ -939,6 +984,25 @@ async def run_once(
                 print(f"  [RS] {candidate.instrument.ticker}: {evidence.evidence}")
             swing_candidates = enriched_candidates
 
+        # --- Supply-chain-lag / bottleneck screen ---
+        # Placed AFTER relative_strength_screen deliberately: these are laggards
+        # by definition, so they must bypass the momentum tech gate above.
+        with _stage(stats, "supply_chain_lag_screen"):
+            try:
+                lag_screen = SupplyChainLagScreen(price_feed)
+                lag_candidates = lag_screen.scan()
+            except Exception as exc:
+                print(f"  [SCREEN FAILED] supply_chain_lag_screen error={exc}")
+                record_provider_failure()
+                lag_candidates = []
+            lag_events = [_lag_candidate_to_event(c, swing_universe) for c in lag_candidates]
+            for c, event in zip(lag_candidates, lag_events):
+                print(
+                    f"  [LAG] {c.ticker} ({c.strategy}): {event.evidence} "
+                    f"(urgency={event.urgency:.2f})"
+                )
+            swing_candidates = swing_candidates + lag_events
+
         # --- Politician disclosure screen (off by default) ---
         if getattr(settings, "politician_signal_enabled", False):
             with _stage(stats, "politician_screen"):
@@ -990,7 +1054,8 @@ async def run_once(
                 timeout=settings.equity_provider_timeout_seconds,
             )
             quality_screen = QualityScreen(fundamentals_provider)
-            core_candidates = quality_screen.scan(core_universe)
+            core_scan_universe = _dedup_union(core_universe, swing_universe)
+            core_candidates = quality_screen.scan(core_scan_universe)
 
         print(f"\n=== Swing candidates: {len(swing_candidates)} ===")
         for c in swing_candidates:

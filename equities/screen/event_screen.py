@@ -30,6 +30,7 @@ class EventType(Enum):
     MATERIAL_FILING = "material_filing"
     POLITICIAN_DISCLOSURE = "politician_disclosure"
     ACTIVIST_13D = "activist_13d"
+    SUPPLY_CHAIN_LAG = "supply_chain_lag"
 
 
 @dataclass(frozen=True)
