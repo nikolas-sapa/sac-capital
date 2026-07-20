@@ -38,6 +38,7 @@ from equities.data.news import YFinanceNewsProvider
 from equities.data.news_composite import CompositeNewsProvider
 from equities.data.news_crawl4ai import Crawl4AINewsProvider
 from equities.data.news_tiingo import TiingoNewsProvider
+from equities.data.truth_social import TruthSocialNewsProvider
 from equities.data.registry import ProviderRegistry
 from equities.data.macro_regime import MacroRegimeGate
 from equities.data.vix import VIXRegimeGate
@@ -793,6 +794,9 @@ async def run_once(
         price_fallback=fallback_mark_price,
     )
     news = CompositeNewsProvider([
+        # First: returns few items but high signal, and the composite stops
+        # once `limit` is filled. No-op if TRUTH_SOCIAL_API_KEY absent.
+        TruthSocialNewsProvider(),
         YFinanceNewsProvider(),
         TiingoNewsProvider(),       # no-op if TIINGO_API_KEY absent
         Crawl4AINewsProvider(),     # no-op if crawl4ai not installed
