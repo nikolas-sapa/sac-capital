@@ -52,6 +52,8 @@ from equities.killgate.tracker import ForwardPaperTracker
 from equities.ledger_equity import EquityLedger
 from equities.paper import EquityPaperTracker, PaperFill
 from equities.risk.kernel import RiskKernel
+from equities.risk.correlation import CorrelationChecker
+from equities.risk.news_guard import NewsGuard
 from equities.risk.vol_target import vol_target_shares
 from equities.data.technicals import vol_20d_ann_pct
 from equities.killgate.thesis_health import ThesisHealthChecker
@@ -1181,6 +1183,20 @@ async def run_once(
                 return (0, 0.0)
             return (bucket.n, bucket.win_rate)
 
+        correlation_checker = (
+            CorrelationChecker(
+                price_feed,
+                lookback_days=settings.equity_correlation_lookback_days,
+            )
+            if settings.equity_correlation_enabled
+            else None
+        )
+        news_guard = NewsGuard(
+            enabled=settings.equity_news_blackout_enabled,
+            before_hours=settings.equity_news_blackout_before_h,
+            after_hours=settings.equity_news_blackout_after_h,
+            failure_callback=record_provider_failure,
+        )
         kernel = RiskKernel(
             capital=settings.bankroll_usd,
             risk_pct=settings.equity_risk_pct,
@@ -1194,6 +1210,9 @@ async def run_once(
             kelly_min_trades=settings.equity_kelly_min_trades,
             win_stats_lookup=_win_stats_lookup,
             state_path=Path("data/kernel_state.json"),
+            max_pairwise_corr=settings.equity_max_pairwise_corr,
+            max_portfolio_corr=settings.equity_max_portfolio_corr,
+            correlation_checker=correlation_checker,
         )
         open_positions = equity_ledger.open_positions()
         sector_lookup: dict[str, str] = {}
@@ -1249,6 +1268,21 @@ async def run_once(
 
                 if sizing_decision == "proceed" and rec.size_verdict == "half":
                     print(f"  [SIZED DOWN] [{rec.instrument.ticker}] halved to {rec.size_pct:.2%}")
+
+                # --- News/macro-event blackout (FOMC/CPI/NFP) — new entries only ---
+                news_verdict = news_guard.evaluate(
+                    rec.instrument.ticker, datetime.fromisoformat(run_cutoff_utc)
+                )
+                if news_verdict["decision"] == "block":
+                    reason = f"news_blackout: {news_verdict['reason']} (next_event={news_verdict['next_event']}, minutes_until={news_verdict['minutes_until']})"
+                    print(f"  REJECTED [{rec.instrument.ticker}] ({rec.sleeve.value}): {reason}")
+                    artifact_store.append(risk_decision_artifact(
+                        rec, decision="rejected", rejection_reason=reason, stage="news_guard",
+                        shares=0,
+                        risk_metrics={"next_event": news_verdict["next_event"], "minutes_until": news_verdict["minutes_until"]},
+                        data_cutoff_utc=run_cutoff_utc,
+                    ))
+                    continue
 
                 sized = kernel.approve(
                     rec,

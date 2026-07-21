@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     equity_max_positions: int = 12
     equity_max_name_pct: float = 0.25
     equity_max_sector_pct: float = 0.35
+    equity_max_pairwise_corr: float = 0.7  # max return corr vs. any single open position
+    equity_max_portfolio_corr: float = 0.5  # max avg return corr vs. the whole open book
+    equity_correlation_lookback_days: int = 90
+    equity_correlation_enabled: bool = True  # disable gate if price provider is unreliable
     equity_daily_loss_limit_pct: float = 0.05
     equity_drawdown_limit_pct: float = 0.15
     equity_max_price_age_days: int = 7
@@ -56,6 +60,9 @@ class Settings(BaseSettings):
     equity_trail_r: float = 1.5  # trail distance in R multiples once target reached
     equity_kelly_min_trades: int = 30  # closed trades per band before Kelly sizing
     equity_pyramid_enabled: bool = False  # probe 1/3, add on confirmation (dark ship)
+    equity_news_blackout_enabled: bool = True  # block new entries near FOMC/CPI/NFP
+    equity_news_blackout_before_h: float = 24.0  # hours before a high-impact event to block
+    equity_news_blackout_after_h: float = 2.0  # hours after a high-impact event to block
     finnhub_api_key: str = ""
     politician_signal_enabled: bool = False
     politician_lookback_days: int = 45

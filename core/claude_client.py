@@ -353,11 +353,15 @@ class ClaudeCodeClient:
         mapped = self._MODEL_MAP.get(model, model)
         full_prompt = f"{system}\n\n---\n\n{user}"
 
-        # ponytail: claude CLI refuses subscription auth ("connectors disabled")
-        # if ANTHROPIC_API_KEY/AUTH_TOKEN is in env (from .env or a parent Claude
-        # Code session). Scrub them so the Max subscription is used, not metered API.
-        env = {k: v for k, v in os.environ.items()
-               if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
+        # Least-privilege env: allowlist only what `claude` needs (mirrors
+        # CodexCLIClient._CODEX_SAFE_ENV_KEYS above). This also drops
+        # ANTHROPIC_API_KEY/AUTH_TOKEN by omission, which the CLI otherwise
+        # picks up over subscription auth ("connectors disabled") — the old
+        # 2-key blocklist passed everything else through, including
+        # MANTLE_PRIVATE_KEY, ALPACA_SECRET_KEY, TELEGRAM_BOT_TOKEN. HOME is
+        # required so the CLI can read its config/auth state under ~/.claude.
+        _CLAUDE_SAFE_ENV_KEYS = {"PATH", "HOME", "TMPDIR", "TERM", "LANG", "LC_ALL", "USER", "LOGNAME"}
+        env = {k: v for k, v in os.environ.items() if k in _CLAUDE_SAFE_ENV_KEYS}
         result = subprocess.run(
             [
                 "claude", "-p", "--model", mapped,

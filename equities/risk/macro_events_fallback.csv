@@ -1,0 +1,43 @@
+# Best-effort static fallback for equities/risk/news_guard.py.
+# NOT verified against a live source from inside this environment — these
+# dates were reconstructed from the publicly pre-announced Fed/BLS release
+# calendars and may drift from the actual schedule (BLS especially shifts
+# CPI/NFP by a day or two around holidays). Verify against
+# federalreserve.gov/monetarypolicy/fomccalendars.htm (FOMC) and
+# bls.gov/schedule/news_release (CPI, NFP) and refresh at least annually.
+# Coverage window is declared in news_guard.py (_FALLBACK_COVERAGE_START/END)
+# — outside that window the guard fails CLOSED regardless of what's below.
+# All times are America/New_York wall-clock (DST-aware in code).
+event_type,name,date,time_et
+FOMC,FOMC Rate Decision,2026-01-28,14:00
+FOMC,FOMC Rate Decision,2026-03-18,14:00
+FOMC,FOMC Rate Decision,2026-04-29,14:00
+FOMC,FOMC Rate Decision,2026-06-17,14:00
+FOMC,FOMC Rate Decision,2026-07-29,14:00
+FOMC,FOMC Rate Decision,2026-09-16,14:00
+FOMC,FOMC Rate Decision,2026-10-28,14:00
+FOMC,FOMC Rate Decision,2026-12-09,14:00
+NFP,Non-Farm Payrolls,2026-01-09,08:30
+NFP,Non-Farm Payrolls,2026-02-06,08:30
+NFP,Non-Farm Payrolls,2026-03-06,08:30
+NFP,Non-Farm Payrolls,2026-04-03,08:30
+NFP,Non-Farm Payrolls,2026-05-08,08:30
+NFP,Non-Farm Payrolls,2026-06-05,08:30
+NFP,Non-Farm Payrolls,2026-07-02,08:30
+NFP,Non-Farm Payrolls,2026-08-07,08:30
+NFP,Non-Farm Payrolls,2026-09-04,08:30
+NFP,Non-Farm Payrolls,2026-10-02,08:30
+NFP,Non-Farm Payrolls,2026-11-06,08:30
+NFP,Non-Farm Payrolls,2026-12-04,08:30
+CPI,CPI Release,2026-01-13,08:30
+CPI,CPI Release,2026-02-11,08:30
+CPI,CPI Release,2026-03-11,08:30
+CPI,CPI Release,2026-04-14,08:30
+CPI,CPI Release,2026-05-12,08:30
+CPI,CPI Release,2026-06-10,08:30
+CPI,CPI Release,2026-07-14,08:30
+CPI,CPI Release,2026-08-12,08:30
+CPI,CPI Release,2026-09-15,08:30
+CPI,CPI Release,2026-10-13,08:30
+CPI,CPI Release,2026-11-12,08:30
+CPI,CPI Release,2026-12-10,08:30

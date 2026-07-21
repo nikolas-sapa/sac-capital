@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -11,6 +12,27 @@ import httpx
 
 from core.config import Settings
 from equities.strategy import Recommendation
+
+
+def _assert_live_trading_allowed(settings: Settings) -> None:
+    """Hard guard against routing an order to a live (non-paper) endpoint.
+
+    Any new live-capable executor must call this guard too — it is the
+    single choke point _submit_order relies on, deliberately redundant
+    with the paper-only check in AlpacaPaperExecutor.__init__.
+    """
+    is_live = (
+        not settings.alpaca_paper
+        or _urlparse(settings.alpaca_base_url).hostname != "paper-api.alpaca.markets"
+    )
+    if not is_live:
+        return
+    if os.environ.get("ALLOW_LIVE_TRADING") != "1" or not settings.live_trading_enabled:
+        raise RuntimeError(
+            "Refusing to submit a live order: live trading requires "
+            "settings.live_trading_enabled=True AND ALLOW_LIVE_TRADING=1 "
+            "in the environment, in addition to non-paper Alpaca config."
+        )
 
 
 @dataclass(frozen=True)
@@ -72,6 +94,7 @@ class AlpacaPaperExecutor:
                 "expected paper-api.alpaca.markets"
             )
 
+        self._settings = settings
         self._base_url = settings.alpaca_base_url.rstrip("/")
         if self._base_url.endswith("/v2"):
             self._base_url = self._base_url[:-3]
@@ -175,6 +198,7 @@ class AlpacaPaperExecutor:
         limit_price: float | None = None,
         client_order_id: str | None = None,
     ) -> AlpacaOrder:
+        _assert_live_trading_allowed(self._settings)
         if qty <= 0:
             raise ValueError("Alpaca order quantity must be positive")
         if order_type == "limit" and (limit_price is None or limit_price <= 0):
