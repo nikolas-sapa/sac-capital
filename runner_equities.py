@@ -1191,7 +1191,12 @@ async def run_once(
                         timeout=settings.equity_provider_timeout_seconds,
                     ))
                 pol_provider = CompositeDisclosureProvider(pol_sources)
-                pol_candidates = PoliticianScreen(pol_provider).scan(swing_universe)
+                # Pass the configured lookback: the providers fetch
+                # politician_lookback_days but the screen defaulted to 30, so
+                # disclosures between the two windows were fetched and dropped.
+                pol_candidates = PoliticianScreen(
+                    pol_provider, lookback_days=settings.politician_lookback_days
+                ).scan(swing_universe)
                 for c in pol_candidates:
                     print(f"  [POL] {c.instrument.ticker}: {c.evidence} (urgency={c.urgency:.2f})")
 
