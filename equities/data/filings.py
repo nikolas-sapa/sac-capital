@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import logging
-from functools import lru_cache
+import os
 from dataclasses import dataclass
 from datetime import date, timedelta, datetime
 from typing import Protocol, runtime_checkable
 
 
-_USER_AGENT = "polymarket-bot research@example.com"
+# SEC fair-access policy wants a real declaring contact. Override via .env;
+# the fallback is deliberately generic so no personal address is committed.
+_USER_AGENT = os.getenv("SEC_USER_AGENT", "sac-capital research contact@example.com")
 _SUBMISSIONS_TIMEOUT = 10.0  # HTTP timeout for SEC EDGAR submissions API
 _TICKERS_TIMEOUT = 5.0  # HTTP timeout for SEC ticker mapping (cached)
 _logger = logging.getLogger(__name__)
@@ -37,20 +39,23 @@ class SECEdgarFilings:
 
         cik = self._cik(ticker)
         if not cik:
+            print(f"  [PROVIDER] source=sec_filings ticker={ticker} error=no_cik_mapping")
             return []
 
         padded = str(cik).zfill(10)
         try:
             resp = httpx.get(
                 f"{self._SUBMISSIONS}/CIK{padded}.json",
-                headers={"User-Agent": "polymarket-bot research@example.com"},
+                headers={"User-Agent": _USER_AGENT},
                 timeout=_SUBMISSIONS_TIMEOUT,
             )
             resp.raise_for_status()
         except httpx.TimeoutException:
+            print(f"  [PROVIDER] source=sec_filings ticker={ticker} error=timeout")
             _logger.warning(f"Timeout fetching SEC filings for {ticker} (CIK {cik}); returning empty list")
             return []
-        except Exception:
+        except Exception as exc:
+            print(f"  [PROVIDER] source=sec_filings ticker={ticker} error={type(exc).__name__}: {exc}")
             return []
 
         data = resp.json()
@@ -87,9 +92,17 @@ class SECEdgarFilings:
         return _ticker_to_cik(ticker)
 
 
-@lru_cache(maxsize=1)
+# ponytail: hand-rolled cache instead of @lru_cache because a failed fetch must
+# NOT be cached — lru_cache pinned an empty map for the whole run and silently
+# blinded every filings-based screen (provider_failures stayed 0).
+_TICKER_MAP_CACHE: dict[str, int] = {}
+
+
 def _company_ticker_map() -> dict[str, int]:
     import httpx
+
+    if _TICKER_MAP_CACHE:
+        return _TICKER_MAP_CACHE
 
     try:
         resp = httpx.get(
@@ -104,14 +117,20 @@ def _company_ticker_map() -> dict[str, int]:
             cik = int(entry.get("cik_str", 0) or 0)
             if ticker and cik:
                 mapping[ticker] = cik
-        return mapping
-    except httpx.TimeoutException:
-        _logger.warning("Timeout fetching SEC ticker map; returning empty mapping")
-        return {}
-    except Exception:
+    except Exception as exc:
+        # Loud: an empty map disables every filings screen, so it must never
+        # look like "no filings found".
+        print(f"  [PROVIDER] source=sec_ticker_map error={type(exc).__name__}: {exc}")
+        _logger.warning("SEC ticker map fetch failed (%s); filings screens degraded", exc)
         return {}
 
+    if not mapping:
+        print("  [PROVIDER] source=sec_ticker_map error=empty_mapping")
+        return {}
 
-@lru_cache(maxsize=2048)
+    _TICKER_MAP_CACHE.update(mapping)
+    return _TICKER_MAP_CACHE
+
+
 def _ticker_to_cik(ticker: str) -> int | None:
     return _company_ticker_map().get(ticker.upper().strip())

@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import sys
+from datetime import date, timedelta
 from types import ModuleType
 
 from equities.data import filings as filings_mod
+
+
+def _days_ago(n: int) -> str:
+    """Filing date N days back, so fixtures never rot out of the lookback window."""
+    return (date.today() - timedelta(days=n)).isoformat()
 
 
 class _Response:
@@ -18,8 +24,7 @@ class _Response:
 
 
 def test_recent_uses_cached_company_ticker_map(monkeypatch):
-    filings_mod._company_ticker_map.cache_clear()
-    filings_mod._ticker_to_cik.cache_clear()
+    filings_mod._TICKER_MAP_CACHE.clear()
 
     monkeypatch.setattr(
         filings_mod,
@@ -67,8 +72,7 @@ def test_recent_uses_cached_company_ticker_map(monkeypatch):
 
 
 def test_recent_returns_fast_when_ticker_not_in_map(monkeypatch):
-    filings_mod._company_ticker_map.cache_clear()
-    filings_mod._ticker_to_cik.cache_clear()
+    filings_mod._TICKER_MAP_CACHE.clear()
 
     monkeypatch.setattr(filings_mod, "_company_ticker_map", lambda: {})
 
@@ -79,8 +83,7 @@ def test_recent_returns_fast_when_ticker_not_in_map(monkeypatch):
 
 
 def test_sc13d_forms_pass_the_filter(monkeypatch):
-    filings_mod._company_ticker_map.cache_clear()
-    filings_mod._ticker_to_cik.cache_clear()
+    filings_mod._TICKER_MAP_CACHE.clear()
 
     monkeypatch.setattr(
         filings_mod,
@@ -117,8 +120,7 @@ def test_sc13d_forms_pass_the_filter(monkeypatch):
 
 def test_recent_handles_mismatched_list_lengths(monkeypatch, capsys):
     """Test that mismatched list lengths are logged and truncated safely."""
-    filings_mod._company_ticker_map.cache_clear()
-    filings_mod._ticker_to_cik.cache_clear()
+    filings_mod._TICKER_MAP_CACHE.clear()
 
     monkeypatch.setattr(
         filings_mod,
@@ -133,7 +135,8 @@ def test_recent_handles_mismatched_list_lengths(monkeypatch, capsys):
                     "filings": {
                         "recent": {
                             "form": ["8-K", "10-Q", "10-K"],  # 3 items
-                            "filingDate": ["2026-06-28", "2026-06-25"],  # 2 items (mismatch)
+                            # Relative dates: hardcoded ones rot out of the lookback window.
+                            "filingDate": [_days_ago(2), _days_ago(5)],  # 2 items (mismatch)
                             "items": ["2.02", ""],  # 2 items
                         }
                     }

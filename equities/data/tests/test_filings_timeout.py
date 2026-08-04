@@ -35,15 +35,39 @@ class TestFilingsTimeout:
 
     def test_company_ticker_map_timeout_returns_empty(self):
         """When ticker map API times out, return empty mapping."""
+        from equities.data.filings import _company_ticker_map, _TICKER_MAP_CACHE
+
+        _TICKER_MAP_CACHE.clear()
         with patch("httpx.get") as mock_get:
             mock_get.side_effect = httpx.TimeoutException("Ticker map timed out")
-            # Call the function directly (bypassing the cache for this test)
-            from equities.data.filings import _company_ticker_map
-
-            # Clear the cache
-            _company_ticker_map.cache_clear()
             result = _company_ticker_map()
             assert result == {}
+
+    def test_failed_ticker_map_is_not_cached(self):
+        """A failed fetch must not poison the cache for the rest of the run.
+
+        Regression: @lru_cache pinned the empty mapping process-wide, so every
+        filings-based screen silently returned zero candidates all run with
+        provider_failures=0.
+        """
+        from equities.data.filings import _company_ticker_map, _TICKER_MAP_CACHE
+
+        _TICKER_MAP_CACHE.clear()
+        try:
+            with patch("httpx.get") as mock_get:
+                mock_get.side_effect = httpx.TimeoutException("boom")
+                assert _company_ticker_map() == {}
+
+            # Second call, network healthy again — must re-fetch, not serve {}.
+            with patch("httpx.get") as mock_get:
+                mock_resp = MagicMock()
+                mock_resp.json.return_value = {
+                    "0": {"ticker": "PLTR", "cik_str": 1321655},
+                }
+                mock_get.return_value = mock_resp
+                assert _company_ticker_map() == {"PLTR": 1321655}
+        finally:
+            _TICKER_MAP_CACHE.clear()
 
     def test_recent_valid_response(self):
         """Verify normal operation with valid SEC response."""

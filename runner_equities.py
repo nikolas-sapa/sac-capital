@@ -226,6 +226,93 @@ DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     # Inference / new IPOs
     Instrument("CBRS",  "Cerebras Systems",           "NASDAQ", CapTier.MID),
     Instrument("AI",    "C3.ai",                      "NYSE",   CapTier.SMALL),
+
+    # --- Breadth expansion 2026-08-04 -------------------------------------
+    # Every ticker below was validated against yfinance (live price + market
+    # cap) and SEC EDGAR (CIK resolves, so the filings screen can see it).
+    # Cap tier assigned from real market cap: LARGE >=$100B, MID >=$12B.
+    # All land SMALL/MID, i.e. all are eligible for the swing event screen.
+
+    # Neocloud / AI datacenter
+    Instrument("IREN",  "IREN Limited",               "NASDAQ", CapTier.MID),
+    Instrument("CRWV",  "CoreWeave",                  "NASDAQ", CapTier.MID),
+    Instrument("CIFR",  "Cipher Mining",              "NASDAQ", CapTier.SMALL),
+    Instrument("WULF",  "TeraWulf",                   "NASDAQ", CapTier.SMALL),
+    Instrument("APLD",  "Applied Digital",            "NASDAQ", CapTier.SMALL),
+    Instrument("GLXY",  "Galaxy Digital",             "NASDAQ", CapTier.SMALL),
+    # Quantum
+    Instrument("IONQ",  "IonQ",                       "NYSE",   CapTier.MID),
+    Instrument("RGTI",  "Rigetti Computing",          "NASDAQ", CapTier.SMALL),
+    Instrument("QBTS",  "D-Wave Quantum",             "NASDAQ", CapTier.SMALL),
+    Instrument("QUBT",  "Quantum Computing Inc",      "NASDAQ", CapTier.SMALL),
+    # Nuclear / SMR / uranium
+    Instrument("OKLO",  "Oklo",                       "NYSE",   CapTier.SMALL),
+    Instrument("SMR",   "NuScale Power",              "NYSE",   CapTier.SMALL),
+    Instrument("LEU",   "Centrus Energy",             "NYSE",   CapTier.SMALL),
+    Instrument("BWXT",  "BWX Technologies",           "NYSE",   CapTier.MID),
+    Instrument("NNE",   "Nano Nuclear Energy",        "NASDAQ", CapTier.SMALL),
+    Instrument("CCJ",   "Cameco",                     "NYSE",   CapTier.MID),
+    Instrument("TLN",   "Talen Energy",               "NASDAQ", CapTier.MID),
+    # Energy storage / solar infrastructure
+    Instrument("FLNC",  "Fluence Energy",             "NASDAQ", CapTier.SMALL),
+    Instrument("NXT",   "Nextracker",                 "NASDAQ", CapTier.MID),
+    Instrument("ENPH",  "Enphase Energy",             "NASDAQ", CapTier.SMALL),
+    Instrument("ARRY",  "Array Technologies",         "NASDAQ", CapTier.SMALL),
+    Instrument("SEDG",  "SolarEdge Technologies",     "NASDAQ", CapTier.SMALL),
+    # Space / drones / defense tech
+    Instrument("PL",    "Planet Labs",                "NYSE",   CapTier.SMALL),
+    Instrument("RCAT",  "Red Cat Holdings",           "NASDAQ", CapTier.SMALL),
+    Instrument("DRS",   "Leonardo DRS",               "NASDAQ", CapTier.MID),
+    Instrument("RDW",   "Redwire",                    "NYSE",   CapTier.SMALL),
+    # Robotics / automation
+    Instrument("SYM",   "Symbotic",                   "NASDAQ", CapTier.MID),
+    Instrument("SERV",  "Serve Robotics",             "NASDAQ", CapTier.SMALL),
+    Instrument("TER",   "Teradyne",                   "NASDAQ", CapTier.MID),
+    Instrument("ROK",   "Rockwell Automation",        "NYSE",   CapTier.MID),
+    # Semi equipment & components
+    Instrument("AEHR",  "Aehr Test Systems",          "NASDAQ", CapTier.SMALL),
+    Instrument("ACLS",  "Axcelis Technologies",       "NASDAQ", CapTier.SMALL),
+    Instrument("UCTT",  "Ultra Clean Holdings",       "NASDAQ", CapTier.SMALL),
+    Instrument("CAMT",  "Camtek",                     "NASDAQ", CapTier.SMALL),
+    Instrument("NVMI",  "Nova Ltd",                   "NASDAQ", CapTier.MID),
+    Instrument("CRDO",  "Credo Technology",           "NASDAQ", CapTier.MID),
+    Instrument("MTSI",  "MACOM Technology",           "NASDAQ", CapTier.MID),
+    Instrument("SITM",  "SiTime",                     "NASDAQ", CapTier.MID),
+    Instrument("POWI",  "Power Integrations",         "NASDAQ", CapTier.SMALL),
+    Instrument("PI",    "Impinj",                     "NASDAQ", CapTier.SMALL),
+    Instrument("LSCC",  "Lattice Semiconductor",      "NASDAQ", CapTier.MID),
+    Instrument("RMBS",  "Rambus",                     "NASDAQ", CapTier.SMALL),
+    Instrument("ALGM",  "Allegro MicroSystems",       "NASDAQ", CapTier.SMALL),
+    Instrument("PENG",  "Penguin Solutions",          "NASDAQ", CapTier.SMALL),
+    # Biotech / GLP-1 / genomics
+    Instrument("VKTX",  "Viking Therapeutics",        "NASDAQ", CapTier.SMALL),
+    Instrument("CRSP",  "CRISPR Therapeutics",        "NASDAQ", CapTier.SMALL),
+    Instrument("NTLA",  "Intellia Therapeutics",      "NASDAQ", CapTier.SMALL),
+    Instrument("BEAM",  "Beam Therapeutics",          "NASDAQ", CapTier.SMALL),
+    Instrument("RXRX",  "Recursion Pharmaceuticals",  "NASDAQ", CapTier.SMALL),
+    Instrument("ALNY",  "Alnylam Pharmaceuticals",    "NASDAQ", CapTier.MID),
+    # Fintech / crypto-adjacent
+    Instrument("UPST",  "Upstart Holdings",           "NASDAQ", CapTier.SMALL),
+    Instrument("DAVE",  "Dave Inc",                   "NASDAQ", CapTier.SMALL),
+    Instrument("OSCR",  "Oscar Health",               "NYSE",   CapTier.SMALL),
+    Instrument("LMND",  "Lemonade",                   "NYSE",   CapTier.SMALL),
+    Instrument("CRCL",  "Circle Internet Group",      "NYSE",   CapTier.MID),
+    Instrument("MSTR",  "Strategy Inc",               "NASDAQ", CapTier.MID),
+    Instrument("MARA",  "MARA Holdings",              "NASDAQ", CapTier.SMALL),
+    Instrument("RIOT",  "Riot Platforms",             "NASDAQ", CapTier.SMALL),
+    # Internet / media
+    Instrument("RDDT",  "Reddit",                     "NYSE",   CapTier.MID),
+    Instrument("ROKU",  "Roku",                       "NASDAQ", CapTier.MID),
+    Instrument("PINS",  "Pinterest",                  "NYSE",   CapTier.MID),
+    Instrument("SNAP",  "Snap",                       "NYSE",   CapTier.SMALL),
+    Instrument("SPOT",  "Spotify Technology",         "NYSE",   CapTier.MID),
+    # AI software
+    Instrument("BBAI",  "BigBear.ai",                 "NYSE",   CapTier.SMALL),
+    Instrument("INOD",  "Innodata",                   "NASDAQ", CapTier.SMALL),
+    Instrument("PATH",  "UiPath",                     "NYSE",   CapTier.SMALL),
+    Instrument("DOCN",  "DigitalOcean Holdings",      "NYSE",   CapTier.MID),
+    Instrument("ESTC",  "Elastic NV",                 "NYSE",   CapTier.SMALL),
+    Instrument("GTLB",  "GitLab",                     "NASDAQ", CapTier.SMALL),
 ]
 
 DEFAULT_CORE_UNIVERSE: list[Instrument] = [
