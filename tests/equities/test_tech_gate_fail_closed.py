@@ -6,10 +6,19 @@ them through ungated (138 vs 5 on a healthy run).
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pandas as pd
 
+from core.assets.instrument import CapTier, Instrument
 from equities.data.prices import YFinancePriceFeed
-from runner_equities import _keep_candidate_without_technicals, _tech_coverage_ok
+from equities.screen.event_screen import CandidateEvent, EventType
+from equities.screen.relative_strength import ScreeningCoverage
+from runner_equities import (
+    _apply_tech_gate,
+    _keep_candidate_without_technicals,
+    _tech_coverage_ok,
+)
 
 
 class TestCoverageThreshold:
@@ -36,6 +45,54 @@ class TestMissingTechnicals:
 
     def test_gate_disabled_keeps_everything(self):
         assert _keep_candidate_without_technicals("empty_frame", hard_gate=False) is True
+
+
+class TestSharedTechGate:
+    """Every timing-checked screen must reach the same verdict for a ticker.
+
+    Regression: politician candidates were appended after the gate ran, so a
+    name dropped as do_not_chase on the filings path re-entered ungated.
+    """
+
+    @staticmethod
+    def _candidate(ticker: str):
+        return CandidateEvent(
+            instrument=Instrument(ticker, ticker, "NASDAQ", CapTier.MID),
+            event_type=EventType.POLITICIAN_DISCLOSURE,
+            evidence="POL buy",
+            urgency=0.65,
+        )
+
+    @staticmethod
+    def _coverage(failed=None):
+        return ScreeningCoverage(total=10, screened=10, failed=failed or {})
+
+    def test_do_not_chase_is_dropped(self):
+        evidence = SimpleNamespace(
+            evidence="RS rank 3/190", trend_ok=True, base_ok=True,
+            breakout_volume=False, do_not_chase=True,
+        )
+        kept = _apply_tech_gate(
+            [self._candidate("ENTG")], {"ENTG": evidence}, self._coverage(), hard_gate=True
+        )
+        assert kept == []
+
+    def test_clean_technicals_survive_and_are_annotated(self):
+        evidence = SimpleNamespace(
+            evidence="RS rank 3/190", trend_ok=True, base_ok=True,
+            breakout_volume=False, do_not_chase=False,
+        )
+        kept = _apply_tech_gate(
+            [self._candidate("BWXT")], {"BWXT": evidence}, self._coverage(), hard_gate=True
+        )
+        assert len(kept) == 1
+        assert "Technicals: RS rank 3/190" in kept[0].evidence
+
+    def test_data_outage_drops_politician_candidate(self):
+        kept = _apply_tech_gate(
+            [self._candidate("MU")], {}, self._coverage({"MU": "empty_frame"}), hard_gate=True
+        )
+        assert kept == []
 
 
 class TestPriceMemo:

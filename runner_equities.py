@@ -102,6 +102,49 @@ def _tech_coverage_ok(screened: int, total: int) -> bool:
     return screened / total >= _MIN_TECH_COVERAGE
 
 
+def _apply_tech_gate(
+    candidates: list[CandidateEvent],
+    rs_evidence: dict,
+    coverage,
+    hard_gate: bool,
+    *,
+    label: str = "TECH GATE",
+) -> list[CandidateEvent]:
+    """Drop candidates failing the technical gate; annotate survivors.
+
+    Shared by every screen whose entries should be timing-checked. The
+    supply-chain-lag screen deliberately does NOT use this — laggards fail a
+    momentum gate by definition (see its call site).
+    """
+    kept: list[CandidateEvent] = []
+    for candidate in candidates:
+        ticker = candidate.instrument.ticker
+        evidence = rs_evidence.get(ticker)
+        if evidence is None:
+            # No evidence because the data failed → drop (fail closed).
+            # No evidence because the name is genuinely too young (recent
+            # IPO) → keep; that is a property of the stock, not an outage.
+            failure = coverage.failed.get(ticker)
+            if not _keep_candidate_without_technicals(failure, hard_gate):
+                print(f"  [{label}] {ticker}: dropped (no technicals: {failure})")
+                continue
+            kept.append(candidate)
+            continue
+        if hard_gate:
+            ok, gate_reason = _passes_tech_gate(evidence)
+            if not ok:
+                print(f"  [{label}] {ticker}: dropped ({gate_reason})")
+                continue
+        kept.append(
+            replace(
+                candidate,
+                evidence=f"{candidate.evidence} | Technicals: {evidence.evidence}",
+            )
+        )
+        print(f"  [RS] {ticker}: {evidence.evidence}")
+    return kept
+
+
 def _keep_candidate_without_technicals(failure: str | None, hard_gate: bool) -> bool:
     """Whether a candidate with no technical evidence may still proceed.
 
@@ -1091,7 +1134,6 @@ async def run_once(
             print(f"skipped_failed={len(coverage.failed)}")
             for ticker, reason in coverage.failed.items():
                 print(f"  ticker={ticker} reason={reason}")
-            enriched_candidates = []
             hard_gate = getattr(settings, "equity_hard_tech_gate", True)
 
             # Fail closed: if the feed collapsed, the gate cannot evaluate
@@ -1104,35 +1146,9 @@ async def run_once(
                 )
                 swing_candidates = []
 
-            for candidate in swing_candidates:
-                ticker = candidate.instrument.ticker
-                evidence = rs_evidence.get(ticker)
-                if evidence is None:
-                    # No evidence because the data failed → drop (fail closed).
-                    # No evidence because the name is genuinely too young (recent
-                    # IPO) → keep; that is a property of the stock, not an outage.
-                    failure = coverage.failed.get(ticker)
-                    if not _keep_candidate_without_technicals(failure, hard_gate):
-                        print(f"  [TECH GATE] {ticker}: dropped (no technicals: {failure})")
-                        continue
-                    enriched_candidates.append(candidate)
-                    continue
-                if hard_gate:
-                    ok, gate_reason = _passes_tech_gate(evidence)
-                    if not ok:
-                        print(
-                            f"  [TECH GATE] {candidate.instrument.ticker}: "
-                            f"dropped ({gate_reason})"
-                        )
-                        continue
-                enriched_candidates.append(
-                    replace(
-                        candidate,
-                        evidence=f"{candidate.evidence} | Technicals: {evidence.evidence}",
-                    )
-                )
-                print(f"  [RS] {candidate.instrument.ticker}: {evidence.evidence}")
-            swing_candidates = enriched_candidates
+            swing_candidates = _apply_tech_gate(
+                swing_candidates, rs_evidence, coverage, hard_gate
+            )
 
         # --- Supply-chain-lag / bottleneck screen ---
         # Placed AFTER relative_strength_screen deliberately: these are laggards
@@ -1178,6 +1194,19 @@ async def run_once(
                 pol_candidates = PoliticianScreen(pol_provider).scan(swing_universe)
                 for c in pol_candidates:
                     print(f"  [POL] {c.instrument.ticker}: {c.evidence} (urgency={c.urgency:.2f})")
+
+                # This screen runs after relative_strength_screen, so its
+                # candidates used to reach the analyst without ever meeting the
+                # technical gate — the same name could be dropped as
+                # do_not_chase on the filings path and re-enter ungated here.
+                # A disclosure is a reason to look, not a reason to chase.
+                if hard_gate and not _tech_coverage_ok(coverage.screened, coverage.total):
+                    print("  [TECH COVERAGE] DEGRADED — skipping politician entries this run")
+                    pol_candidates = []
+                else:
+                    pol_candidates = _apply_tech_gate(
+                        pol_candidates, rs_evidence, coverage, hard_gate, label="POL TECH GATE"
+                    )
                 swing_candidates = swing_candidates + pol_candidates
 
                 # --- Point-in-time check for politician disclosures (warning-only) ---
