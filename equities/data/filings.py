@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from dataclasses import dataclass
 from datetime import date, timedelta, datetime
 from typing import Protocol, runtime_checkable
@@ -12,6 +13,8 @@ from typing import Protocol, runtime_checkable
 _USER_AGENT = os.getenv("SEC_USER_AGENT", "sac-capital research contact@example.com")
 _SUBMISSIONS_TIMEOUT = 10.0  # HTTP timeout for SEC EDGAR submissions API
 _TICKERS_TIMEOUT = 5.0  # HTTP timeout for SEC ticker mapping (cached)
+_CONNECT_RETRIES = 3  # attempts per ticker when the connection itself fails (DNS/TCP)
+_CONNECT_BACKOFF_S = 0.5  # linear backoff between connection retries
 _logger = logging.getLogger(__name__)
 
 
@@ -43,19 +46,34 @@ class SECEdgarFilings:
             return []
 
         padded = str(cik).zfill(10)
-        try:
-            resp = httpx.get(
-                f"{self._SUBMISSIONS}/CIK{padded}.json",
-                headers={"User-Agent": _USER_AGENT},
-                timeout=_SUBMISSIONS_TIMEOUT,
-            )
-            resp.raise_for_status()
-        except httpx.TimeoutException:
-            print(f"  [PROVIDER] source=sec_filings ticker={ticker} error=timeout")
-            _logger.warning(f"Timeout fetching SEC filings for {ticker} (CIK {cik}); returning empty list")
-            return []
-        except Exception as exc:
-            print(f"  [PROVIDER] source=sec_filings ticker={ticker} error={type(exc).__name__}: {exc}")
+        # ponytail: retry connection errors only. Scanning ~190 tickers opens a
+        # fresh connection per query and macOS DNS starts refusing near the tail
+        # (ConnectError), which silently drops those names from the screen.
+        # Upgrade path: one pooled httpx.Client if this stops being enough.
+        resp = None
+        for attempt in range(_CONNECT_RETRIES):
+            try:
+                resp = httpx.get(
+                    f"{self._SUBMISSIONS}/CIK{padded}.json",
+                    headers={"User-Agent": _USER_AGENT},
+                    timeout=_SUBMISSIONS_TIMEOUT,
+                )
+                resp.raise_for_status()
+                break
+            except httpx.TimeoutException:
+                print(f"  [PROVIDER] source=sec_filings ticker={ticker} error=timeout")
+                _logger.warning(f"Timeout fetching SEC filings for {ticker} (CIK {cik}); returning empty list")
+                return []
+            except httpx.ConnectError as exc:
+                if attempt == _CONNECT_RETRIES - 1:
+                    print(f"  [PROVIDER] source=sec_filings ticker={ticker} error=ConnectError: {exc}")
+                    return []
+                time.sleep(_CONNECT_BACKOFF_S * (attempt + 1))
+            except Exception as exc:
+                print(f"  [PROVIDER] source=sec_filings ticker={ticker} error={type(exc).__name__}: {exc}")
+                return []
+
+        if resp is None:
             return []
 
         data = resp.json()

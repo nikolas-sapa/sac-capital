@@ -69,6 +69,55 @@ class TestFilingsTimeout:
         finally:
             _TICKER_MAP_CACHE.clear()
 
+    def test_connect_error_is_retried_then_succeeds(self):
+        """Transient DNS/TCP failures must not silently drop a ticker.
+
+        Regression: scanning ~190 tickers exhausted local DNS near the tail and
+        12 names fell out of the filings screen with no retry.
+        """
+        from datetime import date, timedelta
+
+        filings = SECEdgarFilings()
+        recent_date = (date.today() - timedelta(days=2)).isoformat()
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "filings": {
+                "recent": {
+                    "form": ["8-K"],
+                    "filingDate": [recent_date],
+                    "items": ["2.02"],
+                }
+            }
+        }
+
+        with patch("equities.data.filings._ticker_to_cik", return_value=789019):
+            with patch("equities.data.filings.time.sleep"):
+                with patch("httpx.get") as mock_get:
+                    mock_get.side_effect = [
+                        httpx.ConnectError("nodename nor servname provided"),
+                        httpx.ConnectError("nodename nor servname provided"),
+                        mock_resp,
+                    ]
+                    result = filings.recent("PLTR", days=30)
+
+        assert mock_get.call_count == 3
+        assert len(result) == 1
+        assert result[0].items == ["2.02"]
+
+    def test_connect_error_gives_up_after_retries(self):
+        """Exhausted retries return empty, but loudly (never a silent zero)."""
+        filings = SECEdgarFilings()
+
+        with patch("equities.data.filings._ticker_to_cik", return_value=789019):
+            with patch("equities.data.filings.time.sleep"):
+                with patch("httpx.get") as mock_get:
+                    mock_get.side_effect = httpx.ConnectError("boom")
+                    result = filings.recent("PLTR", days=30)
+
+        assert result == []
+        assert mock_get.call_count == 3
+
     def test_recent_valid_response(self):
         """Verify normal operation with valid SEC response."""
         from datetime import date, timedelta
