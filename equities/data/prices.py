@@ -79,6 +79,17 @@ class YFinancePriceFeed:
                     "timeout": self._timeout,
                 })
                 duration = time.monotonic() - started
+                # An empty frame is a failure, not a success. Reporting it as
+                # "ok" made a rate-limited run look healthy while every
+                # downstream technical gate silently lost its input.
+                if isinstance(df, pd.DataFrame) and df.empty:
+                    self._failures[ticker] = "empty_frame"
+                    print(
+                        f"  [PROVIDER] source=yfinance_download ticker={ticker} "
+                        f"attempt={attempt + 1} error=empty_frame duration_s={duration:.2f}"
+                    )
+                    df = None
+                    continue
                 print(
                     f"  [PROVIDER] source=yfinance_download ticker={ticker} "
                     f"attempt={attempt + 1} ok duration_s={duration:.2f}"
