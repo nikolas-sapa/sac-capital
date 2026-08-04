@@ -1,0 +1,57 @@
+name: Bug Report
+description: Report a bug in SAC Capital
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do **not** file security vulnerabilities here. See [SECURITY.md](https://github.com/nikolas-sapa/sac-capital/blob/main/SECURITY.md).
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened
+      description: A clear description of the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Commands run, config used (redact secrets), and the output/traceback.
+      render: shell
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Trading mode
+      options:
+        - Paper (internal_paper)
+        - Paper (Alpaca paper API)
+        - Live (please explain why in the description)
+    validations:
+      required: true
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      placeholder: "3.12.x"
+    validations:
+      required: true
+  - type: dropdown
+    id: network
+    attributes:
+      label: Mantle network (if relevant)
+      options:
+        - Not applicable
+        - Mantle Sepolia (testnet)
+        - Mantle Mainnet
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: sac-capital version
+      description: Output of `sac --version` or the commit SHA.
+    validations:
+      required: false
