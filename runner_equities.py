@@ -88,6 +88,32 @@ from equities.data.fund_13f import Fund13FProvider
 # Default universe (extend via --universe flag or editing this list)
 # ---------------------------------------------------------------------------
 
+# Fraction of the swing universe that must have usable technical history before
+# the hard tech gate is trusted. Below this the feed is degraded, and a gate
+# that cannot evaluate must not approve — see relative_strength_screen stage.
+_MIN_TECH_COVERAGE = 0.70
+_TECH_COVERAGE_RETRY_SLEEP_S = 20.0
+
+
+def _tech_coverage_ok(screened: int, total: int) -> bool:
+    """True when enough of the universe has technicals to trust the gate."""
+    if not total:
+        return True
+    return screened / total >= _MIN_TECH_COVERAGE
+
+
+def _keep_candidate_without_technicals(failure: str | None, hard_gate: bool) -> bool:
+    """Whether a candidate with no technical evidence may still proceed.
+
+    A data outage must fail closed (drop it). A genuinely short price history
+    is a property of the stock, not an outage, so recent IPOs stay eligible.
+    """
+    if not hard_gate:
+        return True
+    if failure and failure != "insufficient history":
+        return False
+    return True
+
 DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     # Semiconductor equipment & packaging
     Instrument("KLIC",  "Kulicke and Soffa",          "NASDAQ", CapTier.MID),
@@ -1046,6 +1072,18 @@ async def run_once(
             rs_scanner = RelativeStrengthScanner(price_feed)
             rs_evidence = rs_scanner.scan(swing_universe)
             coverage = rs_scanner.coverage
+
+            # A degraded price feed silently disables the technical gate, so
+            # retry once before trusting a collapsed coverage number.
+            if not _tech_coverage_ok(coverage.screened, coverage.total):
+                print(
+                    f"  [TECH COVERAGE] only {coverage.screened}/{coverage.total} screened; "
+                    "retrying price feed once before gating"
+                )
+                time.sleep(_TECH_COVERAGE_RETRY_SLEEP_S)
+                rs_evidence = rs_scanner.scan(swing_universe)
+                coverage = rs_scanner.coverage
+
             print("\n=== Relative-strength screening coverage ===")
             print("scope=curated_swing_universe (not entire stock market)")
             print(f"total_universe={coverage.total}")
@@ -1055,9 +1093,28 @@ async def run_once(
                 print(f"  ticker={ticker} reason={reason}")
             enriched_candidates = []
             hard_gate = getattr(settings, "equity_hard_tech_gate", True)
+
+            # Fail closed: if the feed collapsed, the gate cannot evaluate
+            # anything, so it must not approve anything either. Core DCA and
+            # mark-to-market are unaffected.
+            if hard_gate and not _tech_coverage_ok(coverage.screened, coverage.total):
+                print(
+                    f"  [TECH COVERAGE] DEGRADED — {coverage.screened}/{coverage.total} "
+                    f"below {_MIN_TECH_COVERAGE:.0%}; skipping all swing entries this run"
+                )
+                swing_candidates = []
+
             for candidate in swing_candidates:
-                evidence = rs_evidence.get(candidate.instrument.ticker)
+                ticker = candidate.instrument.ticker
+                evidence = rs_evidence.get(ticker)
                 if evidence is None:
+                    # No evidence because the data failed → drop (fail closed).
+                    # No evidence because the name is genuinely too young (recent
+                    # IPO) → keep; that is a property of the stock, not an outage.
+                    failure = coverage.failed.get(ticker)
+                    if not _keep_candidate_without_technicals(failure, hard_gate):
+                        print(f"  [TECH GATE] {ticker}: dropped (no technicals: {failure})")
+                        continue
                     enriched_candidates.append(candidate)
                     continue
                 if hard_gate:
