@@ -8,12 +8,12 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/nikolassapalidis/sapa_fund/.venv/bin/python</string>
+        <string>/Users/nikolassapalidis/Developer/python/sapa_fund/.venv/bin/python</string>
         <string>runner_equities.py</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/nikolassapalidis/sapa_fund</string>
+    <string>/Users/nikolassapalidis/Developer/python/sapa_fund</string>
 
     <!-- Run three daily scans in the local Mac timezone. -->
     <key>StartCalendarInterval</key>
@@ -42,10 +42,10 @@
     <false/>
 
     <key>StandardOutPath</key>
-    <string>/Users/nikolassapalidis/sapa_fund/data/equities_scan.log</string>
+    <string>/Users/nikolassapalidis/Developer/python/sapa_fund/data/equities_scan.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/nikolassapalidis/sapa_fund/data/equities_scan.err.log</string>
+    <string>/Users/nikolassapalidis/Developer/python/sapa_fund/data/equities_scan.err.log</string>
 
     <key>EnvironmentVariables</key>
     <dict>

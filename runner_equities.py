@@ -747,6 +747,41 @@ def _todays_alpaca_order_count(equity_ledger: EquityLedger) -> int:
     return equity_ledger.broker_orders_opened_on(today, provider="alpaca_paper")
 
 
+def _record_trim(equity_ledger: EquityLedger, ticker: str, shares: float, order) -> float:
+    """Write a concentration trim back to the ledger, oldest lot first.
+
+    A trim sells a fraction of a ticker, not a specific lot, so walk that ticker's
+    open lots FIFO until the sold quantity is accounted for. Returns shares actually
+    reduced — short of `shares` means the ledger held less than the broker sold,
+    which is drift worth surfacing rather than swallowing.
+    """
+    fill_price = float(
+        getattr(order, "filled_avg_price", None) or getattr(order, "limit_price", None) or 0.0
+    )
+    if fill_price <= 0:
+        # Market trims fill immediately but the submit response can precede the
+        # fill. Fall back to the lot's own mark so realized pnl is never computed
+        # against a zero price; reconcile corrects it on the next pass.
+        fill_price = 0.0
+    lots = [
+        p for p in equity_ledger.open_positions() if p.get("ticker") == ticker
+    ]
+    lots.sort(key=lambda p: str(p.get("opened_at") or ""))
+    now = datetime.now(tz=timezone.utc)
+    remaining = float(shares)
+    reduced = 0.0
+    for lot in lots:
+        if remaining <= 1e-9:
+            break
+        price = fill_price or float(lot.get("mark_price") or lot.get("entry_price") or 0.0)
+        done = equity_ledger.reduce_position(
+            int(lot["id"]), remaining, price, "concentration_trim", now
+        )
+        reduced += done
+        remaining -= done
+    return reduced
+
+
 def _should_skip_duplicate(existing_order: dict | None) -> bool:
     # ponytail: any prior row with this client_order_id blocks resubmission;
     # Alpaca idempotency on reused IDs after rejection is undefined.
@@ -1126,6 +1161,20 @@ async def run_once(
                             try:
                                 order = alpaca_executor.sell(trim.ticker, trim.shares)
                                 print(f"  [TRIMMED] {trim.ticker} order={order.id} status={order.status}")
+                                # The sale is real the moment the broker accepts it;
+                                # a trim that never reaches the ledger leaves phantom
+                                # shares that inflate exposure and block later entries.
+                                reduced = _record_trim(
+                                    equity_ledger, trim.ticker, trim.shares, order
+                                )
+                                print(
+                                    f"  [TRIM LEDGER] {trim.ticker} reduced={reduced:.4f} sh"
+                                )
+                                if reduced < trim.shares - 1e-6:
+                                    print(
+                                        f"  [TRIM WARN] {trim.ticker} sold {trim.shares:.4f} "
+                                        f"but ledger only held {reduced:.4f} — investigate drift"
+                                    )
                             except Exception as exc:
                                 print(f"  [TRIM FAILED] {trim.ticker}: {type(exc).__name__}: {exc}")
                     except Exception as exc:

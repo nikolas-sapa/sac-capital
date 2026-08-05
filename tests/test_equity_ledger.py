@@ -216,3 +216,57 @@ def test_close_position_raises_on_missing_position(tmp_path):
         assert "Position 999 not found" in str(e)
     finally:
         led.close()
+
+
+def test_reduce_position_partial_keeps_remainder_open(tmp_path):
+    led = EquityLedger(tmp_path / "eq.db")
+    led.open_position(_rec(), shares=10.0, fill_price=10.0,
+                      opened_at=datetime(2026, 1, 2, 14, 30), mode="paper", strategy="swing_v1")
+    pid = led.open_positions()[0]["id"]
+    sold = led.reduce_position(pid, 4.0, 12.0, "concentration_trim", datetime(2026, 1, 5, 14, 30))
+    assert sold == 4.0
+    open_pos = led.open_positions()
+    assert len(open_pos) == 1
+    assert open_pos[0]["shares"] == 6.0
+    # realized banked on the sold slice only: (12 - 10) * 4
+    assert led.realized_pnl() == 8.0
+    led.close()
+
+
+def test_reduce_position_full_closes_the_lot(tmp_path):
+    led = EquityLedger(tmp_path / "eq.db")
+    led.open_position(_rec(), shares=10.0, fill_price=10.0,
+                      opened_at=datetime(2026, 1, 2, 14, 30), mode="paper", strategy="swing_v1")
+    pid = led.open_positions()[0]["id"]
+    sold = led.reduce_position(pid, 10.0, 12.0, "concentration_trim", datetime(2026, 1, 5, 14, 30))
+    assert sold == 10.0
+    assert led.open_positions() == []
+    assert led.realized_pnl() == 20.0
+    led.close()
+
+
+def test_reduce_position_caps_at_lot_size(tmp_path):
+    """Asking for more than the lot holds reduces the lot, never goes negative."""
+    led = EquityLedger(tmp_path / "eq.db")
+    led.open_position(_rec(), shares=3.0, fill_price=10.0,
+                      opened_at=datetime(2026, 1, 2, 14, 30), mode="paper", strategy="swing_v1")
+    pid = led.open_positions()[0]["id"]
+    sold = led.reduce_position(pid, 9.0, 11.0, "concentration_trim", datetime(2026, 1, 5, 14, 30))
+    assert sold == 3.0
+    assert led.open_positions() == []
+    led.close()
+
+
+def test_reduce_position_does_not_clone_broker_order_ids(tmp_path):
+    """The closed slice must not carry the dedup key, or reruns skip live orders."""
+    led = EquityLedger(tmp_path / "eq.db")
+    led.open_position(_rec(), shares=10.0, fill_price=10.0,
+                      opened_at=datetime(2026, 1, 2, 14, 30), mode="paper", strategy="swing_v1",
+                      broker_client_order_id="eq-buy-ACME-deadbeef")
+    pid = led.open_positions()[0]["id"]
+    led.reduce_position(pid, 4.0, 12.0, "concentration_trim", datetime(2026, 1, 5, 14, 30))
+    found = led.position_by_broker_client_order_id("eq-buy-ACME-deadbeef")
+    assert found is not None
+    assert found["id"] == pid
+    assert found["status"] == "open"
+    led.close()
