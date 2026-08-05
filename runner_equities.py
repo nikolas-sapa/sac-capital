@@ -1523,6 +1523,19 @@ async def run_once(
         deployable_equity = current_equity - equity_ledger.pending_notional()
         today_realized_loss = equity_ledger.realized_pnl_on(today)
 
+        # Gross exposure is the fuse most likely to silently bind; print it every
+        # run so "why did nothing trade today" is answerable from the log alone.
+        gross_open = sum(
+            p.get("shares", 0) * (p.get("mark_price") or p.get("entry_price", 0))
+            for p in open_positions
+        )
+        print(
+            f"\n=== Exposure: gross=${gross_open:,.0f} equity=${current_equity:,.0f} "
+            f"ratio={gross_open / current_equity if current_equity else 0:.1%} "
+            f"cap={settings.equity_max_gross_pct:.0%} "
+            f"headroom=${settings.equity_max_gross_pct * current_equity - gross_open:,.0f} ==="
+        )
+
         with _stage(stats, "risk_and_execution"):
             print(f"\n=== Swing recommendations: {len(swing_recommendations)} ===")
             print(f"=== Core DCA recommendations: {len(core_recommendations)} ===")

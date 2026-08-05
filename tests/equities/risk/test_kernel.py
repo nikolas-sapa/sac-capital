@@ -241,14 +241,14 @@ def test_core_dca_cap_is_per_name_not_portfolio_wide():
     assert result.approved
 
 
-# --- Gross exposure cap -------------------------------------------------
+# --- Gross exposure cap ---------------------------------------------
 
 
 def test_gross_cap_rejects_when_book_fully_deployed():
     """At 1.0x gross the kernel must refuse to draw on broker margin."""
     kernel = RiskKernel(capital=100_000.0, max_gross_pct=1.0, max_positions=99)
     book = [_open_pos(f"T{i}", shares=100.0, price=100.0) for i in range(10)]  # $100k gross
-    result = kernel.approve(_rec(), book)
+    result = kernel.approve(_rec(), book, current_equity=100_000.0)
     assert not result.approved
     assert "gross_exposure" in result.rejection_reason
 
@@ -258,7 +258,9 @@ def test_gross_cap_clamps_partial_headroom():
     kernel = RiskKernel(capital=100_000.0, max_gross_pct=1.0, max_positions=99)
     book = [_open_pos(f"T{i}", shares=100.0, price=100.0) for i in range(9)]
     book.append(_open_pos("T9", shares=50.0, price=100.0))  # $95k gross
-    result = kernel.approve(_rec(entry=100.0, stop=95.0, tp=115.0), book)
+    result = kernel.approve(
+        _rec(entry=100.0, stop=95.0, tp=115.0), book, current_equity=100_000.0
+    )
     assert result.approved
     assert result.shares * 100.0 <= 5_000.0 + 1e-6
 
@@ -268,7 +270,7 @@ def test_gross_cap_counts_core_sleeve_too():
     kernel = RiskKernel(capital=100_000.0, max_gross_pct=1.0, max_positions=99)
     book = [{"ticker": f"C{i}", "sleeve": "core", "shares": 100.0, "entry_price": 100.0,
              "status": "open"} for i in range(10)]
-    result = kernel.approve(_rec(), book)
+    result = kernel.approve(_rec(), book, current_equity=100_000.0)
     assert not result.approved
     assert "gross_exposure" in result.rejection_reason
 
@@ -277,6 +279,41 @@ def test_gross_cap_above_one_permits_leverage():
     """max_gross_pct=1.5 is the deliberate leverage knob."""
     kernel = RiskKernel(capital=100_000.0, max_gross_pct=1.5, max_positions=99)
     book = [_open_pos(f"T{i}", shares=100.0, price=100.0) for i in range(10)]
-    result = kernel.approve(_rec(entry=100.0, stop=95.0, tp=115.0), book)
+    result = kernel.approve(
+        _rec(entry=100.0, stop=95.0, tp=115.0), book, current_equity=100_000.0
+    )
     assert result.approved
     assert result.shares > 0
+
+
+def test_gross_cap_does_not_trip_on_unlevered_book_with_gains():
+    """A winning, unlevered book must not be halted by its own profits.
+
+    Cost basis $106k against a static $100k bankroll reads as 106% and would
+    ratchet the fund shut, while the true picture is $103.8k of marked exposure
+    against $106.8k of live equity = 97%. Denominator must be live equity.
+    """
+    kernel = RiskKernel(capital=100_000.0, max_gross_pct=1.0, max_positions=99)
+    book = [
+        {"ticker": f"T{i}", "sleeve": "core", "shares": 100.0, "entry_price": 106.33,
+         "mark_price": 103.81, "status": "open"}
+        for i in range(10)
+    ]  # cost basis $106.3k, marked $103.8k
+    result = kernel.approve(
+        _rec(entry=100.0, stop=95.0, tp=115.0), book, current_equity=106_770.76
+    )
+    assert result.approved, result.rejection_reason
+    assert result.shares > 0
+
+
+def test_gross_cap_marks_to_market_when_positions_have_run():
+    """Marked exposure above equity trips the cap even if cost basis is under it."""
+    kernel = RiskKernel(capital=100_000.0, max_gross_pct=1.0, max_positions=99)
+    book = [
+        {"ticker": f"T{i}", "sleeve": "core", "shares": 100.0, "entry_price": 50.0,
+         "mark_price": 120.0, "status": "open"}
+        for i in range(10)
+    ]  # cost basis $50k, marked $120k
+    result = kernel.approve(_rec(), book, current_equity=100_000.0)
+    assert not result.approved
+    assert "gross_exposure" in result.rejection_reason

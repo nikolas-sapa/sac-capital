@@ -47,10 +47,12 @@ class RiskKernel:
         max_positions:       Max concurrent open swing positions (default 4).
         max_name_pct:        Max allocation to a single name (default 0.25 = 25%).
         max_gross_pct:       Total open exposure ceiling across BOTH sleeves as a fraction
-                             of capital (default 1.0 = cash-only, no broker margin). The
-                             per-name/sector caps alone allow max_positions * max_name_pct
-                             gross, i.e. silent leverage; this is the only fuse that binds
-                             the book as a whole. Set >1.0 only to lever deliberately.
+                             of LIVE equity (the `current_equity` arg to approve(), falling
+                             back to `capital` when absent). Default 1.0 = cash-only, no
+                             broker margin. The per-name/sector caps alone allow
+                             max_positions * max_name_pct gross, i.e. silent leverage; this
+                             is the only fuse that binds the book as a whole. Set >1.0 only
+                             to lever deliberately.
         daily_loss_limit_pct: Halts new entries when today's realized loss exceeds this
                               fraction of capital (default 0.05 = 5%).
         drawdown_limit_pct:  Circuit-breaker: halt ALL trading when drawdown from high-
@@ -176,13 +178,22 @@ class RiskKernel:
         # Per-name/sector caps bound single bets, not the book: 12 swing slots at
         # 25% each plus an uncapped core sleeve can reach 3x gross on broker
         # margin without a single rejection. Headroom clamps every new order.
+        #
+        # Denominator is live equity, NOT self.capital. self.capital is the static
+        # config bankroll; cost basis grows every time a realized gain is
+        # reinvested, so a static denominator turns this into a ratchet that any
+        # profitable book eventually trips and never un-trips. Numerator marks to
+        # market where the ledger has a mark_price — leverage is a market-value
+        # fact, and cost basis understates a book that has run.
+        gross_capital = current_equity if current_equity and current_equity > 0 else self.capital
         gross_open = sum(
-            p.get("shares", 0) * p.get("entry_price", 0) for p in open_positions
+            p.get("shares", 0) * (p.get("mark_price") or p.get("entry_price", 0))
+            for p in open_positions
         )
-        gross_headroom = self.max_gross_pct * self.capital - gross_open
+        gross_headroom = self.max_gross_pct * gross_capital - gross_open
         gross_rejection = SizedRecommendation(
             recommendation, 0.0, False,
-            f"gross_exposure_{gross_open / self.capital:.0%}_at_{self.max_gross_pct:.0%}_limit",
+            f"gross_exposure_{gross_open / gross_capital:.0%}_at_{self.max_gross_pct:.0%}_limit",
         )
         if is_core and gross_headroom <= 0:
             return gross_rejection
