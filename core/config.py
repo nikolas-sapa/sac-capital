@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     equity_kelly_min_trades: int = 30  # closed trades per band before Kelly sizing
     equity_pyramid_enabled: bool = False  # probe 1/3, add on confirmation (dark ship)
     equity_news_blackout_enabled: bool = True  # block new entries near FOMC/CPI/NFP
+    # Sell-side enforcement of the per-name cap. OFF by default: this is the
+    # only path in the system that sells without an exit signal, so it must be
+    # opted into explicitly rather than inherited by every deployment.
+    equity_rebalance_enabled: bool = False
+    equity_rebalance_band: float = 0.01  # only act once weight exceeds cap + band
     equity_news_blackout_before_h: float = 24.0  # hours before a high-impact event to block
     equity_news_blackout_after_h: float = 2.0  # hours after a high-impact event to block
     finnhub_api_key: str = ""
