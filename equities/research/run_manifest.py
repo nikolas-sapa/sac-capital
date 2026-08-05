@@ -26,6 +26,7 @@ _SAFE_CONFIG_FIELDS = (
     "equity_max_positions",
     "equity_max_name_pct",
     "equity_max_sector_pct",
+    "equity_max_gross_pct",
     "equity_daily_loss_limit_pct",
     "equity_drawdown_limit_pct",
     "equity_max_price_age_days",
