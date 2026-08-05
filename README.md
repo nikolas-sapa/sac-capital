@@ -70,7 +70,9 @@ US Equity Event Screen
   → Sonnet bull thesis
   → Sonnet challenger
   → Auditor
-  → Risk Kernel (fractional Kelly, 2% per-trade cap, 35% sector cap)
+  → News Guard (FOMC/CPI/NFP blackout — new entries only)
+  → Risk Kernel (quarter-Kelly, per-name/sector caps, correlation gate, drawdown breaker)
+  → Live-trading guard (refuses any non-paper order)
   → Alpaca paper order + local ledger entry
   → Deterministic canonical JSON exporter
   → AgentDecisionRegistry on Mantle (bytes32 SHA-256 commitment)
@@ -80,6 +82,41 @@ US Equity Event Screen
 Mantle is the immutable benchmark layer. The agent hashes each decision payload with canonical JSON → SHA-256 → `bytes32`, records it on-chain, and can later anchor outcome hashes against the same decision ID. The frontend recomputes the hash client-side so reviewers can confirm the on-chain record matches the AI output.
 
 **Safety boundary:** paper-only. On-chain records are verifiability anchors — not custody, brokerage, or live-trading instructions.
+
+---
+
+## Risk Table
+
+These are the live fuses. **Values here must match `.env`** — if you loosen a limit, change it here in the same commit and say why. A previous "aggressive profile" block in `.env` silently overrode every one of these while this README advertised the conservative numbers; that divergence is the failure mode this table exists to prevent.
+
+| Fuse | Default | Env key | Enforced at |
+|---|---|---|---|
+| Kelly fraction | 0.25 (quarter) | `KELLY_FRACTION` | `equities/risk/sizing.py` (hard-capped at 0.5 regardless) |
+| Max per-name | 25% | `EQUITY_MAX_NAME_PCT` | `equities/risk/kernel.py` |
+| Max per-sector | 35% | `EQUITY_MAX_SECTOR_PCT` | `equities/risk/kernel.py` |
+| Daily realized-loss halt | 5% | `EQUITY_DAILY_LOSS_LIMIT_PCT` | `equities/risk/kernel.py` |
+| Drawdown circuit-breaker | 15% from HWM | `EQUITY_DRAWDOWN_LIMIT_PCT` | `equities/risk/kernel.py` + `state.py` |
+| Max pairwise correlation | 0.70 | `EQUITY_MAX_PAIRWISE_CORR` | `equities/risk/correlation.py` |
+| Max portfolio avg correlation | 0.50 | `EQUITY_MAX_PORTFOLIO_CORR` | `equities/risk/correlation.py` |
+| Macro blackout window | 24h before / 2h after | `EQUITY_NEWS_BLACKOUT_BEFORE_H` / `_AFTER_H` | `equities/risk/news_guard.py` |
+
+**Correlation gate.** Sector-string matching is not a concentration check: the swing universe is semiconductor-heavy, so five "different" names can be one bet. The gate correlates actual daily returns over a 90d lookback. It **fails open** on missing price data — a provider outage silently disables it, which is the deliberate trade against halting all entries on a yfinance hiccup.
+
+**Macro blackout.** Blocks *new entries* near high-impact US FOMC/CPI/NFP releases. Exits, stops and trailing logic are never blocked — getting out is always allowed. Primary source is the free ForexFactory feed; `equities/risk/macro_events_fallback.csv` is the offline fallback and **fails closed** outside its declared coverage window. The 24h/2h window suits daily bars (the classic 30min/15min window is an intraday setting). Re-verify the fallback dates annually against federalreserve.gov and bls.gov — BLS shifts CPI/NFP around holidays.
+
+**Overfitting gate.** `equities/eval/overfitting.py` implements PBO (via CSCV), Deflated and Probabilistic Sharpe. `AutoPromoter` cannot promote a variant unless the verdict passes (PBO < 0.5 **and** DSR > 0.95) against the *full* set of tournament trials, not just the winner. Fails closed on insufficient data. Note: `run_tournament`/`AutoPromoter` currently have no production caller — this gate is preventive, in place before the self-improvement loop is wired up. Whoever wires a real `score_fn` must verify trial columns actually disperse; if they collapse, DSR's multiple-comparison correction becomes a silent no-op.
+
+## Live-Trading Lock
+
+Live trading is **off by design and refuses rather than routes**. A non-paper order requires all three of:
+
+1. non-paper config (`ALPACA_PAPER=false` + a non-paper base URL),
+2. `ALLOW_LIVE_TRADING=1` in the environment,
+3. `live_trading_enabled=True` in settings.
+
+Enforced at `equities/execution/alpaca.py::_assert_live_trading_allowed`, called as the first line of `_submit_order` — the single choke point both `buy()` and `sell()` route through. Deliberately redundant with the constructor check; do not "simplify" either away. **Any new broker executor must call this guard too** — it is not inherited automatically.
+
+Verify with `uv run python scripts/check_live_trading_guard.py`.
 
 The equities research side now also includes a paper-only supplier-lag research runner:
 

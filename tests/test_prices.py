@@ -54,6 +54,24 @@ def test_yfinance_feed_empty_df_returns_empty_series(monkeypatch):
     assert ps.bars == []
 
 
+def test_yfinance_feed_empty_df_is_reported_as_failure(monkeypatch, capsys):
+    """An empty frame must log as an error, never as ok.
+
+    Regression: a rate-limited run returned empty frames for all 191 tickers,
+    each logged "ok" with duration_s=0.00. The relative-strength screen lost
+    its input and the technical gate silently stopped filtering.
+    """
+    monkeypatch.setattr("equities.data.prices.yf.download", lambda **kwargs: pd.DataFrame())
+    feed = YFinancePriceFeed(retries=0, isolate_requests=False)
+    ps = feed.history("BADTICKER")
+
+    assert ps.bars == []
+    out = capsys.readouterr().out
+    assert "error=empty_frame" in out
+    assert " ok " not in out
+    assert feed.failure_reason("BADTICKER") == "empty_frame"
+
+
 def test_yfinance_feed_exception_returns_empty_series(monkeypatch):
     def fake_download(**kwargs):
         raise RuntimeError("network failed")

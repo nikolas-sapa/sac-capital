@@ -45,6 +45,12 @@ class YFinancePriceFeed:
         self._download = download or yf.download
         self._isolate_requests = isolate_requests
         self._failures: dict[str, str] = {}
+        # ponytail: per-instance memo, not a real cache. One runner shares one
+        # feed and ~6 screens ask for the same ticker, so this cuts a run from
+        # ~600 downloads to ~190 — which is what was tripping yfinance rate
+        # limits. Successful non-empty series only; never memoize a failure.
+        # Upgrade path: persist to disk if runs ever need to share history.
+        self._series_memo: dict[tuple[str, str, str], PriceSeries] = {}
         self._isolated_download = IsolatedCall(_download_request, timeout) if isolate_requests else None
 
     def failure_reason(self, ticker: str) -> str | None:
@@ -64,6 +70,10 @@ class YFinancePriceFeed:
         )
 
     def history(self, ticker: str, period: str = "1y", interval: str = "1d") -> PriceSeries:
+        memo_key = (ticker, period, interval)
+        if (hit := self._series_memo.get(memo_key)) is not None:
+            return hit
+
         df = None
         self._failures.pop(ticker, None)
         for attempt in range(self._retries + 1):
@@ -79,6 +89,17 @@ class YFinancePriceFeed:
                     "timeout": self._timeout,
                 })
                 duration = time.monotonic() - started
+                # An empty frame is a failure, not a success. Reporting it as
+                # "ok" made a rate-limited run look healthy while every
+                # downstream technical gate silently lost its input.
+                if isinstance(df, pd.DataFrame) and df.empty:
+                    self._failures[ticker] = "empty_frame"
+                    print(
+                        f"  [PROVIDER] source=yfinance_download ticker={ticker} "
+                        f"attempt={attempt + 1} error=empty_frame duration_s={duration:.2f}"
+                    )
+                    df = None
+                    continue
                 print(
                     f"  [PROVIDER] source=yfinance_download ticker={ticker} "
                     f"attempt={attempt + 1} ok duration_s={duration:.2f}"
@@ -117,4 +138,7 @@ class YFinancePriceFeed:
                     volume=volume,
                 )
             )
-        return PriceSeries(ticker=ticker, bars=bars)
+        series = PriceSeries(ticker=ticker, bars=bars)
+        if bars:
+            self._series_memo[memo_key] = series
+        return series

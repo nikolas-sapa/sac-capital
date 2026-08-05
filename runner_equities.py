@@ -38,6 +38,7 @@ from equities.data.news import YFinanceNewsProvider
 from equities.data.news_composite import CompositeNewsProvider
 from equities.data.news_crawl4ai import Crawl4AINewsProvider
 from equities.data.news_tiingo import TiingoNewsProvider
+from equities.data.truth_social import TruthSocialNewsProvider
 from equities.data.registry import ProviderRegistry
 from equities.data.macro_regime import MacroRegimeGate
 from equities.data.vix import VIXRegimeGate
@@ -51,6 +52,8 @@ from equities.killgate.tracker import ForwardPaperTracker
 from equities.ledger_equity import EquityLedger
 from equities.paper import EquityPaperTracker, PaperFill
 from equities.risk.kernel import RiskKernel
+from equities.risk.correlation import CorrelationChecker
+from equities.risk.news_guard import NewsGuard
 from equities.risk.vol_target import vol_target_shares
 from equities.data.technicals import vol_20d_ann_pct
 from equities.killgate.thesis_health import ThesisHealthChecker
@@ -84,6 +87,75 @@ from equities.data.fund_13f import Fund13FProvider
 # ---------------------------------------------------------------------------
 # Default universe (extend via --universe flag or editing this list)
 # ---------------------------------------------------------------------------
+
+# Fraction of the swing universe that must have usable technical history before
+# the hard tech gate is trusted. Below this the feed is degraded, and a gate
+# that cannot evaluate must not approve — see relative_strength_screen stage.
+_MIN_TECH_COVERAGE = 0.70
+_TECH_COVERAGE_RETRY_SLEEP_S = 20.0
+
+
+def _tech_coverage_ok(screened: int, total: int) -> bool:
+    """True when enough of the universe has technicals to trust the gate."""
+    if not total:
+        return True
+    return screened / total >= _MIN_TECH_COVERAGE
+
+
+def _apply_tech_gate(
+    candidates: list[CandidateEvent],
+    rs_evidence: dict,
+    coverage,
+    hard_gate: bool,
+    *,
+    label: str = "TECH GATE",
+) -> list[CandidateEvent]:
+    """Drop candidates failing the technical gate; annotate survivors.
+
+    Shared by every screen whose entries should be timing-checked. The
+    supply-chain-lag screen deliberately does NOT use this — laggards fail a
+    momentum gate by definition (see its call site).
+    """
+    kept: list[CandidateEvent] = []
+    for candidate in candidates:
+        ticker = candidate.instrument.ticker
+        evidence = rs_evidence.get(ticker)
+        if evidence is None:
+            # No evidence because the data failed → drop (fail closed).
+            # No evidence because the name is genuinely too young (recent
+            # IPO) → keep; that is a property of the stock, not an outage.
+            failure = coverage.failed.get(ticker)
+            if not _keep_candidate_without_technicals(failure, hard_gate):
+                print(f"  [{label}] {ticker}: dropped (no technicals: {failure})")
+                continue
+            kept.append(candidate)
+            continue
+        if hard_gate:
+            ok, gate_reason = _passes_tech_gate(evidence)
+            if not ok:
+                print(f"  [{label}] {ticker}: dropped ({gate_reason})")
+                continue
+        kept.append(
+            replace(
+                candidate,
+                evidence=f"{candidate.evidence} | Technicals: {evidence.evidence}",
+            )
+        )
+        print(f"  [RS] {ticker}: {evidence.evidence}")
+    return kept
+
+
+def _keep_candidate_without_technicals(failure: str | None, hard_gate: bool) -> bool:
+    """Whether a candidate with no technical evidence may still proceed.
+
+    A data outage must fail closed (drop it). A genuinely short price history
+    is a property of the stock, not an outage, so recent IPOs stay eligible.
+    """
+    if not hard_gate:
+        return True
+    if failure and failure != "insufficient history":
+        return False
+    return True
 
 DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     # Semiconductor equipment & packaging
@@ -223,6 +295,93 @@ DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     # Inference / new IPOs
     Instrument("CBRS",  "Cerebras Systems",           "NASDAQ", CapTier.MID),
     Instrument("AI",    "C3.ai",                      "NYSE",   CapTier.SMALL),
+
+    # --- Breadth expansion 2026-08-04 -------------------------------------
+    # Every ticker below was validated against yfinance (live price + market
+    # cap) and SEC EDGAR (CIK resolves, so the filings screen can see it).
+    # Cap tier assigned from real market cap: LARGE >=$100B, MID >=$12B.
+    # All land SMALL/MID, i.e. all are eligible for the swing event screen.
+
+    # Neocloud / AI datacenter
+    Instrument("IREN",  "IREN Limited",               "NASDAQ", CapTier.MID),
+    Instrument("CRWV",  "CoreWeave",                  "NASDAQ", CapTier.MID),
+    Instrument("CIFR",  "Cipher Mining",              "NASDAQ", CapTier.SMALL),
+    Instrument("WULF",  "TeraWulf",                   "NASDAQ", CapTier.SMALL),
+    Instrument("APLD",  "Applied Digital",            "NASDAQ", CapTier.SMALL),
+    Instrument("GLXY",  "Galaxy Digital",             "NASDAQ", CapTier.SMALL),
+    # Quantum
+    Instrument("IONQ",  "IonQ",                       "NYSE",   CapTier.MID),
+    Instrument("RGTI",  "Rigetti Computing",          "NASDAQ", CapTier.SMALL),
+    Instrument("QBTS",  "D-Wave Quantum",             "NASDAQ", CapTier.SMALL),
+    Instrument("QUBT",  "Quantum Computing Inc",      "NASDAQ", CapTier.SMALL),
+    # Nuclear / SMR / uranium
+    Instrument("OKLO",  "Oklo",                       "NYSE",   CapTier.SMALL),
+    Instrument("SMR",   "NuScale Power",              "NYSE",   CapTier.SMALL),
+    Instrument("LEU",   "Centrus Energy",             "NYSE",   CapTier.SMALL),
+    Instrument("BWXT",  "BWX Technologies",           "NYSE",   CapTier.MID),
+    Instrument("NNE",   "Nano Nuclear Energy",        "NASDAQ", CapTier.SMALL),
+    Instrument("CCJ",   "Cameco",                     "NYSE",   CapTier.MID),
+    Instrument("TLN",   "Talen Energy",               "NASDAQ", CapTier.MID),
+    # Energy storage / solar infrastructure
+    Instrument("FLNC",  "Fluence Energy",             "NASDAQ", CapTier.SMALL),
+    Instrument("NXT",   "Nextracker",                 "NASDAQ", CapTier.MID),
+    Instrument("ENPH",  "Enphase Energy",             "NASDAQ", CapTier.SMALL),
+    Instrument("ARRY",  "Array Technologies",         "NASDAQ", CapTier.SMALL),
+    Instrument("SEDG",  "SolarEdge Technologies",     "NASDAQ", CapTier.SMALL),
+    # Space / drones / defense tech
+    Instrument("PL",    "Planet Labs",                "NYSE",   CapTier.SMALL),
+    Instrument("RCAT",  "Red Cat Holdings",           "NASDAQ", CapTier.SMALL),
+    Instrument("DRS",   "Leonardo DRS",               "NASDAQ", CapTier.MID),
+    Instrument("RDW",   "Redwire",                    "NYSE",   CapTier.SMALL),
+    # Robotics / automation
+    Instrument("SYM",   "Symbotic",                   "NASDAQ", CapTier.MID),
+    Instrument("SERV",  "Serve Robotics",             "NASDAQ", CapTier.SMALL),
+    Instrument("TER",   "Teradyne",                   "NASDAQ", CapTier.MID),
+    Instrument("ROK",   "Rockwell Automation",        "NYSE",   CapTier.MID),
+    # Semi equipment & components
+    Instrument("AEHR",  "Aehr Test Systems",          "NASDAQ", CapTier.SMALL),
+    Instrument("ACLS",  "Axcelis Technologies",       "NASDAQ", CapTier.SMALL),
+    Instrument("UCTT",  "Ultra Clean Holdings",       "NASDAQ", CapTier.SMALL),
+    Instrument("CAMT",  "Camtek",                     "NASDAQ", CapTier.SMALL),
+    Instrument("NVMI",  "Nova Ltd",                   "NASDAQ", CapTier.MID),
+    Instrument("CRDO",  "Credo Technology",           "NASDAQ", CapTier.MID),
+    Instrument("MTSI",  "MACOM Technology",           "NASDAQ", CapTier.MID),
+    Instrument("SITM",  "SiTime",                     "NASDAQ", CapTier.MID),
+    Instrument("POWI",  "Power Integrations",         "NASDAQ", CapTier.SMALL),
+    Instrument("PI",    "Impinj",                     "NASDAQ", CapTier.SMALL),
+    Instrument("LSCC",  "Lattice Semiconductor",      "NASDAQ", CapTier.MID),
+    Instrument("RMBS",  "Rambus",                     "NASDAQ", CapTier.SMALL),
+    Instrument("ALGM",  "Allegro MicroSystems",       "NASDAQ", CapTier.SMALL),
+    Instrument("PENG",  "Penguin Solutions",          "NASDAQ", CapTier.SMALL),
+    # Biotech / GLP-1 / genomics
+    Instrument("VKTX",  "Viking Therapeutics",        "NASDAQ", CapTier.SMALL),
+    Instrument("CRSP",  "CRISPR Therapeutics",        "NASDAQ", CapTier.SMALL),
+    Instrument("NTLA",  "Intellia Therapeutics",      "NASDAQ", CapTier.SMALL),
+    Instrument("BEAM",  "Beam Therapeutics",          "NASDAQ", CapTier.SMALL),
+    Instrument("RXRX",  "Recursion Pharmaceuticals",  "NASDAQ", CapTier.SMALL),
+    Instrument("ALNY",  "Alnylam Pharmaceuticals",    "NASDAQ", CapTier.MID),
+    # Fintech / crypto-adjacent
+    Instrument("UPST",  "Upstart Holdings",           "NASDAQ", CapTier.SMALL),
+    Instrument("DAVE",  "Dave Inc",                   "NASDAQ", CapTier.SMALL),
+    Instrument("OSCR",  "Oscar Health",               "NYSE",   CapTier.SMALL),
+    Instrument("LMND",  "Lemonade",                   "NYSE",   CapTier.SMALL),
+    Instrument("CRCL",  "Circle Internet Group",      "NYSE",   CapTier.MID),
+    Instrument("MSTR",  "Strategy Inc",               "NASDAQ", CapTier.MID),
+    Instrument("MARA",  "MARA Holdings",              "NASDAQ", CapTier.SMALL),
+    Instrument("RIOT",  "Riot Platforms",             "NASDAQ", CapTier.SMALL),
+    # Internet / media
+    Instrument("RDDT",  "Reddit",                     "NYSE",   CapTier.MID),
+    Instrument("ROKU",  "Roku",                       "NASDAQ", CapTier.MID),
+    Instrument("PINS",  "Pinterest",                  "NYSE",   CapTier.MID),
+    Instrument("SNAP",  "Snap",                       "NYSE",   CapTier.SMALL),
+    Instrument("SPOT",  "Spotify Technology",         "NYSE",   CapTier.MID),
+    # AI software
+    Instrument("BBAI",  "BigBear.ai",                 "NYSE",   CapTier.SMALL),
+    Instrument("INOD",  "Innodata",                   "NASDAQ", CapTier.SMALL),
+    Instrument("PATH",  "UiPath",                     "NYSE",   CapTier.SMALL),
+    Instrument("DOCN",  "DigitalOcean Holdings",      "NYSE",   CapTier.MID),
+    Instrument("ESTC",  "Elastic NV",                 "NYSE",   CapTier.SMALL),
+    Instrument("GTLB",  "GitLab",                     "NASDAQ", CapTier.SMALL),
 ]
 
 DEFAULT_CORE_UNIVERSE: list[Instrument] = [
@@ -793,6 +952,9 @@ async def run_once(
         price_fallback=fallback_mark_price,
     )
     news = CompositeNewsProvider([
+        # First: returns few items but high signal, and the composite stops
+        # once `limit` is filled. No-op if TRUTH_SOCIAL_API_KEY absent.
+        TruthSocialNewsProvider(),
         YFinanceNewsProvider(),
         TiingoNewsProvider(),       # no-op if TIINGO_API_KEY absent
         Crawl4AINewsProvider(),     # no-op if crawl4ai not installed
@@ -953,6 +1115,18 @@ async def run_once(
             rs_scanner = RelativeStrengthScanner(price_feed)
             rs_evidence = rs_scanner.scan(swing_universe)
             coverage = rs_scanner.coverage
+
+            # A degraded price feed silently disables the technical gate, so
+            # retry once before trusting a collapsed coverage number.
+            if not _tech_coverage_ok(coverage.screened, coverage.total):
+                print(
+                    f"  [TECH COVERAGE] only {coverage.screened}/{coverage.total} screened; "
+                    "retrying price feed once before gating"
+                )
+                time.sleep(_TECH_COVERAGE_RETRY_SLEEP_S)
+                rs_evidence = rs_scanner.scan(swing_universe)
+                coverage = rs_scanner.coverage
+
             print("\n=== Relative-strength screening coverage ===")
             print("scope=curated_swing_universe (not entire stock market)")
             print(f"total_universe={coverage.total}")
@@ -960,29 +1134,21 @@ async def run_once(
             print(f"skipped_failed={len(coverage.failed)}")
             for ticker, reason in coverage.failed.items():
                 print(f"  ticker={ticker} reason={reason}")
-            enriched_candidates = []
             hard_gate = getattr(settings, "equity_hard_tech_gate", True)
-            for candidate in swing_candidates:
-                evidence = rs_evidence.get(candidate.instrument.ticker)
-                if evidence is None:
-                    enriched_candidates.append(candidate)
-                    continue
-                if hard_gate:
-                    ok, gate_reason = _passes_tech_gate(evidence)
-                    if not ok:
-                        print(
-                            f"  [TECH GATE] {candidate.instrument.ticker}: "
-                            f"dropped ({gate_reason})"
-                        )
-                        continue
-                enriched_candidates.append(
-                    replace(
-                        candidate,
-                        evidence=f"{candidate.evidence} | Technicals: {evidence.evidence}",
-                    )
+
+            # Fail closed: if the feed collapsed, the gate cannot evaluate
+            # anything, so it must not approve anything either. Core DCA and
+            # mark-to-market are unaffected.
+            if hard_gate and not _tech_coverage_ok(coverage.screened, coverage.total):
+                print(
+                    f"  [TECH COVERAGE] DEGRADED — {coverage.screened}/{coverage.total} "
+                    f"below {_MIN_TECH_COVERAGE:.0%}; skipping all swing entries this run"
                 )
-                print(f"  [RS] {candidate.instrument.ticker}: {evidence.evidence}")
-            swing_candidates = enriched_candidates
+                swing_candidates = []
+
+            swing_candidates = _apply_tech_gate(
+                swing_candidates, rs_evidence, coverage, hard_gate
+            )
 
         # --- Supply-chain-lag / bottleneck screen ---
         # Placed AFTER relative_strength_screen deliberately: these are laggards
@@ -1025,9 +1191,27 @@ async def run_once(
                         timeout=settings.equity_provider_timeout_seconds,
                     ))
                 pol_provider = CompositeDisclosureProvider(pol_sources)
-                pol_candidates = PoliticianScreen(pol_provider).scan(swing_universe)
+                # Pass the configured lookback: the providers fetch
+                # politician_lookback_days but the screen defaulted to 30, so
+                # disclosures between the two windows were fetched and dropped.
+                pol_candidates = PoliticianScreen(
+                    pol_provider, lookback_days=settings.politician_lookback_days
+                ).scan(swing_universe)
                 for c in pol_candidates:
                     print(f"  [POL] {c.instrument.ticker}: {c.evidence} (urgency={c.urgency:.2f})")
+
+                # This screen runs after relative_strength_screen, so its
+                # candidates used to reach the analyst without ever meeting the
+                # technical gate — the same name could be dropped as
+                # do_not_chase on the filings path and re-enter ungated here.
+                # A disclosure is a reason to look, not a reason to chase.
+                if hard_gate and not _tech_coverage_ok(coverage.screened, coverage.total):
+                    print("  [TECH COVERAGE] DEGRADED — skipping politician entries this run")
+                    pol_candidates = []
+                else:
+                    pol_candidates = _apply_tech_gate(
+                        pol_candidates, rs_evidence, coverage, hard_gate, label="POL TECH GATE"
+                    )
                 swing_candidates = swing_candidates + pol_candidates
 
                 # --- Point-in-time check for politician disclosures (warning-only) ---
@@ -1177,6 +1361,20 @@ async def run_once(
                 return (0, 0.0)
             return (bucket.n, bucket.win_rate)
 
+        correlation_checker = (
+            CorrelationChecker(
+                price_feed,
+                lookback_days=settings.equity_correlation_lookback_days,
+            )
+            if settings.equity_correlation_enabled
+            else None
+        )
+        news_guard = NewsGuard(
+            enabled=settings.equity_news_blackout_enabled,
+            before_hours=settings.equity_news_blackout_before_h,
+            after_hours=settings.equity_news_blackout_after_h,
+            failure_callback=record_provider_failure,
+        )
         kernel = RiskKernel(
             capital=settings.bankroll_usd,
             risk_pct=settings.equity_risk_pct,
@@ -1190,6 +1388,9 @@ async def run_once(
             kelly_min_trades=settings.equity_kelly_min_trades,
             win_stats_lookup=_win_stats_lookup,
             state_path=Path("data/kernel_state.json"),
+            max_pairwise_corr=settings.equity_max_pairwise_corr,
+            max_portfolio_corr=settings.equity_max_portfolio_corr,
+            correlation_checker=correlation_checker,
         )
         open_positions = equity_ledger.open_positions()
         sector_lookup: dict[str, str] = {}
@@ -1245,6 +1446,21 @@ async def run_once(
 
                 if sizing_decision == "proceed" and rec.size_verdict == "half":
                     print(f"  [SIZED DOWN] [{rec.instrument.ticker}] halved to {rec.size_pct:.2%}")
+
+                # --- News/macro-event blackout (FOMC/CPI/NFP) — new entries only ---
+                news_verdict = news_guard.evaluate(
+                    rec.instrument.ticker, datetime.fromisoformat(run_cutoff_utc)
+                )
+                if news_verdict["decision"] == "block":
+                    reason = f"news_blackout: {news_verdict['reason']} (next_event={news_verdict['next_event']}, minutes_until={news_verdict['minutes_until']})"
+                    print(f"  REJECTED [{rec.instrument.ticker}] ({rec.sleeve.value}): {reason}")
+                    artifact_store.append(risk_decision_artifact(
+                        rec, decision="rejected", rejection_reason=reason, stage="news_guard",
+                        shares=0,
+                        risk_metrics={"next_event": news_verdict["next_event"], "minutes_until": news_verdict["minutes_until"]},
+                        data_cutoff_utc=run_cutoff_utc,
+                    ))
+                    continue
 
                 sized = kernel.approve(
                     rec,

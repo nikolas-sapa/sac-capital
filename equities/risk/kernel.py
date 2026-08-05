@@ -9,6 +9,9 @@ Fuses enforced:
 - Per-trade risk cap: max loss per trade ≤ risk_pct * capital (gap-aware)
 - Max concurrent swing positions: ≤ max_positions (default 4)
 - Per-name concentration: no single name > max_name_pct of swing sleeve
+- Return correlation: blocks adds too correlated (pairwise or vs. portfolio
+  avg) with the open book — catches same-bet exposure sector labels miss
+  (see equities/risk/correlation.py)
 - Max daily loss: halts new entries for the day when breached
 - Max total drawdown circuit-breaker: halts ALL trading
 - Real-money promotion gate: LIVE flag absent by default
@@ -56,6 +59,12 @@ class RiskKernel:
                              replaces flat risk_pct (default 30).
         win_stats_lookup:    Callable[[float], tuple[int, float]] mapping confidence ->
                              (n_closed_in_band, win_rate). Required for Kelly sizing.
+        max_pairwise_corr:   Max allowed return correlation vs. any single open position
+                             (default 0.7). Requires correlation_checker to take effect.
+        max_portfolio_corr:  Max allowed average return correlation vs. the whole open
+                             book (default 0.5). Requires correlation_checker to take effect.
+        correlation_checker: equities.risk.correlation.CorrelationChecker instance (or
+                             None to disable the gate — e.g. provider unavailable).
     """
 
     def __init__(
@@ -73,6 +82,9 @@ class RiskKernel:
         kelly_min_trades: int = 30,
         win_stats_lookup: Any = None,
         state_path: Path | None = None,
+        max_pairwise_corr: float = 0.7,
+        max_portfolio_corr: float = 0.5,
+        correlation_checker: Any = None,
     ) -> None:
         if capital <= 0:
             raise ValueError(f"RiskKernel capital must be positive, got {capital}")
@@ -88,6 +100,9 @@ class RiskKernel:
         self.kelly_fraction = kelly_fraction
         self.kelly_min_trades = kelly_min_trades
         self._win_stats_lookup = win_stats_lookup
+        self.max_pairwise_corr = max_pairwise_corr
+        self.max_portfolio_corr = max_portfolio_corr
+        self._correlation_checker = correlation_checker
 
         self._state_path = state_path
         self._high_water_mark = capital
@@ -186,6 +201,29 @@ class RiskKernel:
                     return SizedRecommendation(
                         recommendation, 0.0, False,
                         f"sector_concentration_{new_sector}_at_{self.max_sector_pct:.0%}_limit",
+                    )
+
+        # --- Return-correlation concentration cap ---
+        # Catches same-bet exposure sector labels miss (e.g. semis spanning
+        # multiple GICS sub-industries). Degrades silently to no-op when the
+        # checker is absent or the candidate's price history is unavailable —
+        # missing correlation data must not block or wave through a trade.
+        if self._correlation_checker is not None:
+            open_tickers = [str(p.get("ticker", "")) for p in swing_open]
+            result = self._correlation_checker.evaluate(ticker, open_tickers)
+            if result.available:
+                worst = result.max_pairwise
+                if worst is not None and worst[1] >= self.max_pairwise_corr:
+                    peer, corr = worst
+                    return SizedRecommendation(
+                        recommendation, 0.0, False,
+                        f"correlation_pairwise_{peer}_{corr:.2f}_at_{self.max_pairwise_corr:.0%}_limit",
+                    )
+                avg = result.portfolio_avg
+                if avg is not None and avg >= self.max_portfolio_corr:
+                    return SizedRecommendation(
+                        recommendation, 0.0, False,
+                        f"correlation_portfolio_avg_{avg:.2f}_at_{self.max_portfolio_corr:.0%}_limit",
                     )
 
         # --- Gap-aware sizing (swing) ---

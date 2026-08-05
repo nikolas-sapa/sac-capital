@@ -51,3 +51,6 @@ htmlcov/
 .DS_Store
 Thumbs.db
 .vercel
+
+# Bundled macro-event fallback calendar is source, not data (see equities/risk/news_guard.py)
+!equities/risk/macro_events_fallback.csv
