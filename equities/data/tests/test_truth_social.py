@@ -102,7 +102,11 @@ def test_identical_reposts_collapse(tmp_path):
     assert len(provider.headlines("AAPL")) == 1
 
 
-def test_no_key_is_a_noop(tmp_path):
+def test_no_key_is_a_noop(tmp_path, monkeypatch):
+    # TruthSocialNewsProvider falls back to os.getenv("TRUTH_SOCIAL_API_KEY"),
+    # so api_key="" alone does not mean "no key" — the ambient environment
+    # leaks in and the provider is no longer a noop. Control it explicitly.
+    monkeypatch.delenv("TRUTH_SOCIAL_API_KEY", raising=False)
     provider = TruthSocialNewsProvider(api_key="", cache_path=tmp_path / "none.jsonl")
     assert provider.headlines("AAPL") == []
 

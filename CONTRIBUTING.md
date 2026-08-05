@@ -26,8 +26,13 @@ uv sync
 Run the test suite:
 
 ```sh
+playwright install chromium   # once — the Senate eFD tests launch a real browser
 ./.venv/bin/python -m pytest
 ```
+
+Without the browser binary, four `test_senate_efd_disclosures` tests fail with
+`BrowserType.launch: Executable doesn't exist`. That is a missing dependency,
+not a broken build.
 
 Run the agent locally (paper trading only — this is the default and the
 only supported mode for contributors):
