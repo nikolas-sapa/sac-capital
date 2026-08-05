@@ -66,7 +66,12 @@ async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ points: [] });
   }
 
-  const periodStartEquity = raw.equity[0] ?? raw.base_value ?? 0;
+  // Intraday: baseline is the PREVIOUS close (`base_value`), not the first bar —
+  // the first 1H bar is already mid-session, so using it subtracts out the day's
+  // gain and flips Today's P&L negative. Multi-day: first bar is the period start.
+  const periodStartEquity = isIntraday
+    ? (raw.base_value ?? raw.equity[0] ?? 0)
+    : (raw.equity[0] ?? raw.base_value ?? 0);
 
   const TZ = "Europe/Athens";
   const fmtIntraday = new Intl.DateTimeFormat("en-US", {
