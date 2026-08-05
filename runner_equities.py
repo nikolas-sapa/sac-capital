@@ -52,6 +52,7 @@ from equities.killgate.tracker import ForwardPaperTracker
 from equities.ledger_equity import EquityLedger
 from equities.paper import EquityPaperTracker, PaperFill
 from equities.risk.kernel import RiskKernel
+from equities.risk.rebalance import compute_trims
 from equities.risk.correlation import CorrelationChecker
 from equities.risk.news_guard import NewsGuard
 from equities.risk.vol_target import vol_target_shares
@@ -1038,6 +1039,49 @@ async def run_once(
                             exit_price=ex.exit_price,
                             is_gap_stop=ex.reason == "stop_hit",
                         )
+
+        # --- Concentration rebalance (sell side of the per-name cap) ---
+        # The risk kernel caps concentration at entry only; nothing reduces a
+        # name that drifted past the limit through price moves or DCA adds.
+        # Off by default — see equity_rebalance_enabled.
+        if getattr(settings, "equity_rebalance_enabled", False):
+            with _stage(stats, "rebalance"):
+                if alpaca_executor is None:
+                    print("  [REBALANCE] no broker executor; skipping")
+                else:
+                    try:
+                        broker_positions = alpaca_executor.list_positions()
+                        account = alpaca_executor.get_account()
+                        trims = compute_trims(
+                            [
+                                {
+                                    "ticker": p.symbol,
+                                    "market_value": p.market_value,
+                                    "shares": p.qty,
+                                }
+                                for p in broker_positions
+                            ],
+                            equity=account.portfolio_value,
+                            max_name_pct=settings.equity_max_name_pct,
+                            band=settings.equity_rebalance_band,
+                        )
+                        if not trims:
+                            print(
+                                f"  [REBALANCE] all names within "
+                                f"{settings.equity_max_name_pct:.0%} cap"
+                            )
+                        for trim in trims:
+                            print(f"  [REBALANCE] {trim.evidence}")
+                            if dry_run:
+                                print(f"  [DRY RUN] would sell {trim.shares:.4f} {trim.ticker}")
+                                continue
+                            try:
+                                order = alpaca_executor.sell(trim.ticker, trim.shares)
+                                print(f"  [TRIMMED] {trim.ticker} order={order.id} status={order.status}")
+                            except Exception as exc:
+                                print(f"  [TRIM FAILED] {trim.ticker}: {type(exc).__name__}: {exc}")
+                    except Exception as exc:
+                        print(f"  [REBALANCE] skipped: {type(exc).__name__}: {exc}")
 
         if mark_only:
             print("Mark-only mode complete.")
