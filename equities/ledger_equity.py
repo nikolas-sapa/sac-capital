@@ -269,6 +269,55 @@ class EquityLedger:
         self._con.commit()
         self._rewrite_csv()
 
+    def reduce_position(self, position_id: int, shares_sold: float, exit_price: float,
+                        exit_reason: str, closed_at: datetime) -> float:
+        """Partially close a lot, banking realized pnl on the sold slice only.
+
+        A concentration trim sells a fraction of a *ticker*, which generally spans
+        several lots, so the caller walks lots FIFO and calls this per lot. Selling
+        the whole lot degenerates to close_position.
+
+        Returns the shares actually reduced (<= shares_sold, capped by the lot).
+        """
+        row = self._con.execute(
+            "SELECT shares, entry_price FROM positions WHERE id = ?", (position_id,)
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"Position {position_id} not found")
+        if row["entry_price"] is None or row["shares"] is None:
+            raise ValueError(f"Position {position_id} missing entry_price or shares")
+
+        held = float(row["shares"])
+        sold = min(float(shares_sold), held)
+        if sold <= 0:
+            return 0.0
+        # Float residue must not strand a dust lot that no later trim can clear.
+        if sold >= held - 1e-9:
+            self.close_position(position_id, exit_price, exit_reason, closed_at)
+            return held
+
+        realized = (exit_price - float(row["entry_price"])) * sold
+        # The sold slice becomes its own closed row so realized pnl and the exit
+        # price survive. Broker order ids are deliberately NOT copied: they are the
+        # rerun-dedup key and must stay bound to the original lot.
+        self._con.execute(
+            "INSERT INTO positions (ticker, sleeve, side, shares, entry_price, stop_loss, "
+            "take_profit, mark_price, unrealized_pnl, realized_pnl, status, exit_price, "
+            "exit_reason, confidence, thesis, mode, opened_at, closed_at, strategy, "
+            "execution_provider, sector, signal_class) "
+            "SELECT ticker, sleeve, side, ?, entry_price, stop_loss, take_profit, ?, 0.0, ?, "
+            "'closed', ?, ?, confidence, thesis, mode, opened_at, ?, strategy, "
+            "execution_provider, sector, signal_class FROM positions WHERE id = ?",
+            (sold, exit_price, realized, exit_price, exit_reason,
+             closed_at.isoformat(), position_id),
+        )
+        self._con.execute(
+            "UPDATE positions SET shares = shares - ? WHERE id = ?", (sold, position_id)
+        )
+        self._con.commit()
+        self._rewrite_csv()
+        return sold
+
     def void_position(
         self,
         position_id: int,
