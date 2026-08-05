@@ -1,18 +1,18 @@
 {
-  "generated_at": "2026-07-16T13:54:45.375344+00:00",
+  "generated_at": "2026-08-05T06:54:05.818731+00:00",
   "total_commitments": 25,
   "equity_trades": {
-    "total": 104,
+    "total": 116,
     "closed": 10,
     "open": 56,
     "realized_pnl": -18.277936,
     "win_rate": 0.5,
-    "avg_confidence": 0.776739
+    "avg_confidence": 0.780484
   },
   "strategies": [
     {
       "name": "equity_analyst",
-      "count": 101
+      "count": 113
     },
     {
       "name": "research_static",

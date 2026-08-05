@@ -217,10 +217,10 @@
     "status": "open",
     "shares": 32.27882,
     "entry_price": 565.669035,
-    "mark_price": 669.489990234375,
+    "mark_price": 587.9400024414062,
     "stop_loss": null,
     "take_profit": null,
-    "unrealized_pnl": 3351.217927,
+    "unrealized_pnl": 718.88055,
     "realized_pnl": null,
     "exit_price": null,
     "exit_reason": null,
@@ -325,10 +325,10 @@
     "status": "open",
     "shares": 88.297244,
     "entry_price": 201.039881,
-    "mark_price": 207.75999450683594,
+    "mark_price": 211.94000244140625,
     "stop_loss": null,
     "take_profit": null,
-    "unrealized_pnl": 593.36753,
+    "unrealized_pnl": 962.450711,
     "realized_pnl": null,
     "exit_price": null,
     "exit_reason": null,
@@ -428,10 +428,10 @@
     "status": "open",
     "shares": 11.706035,
     "entry_price": 1126.542463,
-    "mark_price": 1156.43994140625,
+    "mark_price": 1115.6800537109375,
     "stop_loss": null,
     "take_profit": null,
-    "unrealized_pnl": 349.98093,
+    "unrealized_pnl": -127.155742,
     "realized_pnl": null,
     "exit_price": null,
     "exit_reason": null,
@@ -516,10 +516,10 @@
     "status": "open",
     "shares": 28.40943,
     "entry_price": 377.675566,
-    "mark_price": 393.70001220703125,
+    "mark_price": 492.80999755859375,
     "stop_loss": null,
     "take_profit": null,
-    "unrealized_pnl": 455.245385,
+    "unrealized_pnl": 3270.903576,
     "realized_pnl": null,
     "exit_price": null,
     "exit_reason": null,
@@ -762,9 +762,9 @@
     "ticker": "META",
     "side": "buy",
     "status": "submitted",
-    "shares": 11.005196,
-    "entry_price": 654.236439,
-    "mark_price": 669.489990234375,
+    "shares": 16.999048,
+    "entry_price": 641.212427,
+    "mark_price": 581.7899780273438,
     "stop_loss": null,
     "take_profit": null,
     "unrealized_pnl": null,
@@ -809,6 +809,21 @@
         "price": 669.489990234375,
         "date": "2026-07-16T13:54:44.629979+00:00",
         "shares": 1.941777
+      },
+      {
+        "price": 635.9298706054688,
+        "date": "2026-07-17T14:35:41.136545+00:00",
+        "shares": 2.044251
+      },
+      {
+        "price": 635.9298706054688,
+        "date": "2026-07-21T14:36:01.153076+00:00",
+        "shares": 1.887001
+      },
+      {
+        "price": 581.7899780273438,
+        "date": "2026-08-04T16:35:35.988177+00:00",
+        "shares": 2.0626
       }
     ]
   },
@@ -817,9 +832,9 @@
     "ticker": "NVDA",
     "side": "buy",
     "status": "submitted",
-    "shares": 36.046255,
-    "entry_price": 208.065998,
-    "mark_price": 207.75999450683594,
+    "shares": 53.487261,
+    "entry_price": 207.526052,
+    "mark_price": 210.75999450683594,
     "stop_loss": null,
     "take_profit": null,
     "unrealized_pnl": null,
@@ -864,6 +879,21 @@
         "price": 207.75999450683594,
         "date": "2026-07-16T13:54:44.932096+00:00",
         "shares": 4.813246
+      },
+      {
+        "price": 204.02999877929688,
+        "date": "2026-07-17T14:35:41.464230+00:00",
+        "shares": 4.90124
+      },
+      {
+        "price": 204.02999877929688,
+        "date": "2026-07-21T14:36:01.755508+00:00",
+        "shares": 6.371612
+      },
+      {
+        "price": 210.75999450683594,
+        "date": "2026-08-04T16:35:36.436547+00:00",
+        "shares": 6.168154
       }
     ]
   },
@@ -987,9 +1017,9 @@
     "ticker": "MU",
     "side": "buy",
     "status": "submitted",
-    "shares": 3.65493,
-    "entry_price": 930.250194,
-    "mark_price": 856.594970703125,
+    "shares": 7.213871,
+    "entry_price": 914.903922,
+    "mark_price": 896.60498046875,
     "stop_loss": null,
     "take_profit": null,
     "unrealized_pnl": null,
@@ -1020,6 +1050,21 @@
         "price": 856.594970703125,
         "date": "2026-07-16T13:54:44.308412+00:00",
         "shares": 1.400895
+      },
+      {
+        "price": 862.64501953125,
+        "date": "2026-07-17T14:35:40.801028+00:00",
+        "shares": 1.159225
+      },
+      {
+        "price": 934.2899780273438,
+        "date": "2026-07-21T14:36:00.381951+00:00",
+        "shares": 1.284398
+      },
+      {
+        "price": 896.60498046875,
+        "date": "2026-08-04T16:35:35.641956+00:00",
+        "shares": 1.115318
       }
     ]
   },
@@ -1028,9 +1073,9 @@
     "ticker": "ADBE",
     "side": "buy",
     "status": "submitted",
-    "shares": 13.910038,
-    "entry_price": 222.860652,
-    "mark_price": 224.75010681152344,
+    "shares": 22.515218,
+    "entry_price": 226.513468,
+    "mark_price": 230.77000427246094,
     "stop_loss": null,
     "take_profit": null,
     "unrealized_pnl": null,
@@ -1061,6 +1106,47 @@
         "price": 224.75010681152344,
         "date": "2026-07-16T13:54:45.235708+00:00",
         "shares": 4.894325
+      },
+      {
+        "price": 234.08999633789062,
+        "date": "2026-07-17T14:35:41.799488+00:00",
+        "shares": 4.271861
+      },
+      {
+        "price": 230.77000427246094,
+        "date": "2026-07-21T14:36:02.770284+00:00",
+        "shares": 4.333319
+      }
+    ]
+  },
+  {
+    "id": "117",
+    "ticker": "BX",
+    "side": "buy",
+    "status": "submitted",
+    "shares": 8.770968,
+    "entry_price": 136.815002,
+    "mark_price": 136.81500244140625,
+    "stop_loss": null,
+    "take_profit": null,
+    "unrealized_pnl": null,
+    "realized_pnl": null,
+    "exit_price": null,
+    "exit_reason": null,
+    "confidence": 0.782,
+    "strategy": "equity_analyst",
+    "mode": "paper",
+    "opened_at": "2026-08-04T16:35:36.781980+00:00",
+    "closed_at": null,
+    "analysis": {
+      "signal_class": "core_dca",
+      "horizon": "long-term"
+    },
+    "entries": [
+      {
+        "price": 136.81500244140625,
+        "date": "2026-08-04T16:35:36.781980+00:00",
+        "shares": 8.770968
       }
     ]
   }
