@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { upstreamError, withGuard } from "./_lib/guard.js";
+import { appendLive, bucketPnl, type Bar } from "./_lib/history-math.js";
 
 const BASE_URL =
   process.env.ALPACA_BASE_URL ?? "https://paper-api.alpaca.markets";
@@ -66,12 +67,12 @@ async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ points: [] });
   }
 
-  // Intraday: baseline is the PREVIOUS close (`base_value`), not the first bar —
-  // the first 1H bar is already mid-session, so using it subtracts out the day's
-  // gain and flips Today's P&L negative. Multi-day: first bar is the period start.
-  const periodStartEquity = isIntraday
-    ? (raw.base_value ?? raw.equity[0] ?? 0)
-    : (raw.equity[0] ?? raw.base_value ?? 0);
+  // Baseline is always `base_value` — the equity just before the window opened.
+  // Intraday: the first 1H bar is already mid-session, so baselining on it
+  // subtracted out the day's gain and flipped Today's P&L negative.
+  // Multi-day: `profit_loss` sums to (last equity - base_value), so this keeps
+  // the % denominator consistent with the P&L the chart shows.
+  const periodStartEquity = raw.base_value ?? raw.equity[0] ?? 0;
 
   const TZ = "Europe/Athens";
   const fmtIntraday = new Intl.DateTimeFormat("en-US", {
@@ -115,68 +116,59 @@ async function handler(req: VercelRequest, res: VercelResponse) {
     }
     totalPnl = points.length > 0 ? points[points.length - 1].value : 0;
 
-  } else if (uiPeriod === "1W") {
-    // 1W: one bar per day = that day's individual P&L (not cumulative).
-    // This way today starts at 0 and moves as the market opens.
-    points = raw.timestamp
-      .map((ts, i) => {
-        const pl = raw.profit_loss[i];
-        if (pl == null) return null;
-        return {
-          label: fmtDate.format(new Date(ts * 1000)),
-          value: parseFloat(pl.toFixed(2)),
-        };
-      })
-      .filter((p): p is { label: string; value: number } => p !== null);
-
-    totalPnl = points.reduce((s, p) => s + p.value, 0);
-
-    // If today isn't in the bars yet (market hasn't opened), append it at 0
-    // so the chart shows the new day starting at the baseline.
-    const todayLabel = fmtDate.format(new Date());
-    const lastLabel = points[points.length - 1]?.label;
-    if (lastLabel !== todayLabel) {
-      points.push({ label: todayLabel, value: 0 });
-    }
   } else {
-    // 1M → weekly buckets ("Week 1"…), longer ranges → monthly buckets ("Jun"…).
-    // Each bucket value = equity gain across that bucket (endEquity - startEquity),
-    // so the chart shows how much it went up per week / per month.
-    const byWeek = uiPeriod === "1M";
+    // Multi-day: every bucket is a SUM of Alpaca's per-bar `profit_loss`.
+    // 1W → one bar per day, 1M → weekly buckets, longer → monthly buckets.
+    // Bucketing raw equity instead (a) dropped the gain between one bucket's
+    // last bar and the next one's first, and (b) counted the initial 100k paper
+    // funding as a +$100,299 "June" profit bar on the 1Y chart.
+    let bars: Bar[] = raw.timestamp
+      .map((ts, i) => (raw.profit_loss[i] == null ? null : { ts, pnl: raw.profit_loss[i]! }))
+      .filter((b): b is Bar => b !== null);
+
+    // Daily bars lag a session — fold today's live equity in as today's P&L.
+    if (acctResp.ok) {
+      const acct = await acctResp.json() as { equity?: string };
+      const lastEquity = [...raw.equity].reverse().find((e) => e != null) ?? null;
+      bars = appendLive(
+        bars,
+        lastEquity,
+        acct.equity ? parseFloat(acct.equity) : null,
+        Math.floor(Date.now() / 1000),
+        (a, b) => fmtDate.format(new Date(a * 1000)) === fmtDate.format(new Date(b * 1000))
+      );
+    } else {
+      console.warn(`Failed to fetch live equity for chart: ${acctResp.status} ${acctResp.statusText}`);
+    }
+
     const fmtMonth = new Intl.DateTimeFormat("en-US", { timeZone: TZ, month: "short" });
+    const fmtYearMonth = new Intl.DateTimeFormat("en-US", { timeZone: TZ, year: "numeric", month: "short" });
     const fmtYearWeek = new Intl.DateTimeFormat("en-US", {
       timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
     });
 
-    // Bucket key: ISO-ish week (year + week-of-year) or calendar month.
+    // Continuous week index, so a week spanning a month boundary stays one bucket.
     const weekKey = (d: Date) => {
       const parts = fmtYearWeek.formatToParts(d);
       const get = (t: string) => parts.find((p) => p.type === t)!.value;
       const local = new Date(`${get("year")}-${get("month")}-${get("day")}T00:00:00Z`);
-      const week = Math.floor((local.getTime() / 86400000 + 4) / 7); // continuous week index
-      return String(week);
+      return String(Math.floor((local.getTime() / 86400000 + 4) / 7));
     };
 
-    type Bucket = { key: string; first: number; last: number; monthLabel: string };
-    const buckets: Bucket[] = [];
-    raw.timestamp.forEach((ts, i) => {
-      const equity = raw.equity[i];
-      if (equity == null) return;
+    let weekIndex = 0;
+    const seenWeeks = new Set<string>();
+    const keyOf = (ts: number) => {
       const d = new Date(ts * 1000);
-      const key = byWeek ? weekKey(d) : fmtMonth.format(d) + " " + d.getUTCFullYear();
-      const existing = buckets.find((b) => b.key === key);
-      if (existing) {
-        existing.last = equity;
-      } else {
-        buckets.push({ key, first: equity, last: equity, monthLabel: fmtMonth.format(d) });
+      if (uiPeriod === "1W") return { key: fmtDate.format(d), label: fmtDate.format(d) };
+      if (uiPeriod === "1M") {
+        const key = weekKey(d);
+        if (!seenWeeks.has(key)) { seenWeeks.add(key); weekIndex += 1; }
+        return { key, label: `Week ${weekIndex}` };
       }
-    });
+      return { key: fmtYearMonth.format(d), label: fmtMonth.format(d) };
+    };
 
-    points = buckets.map((b, i) => ({
-      label: byWeek ? `Week ${i + 1}` : b.monthLabel,
-      value: parseFloat((b.last - b.first).toFixed(2)),
-    }));
-
+    points = bucketPnl(bars, keyOf);
     totalPnl = points.reduce((s, p) => s + p.value, 0);
   }
 
