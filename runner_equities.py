@@ -383,7 +383,55 @@ DEFAULT_SWING_UNIVERSE: list[Instrument] = [
     Instrument("DOCN",  "DigitalOcean Holdings",      "NYSE",   CapTier.MID),
     Instrument("ESTC",  "Elastic NV",                 "NYSE",   CapTier.SMALL),
     Instrument("GTLB",  "GitLab",                     "NASDAQ", CapTier.SMALL),
+
+    # --- Politician-disclosure coverage 2026-08-05 ------------------------
+    # Names congress/executives actually bought that the universe could not
+    # see. The politician screen intersects disclosures with this list, so an
+    # untracked ticker is invisible no matter how many filings it has: only
+    # 15 of 123 recent buys were in scope before this. Validated against
+    # yfinance (live price + market cap) and SEC EDGAR (CIK resolves).
+    Instrument("ABT",   "Abbott Laboratories",              "NYSE",   CapTier.LARGE),
+    Instrument("ACN",   "Accenture",                        "NYSE",   CapTier.LARGE),
+    Instrument("ADP",   "Automatic Data Processing",        "NASDAQ", CapTier.LARGE),
+    Instrument("AMAT",  "Applied Materials",                "NASDAQ", CapTier.LARGE),
+    Instrument("ANET",  "Arista Networks",                  "NYSE",   CapTier.LARGE),
+    Instrument("JNJ",   "Johnson & Johnson",                "NYSE",   CapTier.LARGE),
+    Instrument("BEP",   "Brookfield Renewable Partners",    "NYSE",   CapTier.MID),
+    Instrument("BSX",   "Boston Scientific",                "NYSE",   CapTier.MID),
+    Instrument("CHRW",  "C.H. Robinson Worldwide",          "NASDAQ", CapTier.MID),
+    Instrument("CMCSA", "Comcast",                          "NASDAQ", CapTier.MID),
+    Instrument("EA",    "Electronic Arts",                  "NASDAQ", CapTier.MID),
+    Instrument("FE",    "FirstEnergy",                      "NYSE",   CapTier.MID),
+    Instrument("FWONK", "Liberty Media Formula One",        "NASDAQ", CapTier.MID),
+    Instrument("GIS",   "General Mills",                    "NYSE",   CapTier.MID),
+    Instrument("HCA",   "HCA Healthcare",                   "NYSE",   CapTier.MID),
+    Instrument("ICE",   "Intercontinental Exchange",        "NYSE",   CapTier.MID),
+    Instrument("LHX",   "L3Harris Technologies",            "NYSE",   CapTier.MID),
+    Instrument("LPLA",  "LPL Financial Holdings",           "NASDAQ", CapTier.MID),
+    Instrument("MCHP",  "Microchip Technology",             "NASDAQ", CapTier.MID),
+    Instrument("MCK",   "McKesson",                         "NYSE",   CapTier.MID),
+    Instrument("MLM",   "Martin Marietta Materials",        "NYSE",   CapTier.MID),
+    Instrument("MNST",  "Monster Beverage",                 "NASDAQ", CapTier.MID),
+    Instrument("PPG",   "PPG Industries",                   "NYSE",   CapTier.MID),
+    Instrument("TDG",   "TransDigm Group",                  "NYSE",   CapTier.MID),
+    Instrument("TEL",   "TE Connectivity",                  "NYSE",   CapTier.MID),
+    Instrument("TXRH",  "Texas Roadhouse",                  "NASDAQ", CapTier.MID),
+    Instrument("VRSK",  "Verisk Analytics",                 "NASDAQ", CapTier.MID),
+    Instrument("ZTS",   "Zoetis",                           "NYSE",   CapTier.MID),
+    Instrument("BOOT",  "Boot Barn Holdings",               "NYSE",   CapTier.SMALL),
+    Instrument("CDRE",  "Cadre Holdings",                   "NYSE",   CapTier.SMALL),
+    Instrument("CECO",  "CECO Environmental",               "NASDAQ", CapTier.SMALL),
+    Instrument("CYTK",  "Cytokinetics",                     "NASDAQ", CapTier.SMALL),
+    Instrument("DSGX",  "Descartes Systems Group",          "NASDAQ", CapTier.SMALL),
+    Instrument("ESAB",  "ESAB Corporation",                 "NYSE",   CapTier.SMALL),
+    Instrument("FSV",   "FirstService",                     "NASDAQ", CapTier.SMALL),
+    Instrument("HQY",   "HealthEquity",                     "NASDAQ", CapTier.SMALL),
+    Instrument("JKHY",  "Jack Henry & Associates",          "NASDAQ", CapTier.SMALL),
+    Instrument("LTH",   "Life Time Group Holdings",         "NYSE",   CapTier.SMALL),
+    Instrument("MTN",   "Vail Resorts",                     "NYSE",   CapTier.SMALL),
+    Instrument("TCBI",  "Texas Capital Bancshares",         "NASDAQ", CapTier.SMALL),
 ]
+
 
 DEFAULT_CORE_UNIVERSE: list[Instrument] = [
     # Quality large-caps — scored on fundamentals (margins, PE, growth)
