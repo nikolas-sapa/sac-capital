@@ -180,3 +180,62 @@ def test_kelly_used_only_with_sufficient_band_history(kernel_factory, make_swing
     # b = 10/5 = 2, p = 0.6 -> kelly risk = 0.5*0.4 = 0.20, clamped to 2x base = 0.04
     # poor history -> base path risk 0.02. Rich sizes exactly 2x poor.
     assert s_rich.shares == pytest.approx(2.0 * s_poor.shares, rel=1e-6)
+
+
+# --- Core DCA concentration cap ------------------------------------------
+# Regression: the core branch returned before every concentration check, so the
+# sleeve doing the actual accumulating had no per-name ceiling. Repeated DCA
+# adds took single names past max_name_pct while the cap reported itself as
+# enforced (NVDA 26.5%, META 26.4% against a stated 25% limit).
+
+def _core_rec(ticker: str = "NVDA", entry: float = 200.0, size_pct: float = 0.05) -> Recommendation:
+    return Recommendation(
+        instrument=Instrument(ticker, ticker, "NASDAQ", CapTier.LARGE),
+        sleeve=Sleeve.CORE,
+        side="buy",
+        entry=entry,
+        stop_loss=None,
+        take_profit=None,
+        size_pct=size_pct,
+        confidence=0.72,
+        catalyst="dca",
+        thesis="quality accumulation",
+        horizon="months",
+    )
+
+
+def _core_pos(ticker: str, shares: float, price: float, sleeve: str = "core") -> dict:
+    return {"ticker": ticker, "sleeve": sleeve, "shares": shares, "entry_price": price, "status": "open"}
+
+
+def test_core_dca_fresh_name_is_approved():
+    kernel = RiskKernel(capital=100_000.0, max_name_pct=0.25)
+    result = kernel.approve(_core_rec(), open_positions=[])
+    assert result.approved
+    assert result.shares == pytest.approx(25.0)
+
+
+def test_core_dca_add_beyond_name_cap_is_rejected():
+    kernel = RiskKernel(capital=100_000.0, max_name_pct=0.25)
+    held = [_core_pos("NVDA", shares=120.0, price=200.0)]  # 24% already
+    result = kernel.approve(_core_rec(), open_positions=held)  # +5% would breach
+    assert not result.approved
+    assert "concentration_cap" in result.rejection_reason
+
+
+def test_core_dca_counts_exposure_across_sleeves():
+    """One ticker held in both sleeves is a single concentration risk."""
+    kernel = RiskKernel(capital=100_000.0, max_name_pct=0.25)
+    mixed = [
+        _core_pos("NVDA", shares=60.0, price=200.0, sleeve="core"),
+        _core_pos("NVDA", shares=60.0, price=200.0, sleeve="swing"),
+    ]
+    result = kernel.approve(_core_rec(), open_positions=mixed)
+    assert not result.approved
+
+
+def test_core_dca_cap_is_per_name_not_portfolio_wide():
+    kernel = RiskKernel(capital=100_000.0, max_name_pct=0.25)
+    held = [_core_pos("NVDA", shares=120.0, price=200.0)]
+    result = kernel.approve(_core_rec(ticker="AAPL"), open_positions=held)
+    assert result.approved

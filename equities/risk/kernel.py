@@ -169,7 +169,25 @@ class RiskKernel:
         if is_core:
             if recommendation.entry is None or recommendation.entry <= 0:
                 return SizedRecommendation(recommendation, 0.0, False, "missing_entry")
+
+            # The per-name cap below this branch only inspects the swing sleeve,
+            # so core DCA used to accumulate without any concentration ceiling —
+            # repeated adds pushed single names past max_name_pct while the cap
+            # reported itself as enforced. Exposure counts BOTH sleeves: holding
+            # one ticker in core and swing is a single concentration risk.
+            ticker = recommendation.instrument.ticker
+            existing = sum(
+                p.get("shares", 0) * p.get("entry_price", 0)
+                for p in open_positions
+                if p.get("ticker") == ticker
+            )
             alloc_usd = self.capital * recommendation.size_pct
+            if self.capital > 0 and (existing + alloc_usd) / self.capital > self.max_name_pct:
+                return SizedRecommendation(
+                    recommendation, 0.0, False,
+                    f"dca_name_concentration_cap_{self.max_name_pct:.0%}_exceeded",
+                )
+
             shares = alloc_usd / recommendation.entry
             return SizedRecommendation(recommendation, round(shares, 6), True)
 
