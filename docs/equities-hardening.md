@@ -70,7 +70,10 @@ Replay stored research artifacts:
 
 - Buy orders use deterministic `client_order_id` values derived from ticker, side, entry, stop, target, size, sleeve, and catalyst.
 - Reruns skip an active ledger row with the same `broker_client_order_id`.
-- Buy orders check Alpaca paper account state and buying power before submission.
+- Buy orders check Alpaca paper account state and buying power before submission. Broker
+  buying power is a rejection floor only, never a sizing input — position size comes from
+  the local ledger equity, and `EQUITY_MAX_GROSS_PCT` (default 1.0) caps total open
+  exposure so the book never silently draws on broker margin.
 - Buy orders enforce the local `MAX_ORDER_USD` notional guard before submission.
 - Buy orders are submitted as day limit orders at the recommendation entry price.
 - Submitted orders are recorded as `submitted`, not as filled positions.

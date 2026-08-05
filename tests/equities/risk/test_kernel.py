@@ -239,3 +239,44 @@ def test_core_dca_cap_is_per_name_not_portfolio_wide():
     held = [_core_pos("NVDA", shares=120.0, price=200.0)]
     result = kernel.approve(_core_rec(ticker="AAPL"), open_positions=held)
     assert result.approved
+
+
+# --- Gross exposure cap -------------------------------------------------
+
+
+def test_gross_cap_rejects_when_book_fully_deployed():
+    """At 1.0x gross the kernel must refuse to draw on broker margin."""
+    kernel = RiskKernel(capital=100_000.0, max_gross_pct=1.0, max_positions=99)
+    book = [_open_pos(f"T{i}", shares=100.0, price=100.0) for i in range(10)]  # $100k gross
+    result = kernel.approve(_rec(), book)
+    assert not result.approved
+    assert "gross_exposure" in result.rejection_reason
+
+
+def test_gross_cap_clamps_partial_headroom():
+    """With $5k headroom the order is sized down, not rejected."""
+    kernel = RiskKernel(capital=100_000.0, max_gross_pct=1.0, max_positions=99)
+    book = [_open_pos(f"T{i}", shares=100.0, price=100.0) for i in range(9)]
+    book.append(_open_pos("T9", shares=50.0, price=100.0))  # $95k gross
+    result = kernel.approve(_rec(entry=100.0, stop=95.0, tp=115.0), book)
+    assert result.approved
+    assert result.shares * 100.0 <= 5_000.0 + 1e-6
+
+
+def test_gross_cap_counts_core_sleeve_too():
+    """Core DCA exposure consumes the same ceiling as swing."""
+    kernel = RiskKernel(capital=100_000.0, max_gross_pct=1.0, max_positions=99)
+    book = [{"ticker": f"C{i}", "sleeve": "core", "shares": 100.0, "entry_price": 100.0,
+             "status": "open"} for i in range(10)]
+    result = kernel.approve(_rec(), book)
+    assert not result.approved
+    assert "gross_exposure" in result.rejection_reason
+
+
+def test_gross_cap_above_one_permits_leverage():
+    """max_gross_pct=1.5 is the deliberate leverage knob."""
+    kernel = RiskKernel(capital=100_000.0, max_gross_pct=1.5, max_positions=99)
+    book = [_open_pos(f"T{i}", shares=100.0, price=100.0) for i in range(10)]
+    result = kernel.approve(_rec(entry=100.0, stop=95.0, tp=115.0), book)
+    assert result.approved
+    assert result.shares > 0

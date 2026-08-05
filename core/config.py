@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     equity_max_positions: int = 12
     equity_max_name_pct: float = 0.25
     equity_max_sector_pct: float = 0.35
+    # Gross exposure ceiling as a fraction of capital. 1.0 = cash-only (no
+    # broker margin). >1.0 deliberately levers via the broker's buying power.
+    equity_max_gross_pct: float = 1.0
     equity_max_pairwise_corr: float = 0.7  # max return corr vs. any single open position
     equity_max_portfolio_corr: float = 0.5  # max avg return corr vs. the whole open book
     equity_correlation_lookback_days: int = 90

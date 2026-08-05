@@ -1477,6 +1477,7 @@ async def run_once(
             max_positions=settings.equity_max_positions,
             max_name_pct=settings.equity_max_name_pct,
             max_sector_pct=settings.equity_max_sector_pct,
+            max_gross_pct=settings.equity_max_gross_pct,
             daily_loss_limit_pct=settings.equity_daily_loss_limit_pct,
             drawdown_limit_pct=settings.equity_drawdown_limit_pct,
             min_rr=settings.equity_min_rr,

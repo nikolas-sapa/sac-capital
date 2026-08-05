@@ -46,6 +46,11 @@ class RiskKernel:
         risk_pct:            Max loss per trade as fraction of capital (default 0.02 = 2%).
         max_positions:       Max concurrent open swing positions (default 4).
         max_name_pct:        Max allocation to a single name (default 0.25 = 25%).
+        max_gross_pct:       Total open exposure ceiling across BOTH sleeves as a fraction
+                             of capital (default 1.0 = cash-only, no broker margin). The
+                             per-name/sector caps alone allow max_positions * max_name_pct
+                             gross, i.e. silent leverage; this is the only fuse that binds
+                             the book as a whole. Set >1.0 only to lever deliberately.
         daily_loss_limit_pct: Halts new entries when today's realized loss exceeds this
                               fraction of capital (default 0.05 = 5%).
         drawdown_limit_pct:  Circuit-breaker: halt ALL trading when drawdown from high-
@@ -74,6 +79,7 @@ class RiskKernel:
         max_positions: int = 4,
         max_name_pct: float = 0.25,
         max_sector_pct: float = 0.35,
+        max_gross_pct: float = 1.0,
         daily_loss_limit_pct: float = 0.05,
         drawdown_limit_pct: float = 0.15,
         gap_pct: float = _DEFAULT_GAP_PCT,
@@ -93,6 +99,7 @@ class RiskKernel:
         self.max_positions = max_positions
         self.max_name_pct = max_name_pct
         self.max_sector_pct = max_sector_pct
+        self.max_gross_pct = max_gross_pct
         self.daily_loss_limit_pct = daily_loss_limit_pct
         self.drawdown_limit_pct = drawdown_limit_pct
         self.gap_pct = gap_pct
@@ -165,6 +172,21 @@ class RiskKernel:
         sleeve = getattr(recommendation, "sleeve", None)
         is_core = sleeve is not None and str(sleeve.value) == "core"
 
+        # --- Gross exposure cap (both sleeves) ---
+        # Per-name/sector caps bound single bets, not the book: 12 swing slots at
+        # 25% each plus an uncapped core sleeve can reach 3x gross on broker
+        # margin without a single rejection. Headroom clamps every new order.
+        gross_open = sum(
+            p.get("shares", 0) * p.get("entry_price", 0) for p in open_positions
+        )
+        gross_headroom = self.max_gross_pct * self.capital - gross_open
+        gross_rejection = SizedRecommendation(
+            recommendation, 0.0, False,
+            f"gross_exposure_{gross_open / self.capital:.0%}_at_{self.max_gross_pct:.0%}_limit",
+        )
+        if is_core and gross_headroom <= 0:
+            return gross_rejection
+
         # --- CORE DCA: fixed fractional sizing (no stop required) ---
         if is_core:
             if recommendation.entry is None or recommendation.entry <= 0:
@@ -181,7 +203,7 @@ class RiskKernel:
                 for p in open_positions
                 if p.get("ticker") == ticker
             )
-            alloc_usd = self.capital * recommendation.size_pct
+            alloc_usd = min(self.capital * recommendation.size_pct, gross_headroom)
             if self.capital > 0 and (existing + alloc_usd) / self.capital > self.max_name_pct:
                 return SizedRecommendation(
                     recommendation, 0.0, False,
@@ -243,6 +265,11 @@ class RiskKernel:
                         recommendation, 0.0, False,
                         f"correlation_portfolio_avg_{avg:.2f}_at_{self.max_portfolio_corr:.0%}_limit",
                     )
+
+        # Book-level fuse last among the caps: the structural rejections above are
+        # more specific reasons when both bind.
+        if gross_headroom <= 0:
+            return gross_rejection
 
         # --- Gap-aware sizing (swing) ---
         if recommendation.stop_loss is None or recommendation.entry is None:
@@ -306,8 +333,11 @@ class RiskKernel:
             return SizedRecommendation(recommendation, 0.0, False, "zero_shares_after_sizing")
 
         # --- Max position size cap ---
-        max_position_usd = self.max_name_pct * self.capital
+        max_position_usd = min(self.max_name_pct * self.capital, gross_headroom)
         if shares * recommendation.entry > max_position_usd:
             shares = max_position_usd / recommendation.entry
 
-        return SizedRecommendation(recommendation, round(shares, 6), True)
+        shares = round(shares, 6)
+        if shares <= 0:
+            return SizedRecommendation(recommendation, 0.0, False, "zero_shares_after_gross_cap")
+        return SizedRecommendation(recommendation, shares, True)
