@@ -48,3 +48,34 @@ def test_configured_lookback_is_honoured():
 
     assert PoliticianScreen(_StubProvider([trade])).scan(universe) == []
     assert len(PoliticianScreen(_StubProvider([trade]), lookback_days=45).scan(universe)) == 1
+
+
+def test_politician_evidence_reaches_the_analyst_prompt():
+    """The LLM must actually see who bought, how fresh, and how big.
+
+    The screen has never had a candidate survive the technical gate, so this
+    path is untested in production. Assert it directly instead of waiting for
+    market conditions to exercise it.
+    """
+    from equities.analysis.prompt import build_analyst_prompt, build_prefilter_prompt
+
+    today = date.today()
+    trade = PoliticianTrade(
+        ticker="BWXT", politician="Hon. April McClain Delaney", chamber="house",
+        transaction_type="buy", owner="self", amount_min=15001, amount_max=50000,
+        transaction_date=today - timedelta(days=3), date_filed=today - timedelta(days=1),
+        filing_lag_days=2, source="house", source_url="http://x",
+    )
+    universe = [Instrument(ticker="BWXT", name="BWX Technologies", exchange="NYSE", cap_tier=CapTier.MID)]
+    candidate = PoliticianScreen(_StubProvider([trade])).scan(universe)[0]
+
+    prefilter = build_prefilter_prompt([candidate])
+    assert "BWXT" in prefilter
+    assert "politician_disclosure" in prefilter
+    assert "April McClain Delaney" in prefilter
+
+    analyst = build_analyst_prompt(
+        candidate=candidate, current_price=172.40, news=[], filings=[], sector="Industrials"
+    )
+    assert "politician_disclosure" in analyst
+    assert "April McClain Delaney" in analyst

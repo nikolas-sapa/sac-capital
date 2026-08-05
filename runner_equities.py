@@ -392,6 +392,10 @@ DEFAULT_CORE_UNIVERSE: list[Instrument] = [
     Instrument("META",  "Meta Platforms",  "NASDAQ", CapTier.LARGE),
     Instrument("NVDA",  "NVIDIA",          "NASDAQ", CapTier.LARGE),
     Instrument("AMZN",  "Amazon",          "NASDAQ", CapTier.LARGE),
+    # Recent listing: ~36 bars of history, so momentum screens cannot score it
+    # yet. Core is fundamentals-scored, which is why it belongs here and not in
+    # the swing universe (which is SMALL/MID only in any case).
+    Instrument("SPCX",  "Space Exploration Technologies", "NASDAQ", CapTier.LARGE),
     Instrument("V",     "Visa",            "NYSE",   CapTier.LARGE),
     Instrument("MA",    "Mastercard",      "NYSE",   CapTier.LARGE),
     Instrument("JPM",   "JPMorgan Chase",  "NYSE",   CapTier.LARGE),
