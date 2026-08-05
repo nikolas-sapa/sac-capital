@@ -1,16 +1,42 @@
 <p align="center"><img src="https://raw.githubusercontent.com/nikolas-sapa/sac-capital/main/frontend/public/sac-capital.png" width="320" /></p>
 
+<p align="center">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square&color=006bff&labelColor=0B0B0D" />
+  <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-blue?style=flat-square&color=006bff&labelColor=0B0B0D" />
+  <img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-blue?style=flat-square&color=006bff&labelColor=0B0B0D" />
+</p>
+
 # SAC Capital
 
 > AI trading decisions are exported as deterministic `bytes32` commitments and anchored on Mantle — anyone can verify agent behavior and outcomes.
 
 **Track:** AI Alpha & Data · Turing Test Hackathon 2026
 
+> **Disclaimer.** SAC Capital is research software, not financial advice.
+> It runs in **paper-trading mode by default** (`EXECUTION_PROVIDER=internal_paper`,
+> `LIVE_TRADING_ENABLED=false`), and the on-chain Mantle records are
+> verifiability anchors, not custody, brokerage, or investment services.
+> Nothing in this repository is a solicitation to buy or sell any security,
+> and nothing here is a performance or profitability claim. The Solidity
+> contracts are unaudited — see [SECURITY.md](SECURITY.md).
+
 | | |
 |---|---|
 | Demo | [sapa-fund.vercel.app](https://sapa-fund.vercel.app) |
 | Contract | [`0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887`](https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887) |
 | Deploy tx | [`0x46bbaa...`](https://explorer.mantle.xyz/tx/0x46bbaa02a9e7fd1025f00896c70405978cc3596e04d0559e07c5c1b0cac1222b) |
+
+## Quick start
+
+```sh
+uv tool install sac-capital   # or: pip install sac-capital
+sac setup                     # step-by-step wizard — connect LLM, broker, alerts
+sac doctor                    # verify config
+sac run                       # equities pipeline (paper trading)
+```
+
+See [INSTALL.md](INSTALL.md) for the full setup guide, or clone and run from
+source with `uv sync` (see [Reproduce Locally](#reproduce-locally) below).
 
 ## Install the CLI
 
@@ -241,6 +267,24 @@ POLITICIAN_SIGNAL_ENABLED=false
 # Feed URLs default to public House/Senate stock-watcher mirrors; override to
 # point at canonical sources. POLITICIAN_HOUSE_URL / POLITICIAN_SENATE_URL
 ```
+
+---
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
+dev setup, how to run the agent in paper mode, and how to work on the
+contracts and frontend. This project follows the
+[Contributor Covenant](CODE_OF_CONDUCT.md).
+
+## Security
+
+Report vulnerabilities privately per [SECURITY.md](SECURITY.md) — do not
+open a public issue. The Solidity contracts are unaudited.
+
+## License
+
+[MIT](LICENSE) © 2026 Nikolas Sapalidis
 
 ---
 
