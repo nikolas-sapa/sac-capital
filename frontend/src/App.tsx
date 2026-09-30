@@ -151,8 +151,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#0B0B0D]">
-      <NavBar />
-      <BotStatusBanner />
+      <NavBar>
+        <BotStatusBanner />
+      </NavBar>
       <HeroSection />
       <HowItWorksSection />
       <PerformanceSection positions={positions} />

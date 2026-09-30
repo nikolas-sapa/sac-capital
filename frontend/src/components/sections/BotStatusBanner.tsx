@@ -70,7 +70,7 @@ export function BotStatusBanner() {
   const [isUnavailable, setIsUnavailable] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
-  const containerRef = useRef<HTMLElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -125,78 +125,59 @@ export function BotStatusBanner() {
   }, []);
 
   useEffect(() => {
-    if (isOpen) closeButtonRef.current?.focus();
-  }, [isOpen]);
+    const dialog = dialogRef.current;
+    if (!dialog) return;
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    function handlePointerDown(event: PointerEvent) {
-      if (event.target instanceof Node && !containerRef.current?.contains(event.target)) {
-        setIsOpen(false);
-      }
+    if (isOpen && !dialog.open) {
+      dialog.showModal();
+      closeButtonRef.current?.focus();
+    } else if (!isOpen && dialog.open) {
+      dialog.close();
     }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-        triggerRef.current?.focus();
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
   }, [isOpen]);
 
   function closePopup() {
-    setIsOpen(false);
-    triggerRef.current?.focus();
+    dialogRef.current?.close();
   }
 
   return (
-    <section
-      ref={containerRef}
-      aria-label="Bot run status"
-      className="relative z-40 bg-[#0B0B0D] px-6 pb-3 pt-24"
-      style={{ fontFamily: "Geist, sans-serif" }}
-    >
-      <div className="relative mx-auto max-w-7xl">
-        <button
-          ref={triggerRef}
-          type="button"
-          aria-haspopup="dialog"
-          aria-expanded={isOpen}
-          aria-controls="bot-activity-popup"
-          onClick={() => setIsOpen((open) => !open)}
-          className="group inline-flex max-w-full items-center gap-2.5 rounded-full border border-[rgba(243,242,238,0.12)] bg-[#101013] px-4 py-2.5 text-left text-sm text-[#F3F2EE] transition-colors hover:border-[rgba(0,107,255,0.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#006bff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B0B0D]"
-        >
-          <Activity className="size-4 shrink-0 text-[#006bff]" strokeWidth={1.75} aria-hidden="true" />
-          <span className="truncate">
-            {status
-              ? `The bot last ran ${agePhrase(status.latest_activity.started_at, now)}`
-              : isUnavailable
-                ? "The bot run time is unavailable"
-                : "Loading bot run history…"}
-          </span>
-          {isHistorical && status && <span className="sr-only">Historical data</span>}
-          <ChevronDown className={`size-4 shrink-0 text-[#8B8D91] transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden="true" />
-        </button>
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        aria-controls="bot-activity-popup"
+        onClick={() => setIsOpen((open) => !open)}
+        className="group inline-flex min-w-0 max-w-[min(17rem,52vw)] items-center gap-2 rounded-full border border-[rgba(243,242,238,0.12)] bg-[#101013] px-3 py-2 text-left text-xs text-[#F3F2EE] transition-colors hover:border-[rgba(0,107,255,0.65)] focus-visible:ring-2 focus-visible:ring-[#006bff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B0B0D] md:max-w-[17rem] md:px-3.5 md:py-2.5 md:text-sm"
+      >
+        <Activity className="size-4 shrink-0 text-[#006bff]" strokeWidth={1.75} aria-hidden="true" />
+        <span className="truncate">
+          {status
+            ? `The bot last ran ${agePhrase(status.latest_activity.started_at, now)}`
+            : isUnavailable
+              ? "Bot run time unavailable"
+              : "Loading bot run history…"}
+        </span>
+        {isHistorical && status && <span className="sr-only">Historical data</span>}
+        <ChevronDown className={`size-3.5 shrink-0 text-[#8B8D91] transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
 
-        {isOpen && (
-          <div
-            id="bot-activity-popup"
-            role="dialog"
-            aria-label="Bot activity details"
-            className="absolute left-0 top-[calc(100%+0.75rem)] z-50 w-[min(26rem,calc(100vw-3rem))] rounded-2xl border border-[rgba(243,242,238,0.12)] bg-[#101013] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.55)] sm:p-6"
-          >
+      {isOpen && (
+        <dialog
+          ref={dialogRef}
+          id="bot-activity-popup"
+          aria-labelledby="bot-activity-title"
+          onClose={() => {
+            setIsOpen(false);
+            triggerRef.current?.focus();
+          }}
+          className="fixed inset-0 m-auto max-h-[min(80vh,36rem)] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-[rgba(243,242,238,0.12)] bg-[#101013] p-5 text-left text-sm text-[#F3F2EE] shadow-[0_20px_60px_rgba(0,0,0,0.55)] backdrop:bg-black/70 backdrop:backdrop-blur-sm sm:p-6"
+        >
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#006bff]">Bot activity</p>
-                <h2 className="mt-1 text-lg font-semibold text-[#F3F2EE]">Run history</h2>
+                <h2 id="bot-activity-title" className="mt-1 text-lg font-semibold text-[#F3F2EE]">Run history</h2>
               </div>
               <button
                 ref={closeButtonRef}
@@ -257,9 +238,8 @@ export function BotStatusBanner() {
                 </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
-    </section>
+        </dialog>
+      )}
+    </>
   );
 }
