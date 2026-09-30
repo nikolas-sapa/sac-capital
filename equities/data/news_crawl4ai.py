@@ -28,23 +28,49 @@ _EXCERPT_LEN = 600
 _BLOCKED_DOMAINS = ("finance.yahoo.com", "yahoo.com")
 
 
+def _handle_playwright_teardown_error(loop, context, previous_handler) -> None:
+    exception = context.get("exception")
+    if (
+        type(exception).__name__ == "TargetClosedError"
+        and "page, context or browser has been closed" in str(exception)
+    ):
+        return
+    if previous_handler is not None:
+        previous_handler(loop, context)
+    else:
+        loop.default_exception_handler(context)
+
+
 async def _fetch_articles(urls: list[str]) -> list[tuple[str, str]]:
     """Fetch full article markdown for each URL. Returns (url, text) pairs."""
+    loop = asyncio.get_running_loop()
+    previous_exception_handler = loop.get_exception_handler()
+    loop.set_exception_handler(
+        lambda current_loop, context: _handle_playwright_teardown_error(
+            current_loop, context, previous_exception_handler
+        )
+    )
     results: list[tuple[str, str]] = []
-    async with AsyncWebCrawler(verbose=False) as crawler:
-        for url in urls:
-            try:
-                result = await asyncio.wait_for(
-                    crawler.arun(url=url),
-                    timeout=_TIMEOUT,
-                )
-                if not getattr(result, "success", True):
-                    continue
-                text = (result.markdown or "").strip()
-                if text:
-                    results.append((url, text))
-            except Exception:
-                pass
+    try:
+        async with AsyncWebCrawler(verbose=False) as crawler:
+            for url in urls:
+                try:
+                    result = await asyncio.wait_for(
+                        crawler.arun(url=url),
+                        timeout=_TIMEOUT,
+                    )
+                    if not getattr(result, "success", True):
+                        continue
+                    text = (result.markdown or "").strip()
+                    if text:
+                        results.append((url, text))
+                except Exception:
+                    pass
+    except Exception:
+        # Browser shutdown can raise after a timed-out request has already
+        # closed its Playwright page. News enrichment is optional; preserve
+        # any articles fetched before shutdown and keep the screen moving.
+        pass
     return results
 
 

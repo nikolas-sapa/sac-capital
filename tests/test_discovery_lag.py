@@ -24,9 +24,9 @@ def test_lag_is_trunk_minus_leaf():
     assert calc.compute("NVDA", "COHR") == pytest.approx(110.0)
 
 
-def test_missing_ticker_returns_zero():
+def test_missing_ticker_returns_no_signal():
     calc = _StubLag()
-    assert calc.compute("NVDA", "UNKN") == 0.0
+    assert calc.compute("NVDA", "UNKN") is None
 
 
 def test_lag_supports_shorter_periods():
@@ -39,3 +39,22 @@ def test_lag_supports_strategy_periods():
     assert calc.compute("NVDA", "COHR", period="1y") == pytest.approx(110.0)
     assert calc.compute("NVDA", "COHR", period="3mo") == pytest.approx(23.0)
     assert calc.compute("NVDA", "COHR", period="1mo") == pytest.approx(15.0)
+
+
+def test_yfinance_history_requests_adjusted_prices(monkeypatch):
+    calls = {}
+
+    class History:
+        @staticmethod
+        def history(**kwargs):
+            calls.update(kwargs)
+            return type("Frame", (), {"empty": True})()
+
+    class YF:
+        @staticmethod
+        def Ticker(_ticker):
+            return History()
+
+    monkeypatch.setitem(__import__("sys").modules, "yfinance", YF)
+    assert DiscoveryLagCalculator()._fetch_return("NVDA") is None
+    assert calls["auto_adjust"] is True

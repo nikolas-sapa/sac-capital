@@ -114,6 +114,10 @@ class SECEdgarFilings:
 # NOT be cached — lru_cache pinned an empty map for the whole run and silently
 # blinded every filings-based screen (provider_failures stayed 0).
 _TICKER_MAP_CACHE: dict[str, int] = {}
+# EA was absent from the SEC's ticker mapping during the Sep 30 2026 run,
+# despite remaining an Exchange Act registrant. Keep this verified CIK fallback
+# so one missing mapping does not blind that issuer's filing screen.
+_TICKER_CIK_OVERRIDES = {"EA": 712515}
 
 
 def _company_ticker_map() -> dict[str, int]:
@@ -151,4 +155,5 @@ def _company_ticker_map() -> dict[str, int]:
 
 
 def _ticker_to_cik(ticker: str) -> int | None:
-    return _company_ticker_map().get(ticker.upper().strip())
+    normalized = ticker.upper().strip()
+    return _company_ticker_map().get(normalized) or _TICKER_CIK_OVERRIDES.get(normalized)

@@ -28,10 +28,13 @@ def _candidate_payload(
     lag: DiscoveryLagCalculator,
     bottleneck_score: float,
     thesis: str,
-) -> dict:
+) -> dict | None:
     lag_1y = lag.compute(trunk, ticker, period="1y")
     lag_3mo = lag.compute(trunk, ticker, period="3mo")
     lag_1mo = lag.compute(trunk, ticker, period="1mo")
+    if lag_1y is None or lag_3mo is None or lag_1mo is None:
+        print(f"  [RESEARCH SKIP] {trunk}/{ticker}: missing adjusted price history")
+        return None
     return {
         "ticker": ticker,
         "trunk": trunk,
@@ -98,14 +101,16 @@ def main() -> None:
             for level, tickers in [("L1", result.level_1), ("L2", result.level_2), ("L3", result.level_3)]:
                 for ticker in tickers:
                     b_score = scorer.score(ticker, result.trunk)
-                    all_candidates.append(_candidate_payload(
+                    candidate = _candidate_payload(
                         ticker=ticker,
                         trunk=result.trunk,
                         level=level,
                         lag=lag,
                         bottleneck_score=b_score,
                         thesis=result.thesis[:100],
-                    ))
+                    )
+                    if candidate is not None:
+                        all_candidates.append(candidate)
     else:
         print("=== Static-only supply chain discovery lag ===")
 
@@ -114,14 +119,16 @@ def main() -> None:
         print(f"\n{trunk}:")
         for leaf, b, d in lag.score_all_leaves(trunk)[:8]:
             print(f"  {leaf}  bottleneck={b:.2f}  lag={d:+.1f}pp")
-            all_candidates.append(_candidate_payload(
+            candidate = _candidate_payload(
                 ticker=leaf,
                 trunk=trunk,
                 level="static",
                 lag=lag,
                 bottleneck_score=b,
                 thesis=f"Static supply-chain lag behind {trunk}",
-            ))
+            )
+            if candidate is not None:
+                all_candidates.append(candidate)
 
     all_candidates.sort(key=lambda x: x["opportunity_score"], reverse=True)
 

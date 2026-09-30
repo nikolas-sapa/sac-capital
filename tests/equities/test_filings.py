@@ -25,6 +25,7 @@ class _Response:
 
 def test_recent_uses_cached_company_ticker_map(monkeypatch):
     filings_mod._TICKER_MAP_CACHE.clear()
+    monkeypatch.setattr(filings_mod, "_TICKER_CIK_OVERRIDES", {})
 
     monkeypatch.setattr(
         filings_mod,
@@ -84,12 +85,16 @@ def test_recent_returns_fast_when_ticker_not_in_map(monkeypatch):
 
 def test_sc13d_forms_pass_the_filter(monkeypatch):
     filings_mod._TICKER_MAP_CACHE.clear()
+    from datetime import date, timedelta
+
+    recent = (date.today() - timedelta(days=10)).isoformat()
 
     monkeypatch.setattr(
         filings_mod,
         "_company_ticker_map",
         lambda: {"TEST": 999999},
     )
+    monkeypatch.setattr(filings_mod, "_TICKER_CIK_OVERRIDES", {})
 
     def fake_get(url, headers=None, timeout=None):  # noqa: ANN001
         if url.endswith("CIK0000999999.json"):
@@ -98,7 +103,7 @@ def test_sc13d_forms_pass_the_filter(monkeypatch):
                     "filings": {
                         "recent": {
                             "form": ["SC 13D", "SC 13D/A", "4"],
-                            "filingDate": ["2026-07-10", "2026-07-11", "2026-07-11"],
+                            "filingDate": [recent, recent, recent],
                             "items": ["", "", ""],
                         }
                     }
@@ -116,6 +121,11 @@ def test_sc13d_forms_pass_the_filter(monkeypatch):
 
     got = {f.form_type for f in filings}
     assert "SC 13D" in got and "SC 13D/A" in got and "4" not in got
+
+
+def test_ea_cik_fallback(monkeypatch):
+    monkeypatch.setattr(filings_mod, "_company_ticker_map", lambda: {})
+    assert filings_mod._ticker_to_cik("EA") == 712515
 
 
 def test_recent_handles_mismatched_list_lengths(monkeypatch, capsys):
