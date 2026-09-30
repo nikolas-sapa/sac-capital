@@ -207,7 +207,10 @@ class CodexCLIClient:
         )
         with tempfile.TemporaryDirectory() as tmp:
             out_path = Path(tmp) / "codex-last-message.txt"
-            _CODEX_SAFE_ENV_KEYS = {"PATH", "HOME", "TMPDIR", "TERM", "LANG", "LC_ALL", "USER", "LOGNAME"}
+            _CODEX_SAFE_ENV_KEYS = {
+                "PATH", "HOME", "TMPDIR", "TERM", "LANG", "LC_ALL", "USER", "LOGNAME",
+                "CODEX_CI", "CODEX_CLI_PATH", "CODEX_INTERNAL_ORIGINATOR_OVERRIDE", "CODEX_SHELL",
+            }
             safe_env = {k: v for k, v in os.environ.items() if k in _CODEX_SAFE_ENV_KEYS}
             result = subprocess.run(
                 [
@@ -215,6 +218,7 @@ class CodexCLIClient:
                     "--ask-for-approval",
                     "never",
                     "exec",
+                    "--ignore-user-config",
                     "--model",
                     mapped,
                     "--sandbox",

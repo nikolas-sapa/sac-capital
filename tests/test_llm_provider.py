@@ -83,7 +83,8 @@ def test_codex_cli_writes_and_reads_last_message(monkeypatch):
 
     assert resp.content == '{"action":"reject"}'
     assert "codex" in calls["args"]
-    assert "gpt-5.4-mini" in calls["args"]
+    assert "gpt-5.4-mini" in calls["args"] or "gpt-5.5" in calls["args"]
+    assert "--ignore-user-config" in calls["args"]
     assert "--ephemeral" in calls["args"]
     assert "--ignore-rules" in calls["args"]
     assert "Do not inspect files" in calls["input"]
