@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   MAX_EVENT_BODY_BYTES,
   SEED_STATUS,
+  createBlobStatusStore,
   handleStatusRequest,
   mergeEvent,
   persistEvent,
@@ -78,6 +79,7 @@ assert.equal((await handleStatusRequest({ method: "POST", authorization: AUTH, b
 assert.equal((await handleStatusRequest({ method: "POST", authorization: AUTH, body: { ...event, status: "unknown" } }, new MemoryStore(), TOKEN, NOW)).status, 400);
 assert.equal((await handleStatusRequest({ method: "POST", authorization: AUTH, body: { ...event, run_type: "weekly" } }, new MemoryStore(), TOKEN, NOW)).status, 400);
 assert.equal((await handleStatusRequest({ method: "POST", authorization: AUTH, body: { ...event, started_at: "today" } }, new MemoryStore(), TOKEN, NOW)).status, 400);
+assert.equal((await handleStatusRequest({ method: "POST", authorization: AUTH, body: { ...event, started_at: "2026-02-30T10:00:00Z" } }, new MemoryStore(), TOKEN, NOW)).status, 400);
 assert.equal((await handleStatusRequest({ method: "POST", authorization: AUTH, body: { ...event, updated_at: "2026-10-01T00:00:00Z" } }, new MemoryStore(), TOKEN, NOW)).status, 400);
 assert.equal((await handleStatusRequest({ method: "POST", authorization: AUTH, body: `{"padding":"${"x".repeat(MAX_EVENT_BODY_BYTES)}"}` }, new MemoryStore(), TOKEN, NOW)).status, 400);
 
@@ -93,16 +95,32 @@ assert.equal(fullResponse.status, 200);
 assert.equal((fullResponse.body as BotStatusDocument).latest_full_scan.run_id, fullScan.run_id);
 
 const originalError = console.error;
-console.error = () => undefined;
+const logged: unknown[][] = [];
+console.error = (...args: unknown[]) => { logged.push(args); };
+const logSentinel = "SENTINEL_PRIVATE_DETAIL";
 const storageError = await handleStatusRequest(
   { method: "GET" },
-  { read: async () => { throw new Error("BLOB_READ_WRITE_TOKEN=private"); }, write: async () => undefined },
+  { read: async () => { throw new Error(logSentinel); }, write: async () => undefined },
   TOKEN,
   NOW,
 );
 console.error = originalError;
 assert.deepEqual(storageError, { status: 503, body: { error: "Status unavailable" } });
 assert.equal(JSON.stringify(storageError).includes("private"), false);
+assert.equal(JSON.stringify(logged).includes(logSentinel), false);
+assert.match(String(logged[0]?.[0]), /^Bot status storage error: [A-Za-z][A-Za-z0-9]*$/);
+
+// A fresh private store reads the seed and creates the fixed object without an ETag.
+let firstWrite: { pathname: string; options: Record<string, unknown> } | undefined;
+const missingBlobStore = createBlobStatusStore(
+  async () => null,
+  async (pathname, _body, options) => { firstWrite = { pathname, options }; },
+);
+assert.deepEqual(await missingBlobStore.read(), { document: SEED_STATUS, etag: null });
+await missingBlobStore.write(SEED_STATUS, null);
+assert.equal(firstWrite?.pathname, "bot-status/status.json");
+assert.equal(firstWrite?.options.allowOverwrite, false);
+assert.equal("ifMatch" in (firstWrite?.options ?? {}), false);
 
 // Monotonicity: old runs lose, newer runs win, same run updates, full scans update both slots.
 const older = { ...event, run_id: "20260901T000000Z", started_at: "2026-09-01T00:00:00Z", updated_at: "2026-09-01T00:00:00Z" };

@@ -1,37 +1,11 @@
 import { BlobNotFoundError, get, put } from "@vercel/blob";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import {
-  BOT_STATUS_BLOB_PATH,
-  SEED_STATUS,
+  createBlobStatusStore,
   handleStatusRequest,
-  type BotStatusDocument,
-  type BotStatusStore,
 } from "./_lib/bot-status.js";
 
-const store: BotStatusStore = {
-  async read() {
-    try {
-      const result = await get(BOT_STATUS_BLOB_PATH, { access: "private", useCache: false });
-      if (result.statusCode !== 200) throw new Error("unexpected Blob response");
-      if (result.blob.size > 16_384) throw new Error("status document too large");
-      const text = await new Response(result.stream).text();
-      return { document: JSON.parse(text) as unknown, etag: result.blob.etag };
-    } catch (error) {
-      if (error instanceof BlobNotFoundError) return { document: SEED_STATUS, etag: null };
-      throw error;
-    }
-  },
-  async write(document: BotStatusDocument, etag: string | null) {
-    await put(BOT_STATUS_BLOB_PATH, JSON.stringify(document), {
-      access: "private",
-      addRandomSuffix: false,
-      allowOverwrite: etag !== null,
-      ...(etag === null ? {} : { ifMatch: etag }),
-      contentType: "application/json",
-      cacheControlMaxAge: 60,
-    });
-  },
-};
+const store = createBlobStatusStore(get, put, (error) => error instanceof BlobNotFoundError);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const authorization = Array.isArray(req.headers.authorization)

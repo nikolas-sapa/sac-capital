@@ -49,6 +49,62 @@ export interface BotStatusStore {
   write(document: BotStatusDocument, etag: string | null): Promise<void>;
 }
 
+type BlobGetResult = {
+  statusCode: number;
+  stream: ReadableStream<Uint8Array> | null;
+  blob: { size: number | null; etag: string };
+} | null;
+type BlobGetter = (
+  pathname: string,
+  options: { access: "private"; useCache: false },
+) => Promise<BlobGetResult>;
+type BlobPutter = (
+  pathname: string,
+  body: string,
+  options: {
+    access: "private";
+    addRandomSuffix: false;
+    allowOverwrite: boolean;
+    ifMatch?: string;
+    contentType: "application/json";
+    cacheControlMaxAge: 60;
+  },
+) => Promise<unknown>;
+
+export function createBlobStatusStore(
+  blobGet: BlobGetter,
+  blobPut: BlobPutter,
+  isMissingError: (error: unknown) => boolean = () => false,
+): BotStatusStore {
+  return {
+    async read() {
+      try {
+        const result = await blobGet(BOT_STATUS_BLOB_PATH, { access: "private", useCache: false });
+        if (result === null) return { document: SEED_STATUS, etag: null };
+        if (result.statusCode !== 200 || result.stream === null || result.blob.size === null) {
+          throw new Error("unexpected Blob response");
+        }
+        if (result.blob.size > 16_384) throw new Error("status document too large");
+        const text = await new Response(result.stream).text();
+        return { document: JSON.parse(text) as unknown, etag: result.blob.etag };
+      } catch (error) {
+        if (isMissingError(error)) return { document: SEED_STATUS, etag: null };
+        throw error;
+      }
+    },
+    async write(document: BotStatusDocument, etag: string | null) {
+      await blobPut(BOT_STATUS_BLOB_PATH, JSON.stringify(document), {
+        access: "private",
+        addRandomSuffix: false,
+        allowOverwrite: etag !== null,
+        ...(etag === null ? {} : { ifMatch: etag }),
+        contentType: "application/json",
+        cacheControlMaxAge: 60,
+      });
+    },
+  };
+}
+
 export type StatusResponse = {
   status: number;
   body: BotStatusDocument | { error: string };
@@ -62,18 +118,34 @@ const EVENT_KEYS = [
   "started_at",
   "updated_at",
 ] as const;
-const UTC_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
+const UTC_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function parseTimestamp(value: unknown, nowMs: number): string {
-  if (typeof value !== "string" || !UTC_TIMESTAMP.test(value)) {
+  if (typeof value !== "string") {
     throw new Error("invalid timestamp");
   }
+  const match = UTC_TIMESTAMP.exec(value);
+  if (!match) throw new Error("invalid timestamp");
   const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed) || parsed > nowMs) {
+  const date = new Date(parsed);
+  const fractional = match[1] ?? "";
+  const expectedMilliseconds = fractional ? Number(fractional.slice(1).padEnd(3, "0")) : 0;
+  const parts = value.slice(0, 19).split(/[-T:]/).map(Number);
+  if (
+    !Number.isFinite(parsed) ||
+    date.getUTCFullYear() !== parts[0] ||
+    date.getUTCMonth() + 1 !== parts[1] ||
+    date.getUTCDate() !== parts[2] ||
+    date.getUTCHours() !== parts[3] ||
+    date.getUTCMinutes() !== parts[4] ||
+    date.getUTCSeconds() !== parts[5] ||
+    date.getUTCMilliseconds() !== expectedMilliseconds ||
+    parsed > nowMs
+  ) {
     throw new Error("invalid timestamp");
   }
   return value;
@@ -240,7 +312,11 @@ export async function handleStatusRequest(
     const saved = await persistEvent(store, event, nowMs);
     return { status: 200, body: projectPublicStatus(saved, nowMs) };
   } catch (error) {
-    console.error("Bot status storage error:", error);
+    const constructorName = error instanceof Error ? error.constructor.name : undefined;
+    const errorClass = typeof constructorName === "string" && /^[A-Za-z][A-Za-z0-9]*$/.test(constructorName)
+      ? constructorName
+      : "UnknownError";
+    console.error(`Bot status storage error: ${errorClass}`);
     return { status: 503, body: { error: "Status unavailable" } };
   }
 }
