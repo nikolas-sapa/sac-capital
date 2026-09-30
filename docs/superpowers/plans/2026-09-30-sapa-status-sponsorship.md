@@ -29,7 +29,10 @@
 
 ## Task 2: Website status and sponsorship
 - Add responsive status banner and sponsorship placements section with supplied contact email.
-- Fetch status with seeded fallback and honest unavailable state.
+- Place status strip directly after `NavBar` and before the full-height hero. Latest activity copy shows “The bot last ran … ago” and its exact Europe/Athens date/time; second row shows latest full scan relative age and exact date/time, with unknown historical outcome stated plainly.
+- Fetch `/api/bot-status`; load `/bot-status-seed.json` as immediate/hard-failure fallback. Show a small “Historical status” note when live API is unavailable.
+- Place sponsor section after verification and before existing CTA. Heading: “Sponsorship & Ad Placements”. Copy: “We’re accepting sponsorship placements and site ad space to help fund continued development.” Link to `mailto:nikolas@helpmarq.com?subject=SAC%20Capital%20sponsorship%20placement` with visible label “Discuss a placement”.
+- Relative formatter uses “just now”, minutes, hours, or days; exact time uses `Europe/Athens`. Refresh age each minute. Preserve mobile layout.
 - Files: `frontend/src/App.tsx`, `frontend/src/components/sections/BotStatusBanner.tsx`, `frontend/src/components/sections/SponsorSection.tsx`, `frontend/index.html` only if Geist needs adding.
 - Pass: production build exits 0; screenshot check at 1440px/390px shows both sections, correct dates, relative ages, and zero console errors.
 
