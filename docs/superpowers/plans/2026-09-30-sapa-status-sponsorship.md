@@ -18,7 +18,10 @@
 
 ## Task 1: Bot status service and publisher
 - Add validated `GET`/authenticated `POST /api/bot-status`, fixed private Blob key, timestamp ordering with conditional ETag writes, public response projection, bounded request body, and sanitized errors.
-- Add historical seed from known successful 2026-09-24 activity and unknown-outcome 2026-08-27 full scan.
+- Event contract: `{ run_id, run_type: "routine" | "full_scan", status: "running" | "completed" | "failed", started_at, updated_at }`; timestamps are ISO 8601 UTC. Storage shape: `{ version: 1, latest_activity, latest_full_scan }`.
+- Seed latest activity as completed at `2026-09-24T11:04:06Z` (14:04 Europe/Athens), run id `20260924T110406Z`. Seed latest full scan at `2026-08-27T20:02:26Z` (23:02 Europe/Athens), id `20260827T200226Z`, status `unknown` because source records do not provide an outcome.
+- Advance each stored slot by `started_at`; same `run_id` updates its status. Use ETag compare-and-set with up to 3 retries; older events cannot replace newer records.
+- `BLOB_READ_WRITE_TOKEN` belongs to the private Blob SDK; `BOT_STATUS_WRITE_TOKEN` authenticates the bot. Both must be set for Preview and Production before deploy, and the writer token must also be on the bot host. Never commit values.
 - Add best-effort start/completion/failure publisher to the runner and focused tests.
 - Document the two runtime secrets and the Preview/Production setup gate.
 - Files: `frontend/api/bot-status.ts`, `frontend/api/_lib/bot-status.ts`, `frontend/api/_lib/bot-status.check.ts`, `frontend/public/bot-status-seed.json`, `frontend/package.json`, `frontend/package-lock.json`, `runner_equities.py`, `core/config.py`, `tests/test_bot_status.py`, `deploy/README.md`, `.env.example` (if one exists).
