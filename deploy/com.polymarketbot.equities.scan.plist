@@ -8,7 +8,11 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/nikolassapalidis/Developer/python/sapa_fund/.venv/bin/python</string>
+        <string>/opt/homebrew/bin/uv</string>
+        <string>run</string>
+        <string>--project</string>
+        <string>/Users/nikolassapalidis/Developer/python/sapa_fund</string>
+        <string>python</string>
         <string>runner_equities.py</string>
     </array>
 

@@ -12,7 +12,7 @@ const navLinks = [
   { label: "GitHub", href: "https://github.com/nikolas-sapa/sac-capital", external: true },
 ];
 
-export function NavBar() {
+export function NavBar({ children }: { children?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const scrolled = useScroll(60);
 
@@ -20,7 +20,7 @@ export function NavBar() {
     <header className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-4 px-4">
       <motion.nav
         initial={false}
-        animate={{ maxWidth: scrolled ? "480px" : "1200px" }}
+        animate={{ maxWidth: scrolled ? "760px" : "1200px" }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
         className={cn(
           "relative w-full flex items-center justify-between px-5 py-3 transition-all duration-300",
@@ -47,13 +47,14 @@ export function NavBar() {
           ))}
         </ul>
 
-        {/* Live badge — dot-only when scrolled, full label when expanded */}
-        <div className="hidden md:flex flex-1 items-center justify-end">
+        {/* Activity trigger stays in global navigation, outside page content. */}
+        <div className="flex min-w-0 items-center justify-end gap-2 md:flex-1">
+          {children}
           <a
             href="https://explorer.mantle.xyz/address/0x1d1fFbC1b5F5E0471f8e8E28eAf007dd24EB4887"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono text-[#0b7bff] border border-[rgba(11,123,255,0.3)] hover:border-[rgba(11,123,255,0.6)] transition-colors"
+            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono text-[#0b7bff] border border-[rgba(11,123,255,0.3)] hover:border-[rgba(11,123,255,0.6)] transition-colors"
           >
             <span className="relative flex h-1.5 w-1.5 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0b7bff] opacity-75" />
@@ -68,7 +69,7 @@ export function NavBar() {
           size="icon"
           variant="ghost"
           onClick={() => setOpen(!open)}
-          className="md:hidden text-[#F3F2EE]"
+          className="md:hidden shrink-0 text-[#F3F2EE]"
           aria-label="Toggle menu"
         >
           <MenuToggleIcon open={open} className="size-5" duration={300} />

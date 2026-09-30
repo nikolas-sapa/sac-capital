@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     allow_test_orders: bool = False
     live_trading_enabled: bool = False
     execution_provider: str = "internal_paper"  # internal_paper | alpaca_paper
+    bot_status_endpoint: str = ""
+    bot_status_write_token: str = ""
+    bot_status_timeout_seconds: float = 3.0
 
     # equities (Plan 07)
     equity_ledger_path: str = "data/equity.db"

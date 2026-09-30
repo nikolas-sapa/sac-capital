@@ -23,7 +23,9 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterator
+from typing import Callable, Iterator, TypeVar
+
+import httpx
 
 from core.alerts.telegram import TelegramAlerts
 from core.assets.instrument import CapTier, Instrument
@@ -1864,16 +1866,68 @@ async def run_once(
             print(f"WARNING: failed to write run manifest: {exc}")
 
 
+_RunResult = TypeVar("_RunResult")
+
+
+def _status_timestamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _publish_bot_status(settings, event: dict, *, post=None) -> bool:
+    """Publish one status event without affecting the runner result."""
+    endpoint = str(getattr(settings, "bot_status_endpoint", "")).strip()
+    token = str(getattr(settings, "bot_status_write_token", "")).strip()
+    if not endpoint:
+        return False
+    if not token:
+        print("WARN: bot status publisher disabled: BOT_STATUS_WRITE_TOKEN is missing")
+        return False
+    send = post or httpx.post
+    try:
+        response = send(
+            endpoint,
+            json=event,
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=float(getattr(settings, "bot_status_timeout_seconds", 3.0)),
+        )
+        response.raise_for_status()
+        return True
+    except Exception as exc:
+        print(f"WARN: bot status publish failed: {type(exc).__name__}")
+        return False
+
+
+def _run_with_bot_status(
+    action: Callable[[], _RunResult],
+    settings,
+    run_type: str,
+    *,
+    now: Callable[[], datetime] | None = None,
+) -> _RunResult:
+    clock = now or (lambda: datetime.now(timezone.utc))
+    started = clock()
+    started_at = _status_timestamp(started)
+    event = {
+        "run_id": started.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ"),
+        "run_type": run_type,
+        "status": "running",
+        "started_at": started_at,
+        "updated_at": started_at,
+    }
+    _publish_bot_status(settings, event)
+    try:
+        result = action()
+    except BaseException:
+        _publish_bot_status(settings, {**event, "status": "failed", "updated_at": _status_timestamp(clock())})
+        raise
+    _publish_bot_status(settings, {**event, "status": "completed", "updated_at": _status_timestamp(clock())})
+    return result
+
+
 def main() -> None:
     from scripts.preflight import run_preflight
 
-    preflight = run_preflight(load_config())
-    if not preflight.ok:
-        print("PREFLIGHT FAILED:")
-        for failure in preflight.failures:
-            print(f"  - {failure}")
-        sys.exit(1)
-
+    settings = load_config()
     parser = argparse.ArgumentParser(description="Equities paper runner")
     parser.add_argument("--no-analyse", action="store_true", help="Screen only; skip LLM analyst")
     parser.add_argument("--mark-only", action="store_true", help="Mark-to-market + exits only")
@@ -1887,31 +1941,42 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if args.reconcile_only:
-        asyncio.run(run_reconcile_only())
-        return
+    def execute() -> None:
+        preflight = run_preflight(settings)
+        if not preflight.ok:
+            print("PREFLIGHT FAILED:")
+            for failure in preflight.failures:
+                print(f"  - {failure}")
+            sys.exit(1)
 
-    asyncio.run(
-        run_once(
-            DEFAULT_SWING_UNIVERSE,
-            DEFAULT_CORE_UNIVERSE,
-            no_analyse=args.no_analyse,
-            mark_only=args.mark_only,
-            dry_run=args.dry_run,
-            checkpoint=args.checkpoint,
-            clear_analysis_checkpoints=args.clear_analysis_checkpoints,
+        if args.reconcile_only:
+            asyncio.run(run_reconcile_only())
+            return
+
+        asyncio.run(
+            run_once(
+                DEFAULT_SWING_UNIVERSE,
+                DEFAULT_CORE_UNIVERSE,
+                no_analyse=args.no_analyse,
+                mark_only=args.mark_only,
+                dry_run=args.dry_run,
+                checkpoint=args.checkpoint,
+                clear_analysis_checkpoints=args.clear_analysis_checkpoints,
+            )
         )
-    )
 
-    # Refresh the frontend's static snapshots so the website isn't stale.
-    # Only when running from the repo (skips silently for the pip-installed CLI,
-    # which has no frontend/ dir). ponytail: regen only; deploy stays manual.
-    regen = Path("scripts/generate_frontend_data.py")
-    if not args.dry_run and regen.is_file() and Path("frontend/public").is_dir():
-        try:
-            subprocess.run([sys.executable, str(regen)], check=True)
-        except Exception as exc:  # never fail the pipeline on a frontend-export hiccup
-            print(f"WARN: frontend data regen failed: {exc}")
+        # Refresh the frontend's static snapshots so the website isn't stale.
+        # Only when running from the repo (skips silently for the pip-installed CLI,
+        # which has no frontend/ dir). ponytail: regen only; deploy stays manual.
+        regen = Path("scripts/generate_frontend_data.py")
+        if not args.dry_run and regen.is_file() and Path("frontend/public").is_dir():
+            try:
+                subprocess.run([sys.executable, str(regen)], check=True)
+            except Exception as exc:  # never fail the pipeline on a frontend-export hiccup
+                print(f"WARN: frontend data regen failed: {exc}")
+
+    run_type = "routine" if args.mark_only or args.reconcile_only else "full_scan"
+    _run_with_bot_status(execute, settings, run_type)
 
 
 if __name__ == "__main__":

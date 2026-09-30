@@ -11,7 +11,7 @@ Several launchd agents drive the paper-trading loop locally.
 | Situational digest | `com.polymarketbot.situational-digest.plist` | Nightly 22:30 Athens time (`StartCalendarInterval`) |
 | Nightly harness | `com.polymarketbot.nightly.plist` | Nightly at 02:30 (`StartCalendarInterval`) |
 
-Both invoke the venv Python binary directly (no bare `uv`/`python` in PATH) and set `WorkingDirectory` so relative paths like `data/ledger.db` and `.env` resolve correctly.
+The equities mark and scan agents use the installed `uv` executable with `uv run --project` to create/use the project environment. Other agents that invoke Python directly still use their configured interpreter. Each agent sets `WorkingDirectory` so relative paths like `data/ledger.db` and `.env` resolve correctly.
 
 ---
 
@@ -22,6 +22,15 @@ Both invoke the venv Python binary directly (no bare `uv`/`python` in PATH) and 
    mkdir -p /Users/nikolassapalidis/sapa_fund/data
    ```
 2. `.env` at the project root must contain real credentials for live runs (API key, private key, etc.). Without it the bot runs in dry-run/dummy mode only.
+
+### Bot status publishing
+
+The website status API uses a private Vercel Blob object. Before deploying, set both runtime secrets in every Vercel target:
+
+- Preview: `BLOB_READ_WRITE_TOKEN` and `BOT_STATUS_WRITE_TOKEN`
+- Production: `BLOB_READ_WRITE_TOKEN` and `BOT_STATUS_WRITE_TOKEN`
+
+Do not deploy until both targets have both values. `BLOB_READ_WRITE_TOKEN` must come from the private Blob store. Use the same `BOT_STATUS_WRITE_TOKEN` on the bot host, together with `BOT_STATUS_ENDPOINT` set to the deployed `/api/bot-status` URL. Never commit secret values. Publishing is best effort: a missing endpoint disables it, and network/API failures only produce a warning.
 
 ---
 

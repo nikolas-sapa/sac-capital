@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "latest_activity": {
+    "run_id": "20260924T110406Z",
+    "run_type": "routine",
+    "status": "completed",
+    "started_at": "2026-09-24T11:04:06Z",
+    "updated_at": "2026-09-24T11:04:06Z"
+  },
+  "latest_full_scan": {
+    "run_id": "20260827T200226Z",
+    "run_type": "full_scan",
+    "status": "unknown",
+    "started_at": "2026-08-27T20:02:26Z",
+    "updated_at": "2026-08-27T20:02:26Z"
+  }
+}
