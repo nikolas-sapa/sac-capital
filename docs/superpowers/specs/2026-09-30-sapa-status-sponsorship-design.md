@@ -14,7 +14,7 @@ Publish public run freshness (latest bot activity and latest full scan) and a sp
 
 ## Desired behavior
 
-1. Site shows newest activity in relative time and exact Europe/Athens date/time, and separately identifies the most recent full scan with its relative time and date.
+1. Site shows a compact, visible bot-activity chip with the latest run age. Activating it opens a small accessible popup with the latest activity and latest full-scan relative ages and exact Europe/Athens date/times.
 2. Initial status is seeded from verified historical run records; full scan outcome remains explicitly unknown.
 3. Subsequent runner starts/completions update durable status. Status publishing errors log a warning and never change the bot's trading/run result.
 4. Sponsorship and on-site ad placements are described as accepting inquiries, with a mailto link to the supplied address.

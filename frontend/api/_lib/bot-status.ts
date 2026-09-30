@@ -4,6 +4,12 @@ export const BOT_STATUS_BLOB_PATH = "bot-status/status.json";
 export const MAX_EVENT_BODY_BYTES = 4_096;
 export const MAX_WRITE_ATTEMPTS = 3;
 
+export function validateContentLength(value: string | undefined): "missing" | "invalid" | "too-large" | null {
+  if (value === undefined) return "missing";
+  if (!/^\d+$/.test(value)) return "invalid";
+  return Number(value) > MAX_EVENT_BODY_BYTES ? "too-large" : null;
+}
+
 export type RunType = "routine" | "full_scan";
 export type PublishedStatus = "running" | "completed" | "failed";
 export type StoredStatus = PublishedStatus | "unknown";
@@ -233,6 +239,8 @@ function compareRuns(a: StoredBotStatusEvent, b: StoredBotStatusEvent): number {
   return time || a.run_id.localeCompare(b.run_id);
 }
 
+class InvalidStatusIdentityError extends Error {}
+
 function advance(current: StoredBotStatusEvent, event: BotStatusEvent): StoredBotStatusEvent {
   if (current.run_id === event.run_id) {
     return Date.parse(event.updated_at) >= Date.parse(current.updated_at) ? event : current;
@@ -241,6 +249,16 @@ function advance(current: StoredBotStatusEvent, event: BotStatusEvent): StoredBo
 }
 
 export function mergeEvent(document: BotStatusDocument, event: BotStatusEvent): BotStatusDocument {
+  const existingRun = [document.latest_activity, document.latest_full_scan].find(
+    (current) => current.run_id === event.run_id,
+  );
+  if (
+    existingRun &&
+    (existingRun.run_type !== event.run_type || existingRun.started_at !== event.started_at)
+  ) {
+    throw new InvalidStatusIdentityError("run identity cannot change");
+  }
+
   return {
     version: 1,
     latest_activity: advance(document.latest_activity, event),
@@ -309,7 +327,15 @@ export async function handleStatusRequest(
     } catch {
       return { status: 400, body: { error: "Invalid status event" } };
     }
-    const saved = await persistEvent(store, event, nowMs);
+    let saved: BotStatusDocument;
+    try {
+      saved = await persistEvent(store, event, nowMs);
+    } catch (error) {
+      if (error instanceof InvalidStatusIdentityError) {
+        return { status: 400, body: { error: "Invalid status event" } };
+      }
+      throw error;
+    }
     return { status: 200, body: projectPublicStatus(saved, nowMs) };
   } catch (error) {
     const constructorName = error instanceof Error ? error.constructor.name : undefined;

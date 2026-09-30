@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import type { Hex } from "viem";
 import { NavBar } from "@/components/sections/NavBar";
+import { BotStatusBanner } from "@/components/sections/BotStatusBanner";
 import { HeroSection } from "@/components/sections/HeroSection";
 import { HowItWorksSection } from "@/components/sections/HowItWorksSection";
 import { DecisionsSection } from "@/components/sections/DecisionsSection";
 import { PerformanceSection } from "@/components/sections/PerformanceSection";
 import { VerifySection } from "@/components/sections/VerifySection";
+import { SponsorSection } from "@/components/sections/SponsorSection";
 import { CTASection } from "@/components/sections/CTASection";
 import type { Commitment, RegistryEvent, PerformanceSummary, EquityPosition } from "@/types";
 import {
@@ -150,11 +152,13 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#0B0B0D]">
       <NavBar />
+      <BotStatusBanner />
       <HeroSection />
-<HowItWorksSection />
+      <HowItWorksSection />
       <PerformanceSection positions={positions} />
       <DecisionsSection positions={positions} />
       <VerifySection selected={selected} verifiedHash={verifiedHash} events={events} />
+      <SponsorSection />
       <CTASection />
       <footer className="border-t border-[rgba(243,242,238,0.06)] py-8 px-6 text-center">
         <p className="text-xs font-mono text-[rgba(243,242,238,0.3)]">

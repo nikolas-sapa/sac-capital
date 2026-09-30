@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "build": "npm run check:types && vite build",
+    "preview": "vite preview",
+    "check:types": "tsc -b && tsc --noEmit -p tsconfig.api.json",
+    "check:bot-status": "node api/_lib/bot-status.check.ts"
   },
   "dependencies": {
     "@paper-design/shaders": "0.0.76",

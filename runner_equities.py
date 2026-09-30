@@ -1928,13 +1928,6 @@ def main() -> None:
     from scripts.preflight import run_preflight
 
     settings = load_config()
-    preflight = run_preflight(settings)
-    if not preflight.ok:
-        print("PREFLIGHT FAILED:")
-        for failure in preflight.failures:
-            print(f"  - {failure}")
-        sys.exit(1)
-
     parser = argparse.ArgumentParser(description="Equities paper runner")
     parser.add_argument("--no-analyse", action="store_true", help="Screen only; skip LLM analyst")
     parser.add_argument("--mark-only", action="store_true", help="Mark-to-market + exits only")
@@ -1949,6 +1942,13 @@ def main() -> None:
     args = parser.parse_args()
 
     def execute() -> None:
+        preflight = run_preflight(settings)
+        if not preflight.ok:
+            print("PREFLIGHT FAILED:")
+            for failure in preflight.failures:
+                print(f"  - {failure}")
+            sys.exit(1)
+
         if args.reconcile_only:
             asyncio.run(run_reconcile_only())
             return

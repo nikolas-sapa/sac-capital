@@ -8,6 +8,7 @@ import {
   mergeEvent,
   persistEvent,
   projectPublicStatus,
+  validateContentLength,
   type BotStatusDocument,
   type BotStatusEvent,
   type BotStatusStore,
@@ -16,6 +17,10 @@ import {
 const NOW = Date.parse("2026-09-30T12:00:00Z");
 const TOKEN = "test-writer-token";
 const AUTH = `Bearer ${TOKEN}`;
+assert.equal(validateContentLength(undefined), "missing");
+assert.equal(validateContentLength("not-a-length"), "invalid");
+assert.equal(validateContentLength(String(MAX_EVENT_BODY_BYTES)), null);
+assert.equal(validateContentLength(String(MAX_EVENT_BODY_BYTES + 1)), "too-large");
 const event: BotStatusEvent = {
   run_id: "20260930T100000Z",
   run_type: "routine",
@@ -81,7 +86,7 @@ assert.equal((await handleStatusRequest({ method: "POST", authorization: AUTH, b
 assert.equal((await handleStatusRequest({ method: "POST", authorization: AUTH, body: { ...event, started_at: "today" } }, new MemoryStore(), TOKEN, NOW)).status, 400);
 assert.equal((await handleStatusRequest({ method: "POST", authorization: AUTH, body: { ...event, started_at: "2026-02-30T10:00:00Z" } }, new MemoryStore(), TOKEN, NOW)).status, 400);
 assert.equal((await handleStatusRequest({ method: "POST", authorization: AUTH, body: { ...event, updated_at: "2026-10-01T00:00:00Z" } }, new MemoryStore(), TOKEN, NOW)).status, 400);
-assert.equal((await handleStatusRequest({ method: "POST", authorization: AUTH, body: `{"padding":"${"x".repeat(MAX_EVENT_BODY_BYTES)}"}` }, new MemoryStore(), TOKEN, NOW)).status, 400);
+assert.equal((await handleStatusRequest({ method: "POST", authorization: AUTH, body: `${JSON.stringify(event)}${" ".repeat(MAX_EVENT_BODY_BYTES)}` }, new MemoryStore(), TOKEN, NOW)).status, 400);
 
 const routineStore = new MemoryStore();
 const routinePost = await handleStatusRequest({ method: "POST", authorization: AUTH, body: event }, routineStore, TOKEN, NOW);
@@ -129,6 +134,8 @@ const newer = mergeEvent(SEED_STATUS, event);
 assert.equal(newer.latest_activity.run_id, event.run_id);
 const completed = { ...event, status: "completed" as const, updated_at: "2026-09-30T10:05:00Z" };
 assert.equal(mergeEvent(newer, completed).latest_activity.status, "completed");
+const changedIdentity = { ...completed, run_type: "full_scan" as const, started_at: "2026-09-30T09:00:00Z" };
+assert.equal((await handleStatusRequest({ method: "POST", authorization: AUTH, body: changedIdentity }, new MemoryStore(newer), TOKEN, NOW)).status, 400);
 const afterScan = mergeEvent(newer, fullScan);
 assert.equal(afterScan.latest_activity.run_id, fullScan.run_id);
 assert.equal(afterScan.latest_full_scan.run_id, fullScan.run_id);

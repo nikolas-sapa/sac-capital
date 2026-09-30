@@ -140,3 +140,28 @@ def test_publish_failure_does_not_change_action_result(monkeypatch):
     assert runner_equities._run_with_bot_status(
         lambda: 42, _settings(), "routine", now=lambda: fixed
     ) == 42
+
+
+def test_preflight_failure_publishes_failed_status(monkeypatch, capsys):
+    from scripts import preflight
+
+    published: list[dict] = []
+    monkeypatch.setattr(runner_equities, "load_config", lambda: _settings())
+    monkeypatch.setattr(runner_equities.sys, "argv", ["runner_equities.py", "--mark-only"])
+    monkeypatch.setattr(
+        preflight,
+        "run_preflight",
+        lambda _settings: SimpleNamespace(ok=False, failures=["preflight issue"]),
+    )
+    monkeypatch.setattr(
+        runner_equities,
+        "_publish_bot_status",
+        lambda _settings, event: published.append(event.copy()) or True,
+    )
+
+    with pytest.raises(SystemExit, match="1"):
+        runner_equities.main()
+
+    assert [item["status"] for item in published] == ["running", "failed"]
+    assert {item["run_type"] for item in published} == {"routine"}
+    assert "PREFLIGHT FAILED" in capsys.readouterr().out
