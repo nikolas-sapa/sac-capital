@@ -11,7 +11,7 @@ Several launchd agents drive the paper-trading loop locally.
 | Situational digest | `com.polymarketbot.situational-digest.plist` | Nightly 22:30 Athens time (`StartCalendarInterval`) |
 | Nightly harness | `com.polymarketbot.nightly.plist` | Nightly at 02:30 (`StartCalendarInterval`) |
 
-Both invoke the venv Python binary directly (no bare `uv`/`python` in PATH) and set `WorkingDirectory` so relative paths like `data/ledger.db` and `.env` resolve correctly.
+The equities mark and scan agents use the installed `uv` executable with `uv run --project` to create/use the project environment. Other agents that invoke Python directly still use their configured interpreter. Each agent sets `WorkingDirectory` so relative paths like `data/ledger.db` and `.env` resolve correctly.
 
 ---
 
