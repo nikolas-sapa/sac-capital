@@ -7,6 +7,13 @@ import pytest
 from equities.data.senate_efd_disclosures import parse_senate_ptr_html, SenateEFDDisclosureProvider
 
 
+@pytest.fixture
+def fake_playwright():
+    """Stub sync_playwright so fetch() tests never launch a real browser or touch the network."""
+    with patch("playwright.sync_api.sync_playwright") as sp:
+        yield sp
+
+
 # Sample Senate PTR HTML table
 SENATE_PTR_HTML_SAMPLE = """
 <html>
@@ -217,7 +224,7 @@ def test_parse_senate_ptr_html_case_insensitive_ticker():
     assert trades[0].ticker == "AAPL"  # Normalized to uppercase
 
 
-def test_fetch_never_raises_on_agreement_failure():
+def test_fetch_never_raises_on_agreement_failure(fake_playwright):
     """Provider.fetch() never raises — errors surface in .error."""
     provider = SenateEFDDisclosureProvider(lookback_days=30)
 
@@ -232,7 +239,7 @@ def test_fetch_never_raises_on_agreement_failure():
         assert "Failed to accept agreement" in result.error
 
 
-def test_fetch_never_raises_on_search_failure():
+def test_fetch_never_raises_on_search_failure(fake_playwright):
     """Provider.fetch() never raises even if search fails."""
     provider = SenateEFDDisclosureProvider(lookback_days=30)
 
@@ -250,7 +257,7 @@ def test_fetch_never_raises_on_search_failure():
             assert "Failed to search" in result.error or "Network timeout" in result.error
 
 
-def test_fetch_handles_empty_search_results():
+def test_fetch_handles_empty_search_results(fake_playwright):
     """Provider.fetch() handles empty search results gracefully."""
     provider = SenateEFDDisclosureProvider(lookback_days=30)
 
@@ -266,7 +273,7 @@ def test_fetch_handles_empty_search_results():
             assert result.error is None
 
 
-def test_fetch_caps_reports_at_max():
+def test_fetch_caps_reports_at_max(fake_playwright):
     """Provider.fetch() respects max_reports limit."""
     provider = SenateEFDDisclosureProvider(lookback_days=30, max_reports=3)
 
