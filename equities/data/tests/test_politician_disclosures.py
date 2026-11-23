@@ -1,10 +1,8 @@
 from datetime import date
 
-import equities.data.politician_disclosures as mod
 from equities.data.politician_disclosures import (
-    PoliticianDisclosureProvider,
     PoliticianTrade,
-    _normalize_house_record,
+    _build_trade,
     parse_amount_range,
 )
 
@@ -15,18 +13,18 @@ def test_parse_amount_range_standard_bracket():
     assert parse_amount_range("garbage") == (0, 0)
 
 
-def test_normalize_house_record_buy():
-    raw = {
-        "ticker": "NVDA",
-        "representative": "Nancy Pelosi",
-        "type": "purchase",
-        "owner": "spouse",
-        "amount": "$50,001 - $100,000",
-        "transaction_date": "2026-06-10",
-        "disclosure_date": "2026-06-29",
-        "ptr_link": "https://disclosures-clerk.house.gov/x",
-    }
-    t = _normalize_house_record(raw)
+def test_build_trade_buy():
+    t = _build_trade(
+        ticker="NVDA",
+        politician="Nancy Pelosi",
+        chamber="house",
+        raw_type="purchase",
+        owner="spouse",
+        amount="$50,001 - $100,000",
+        txn_date="2026-06-10",
+        filed_date="2026-06-29",
+        url="https://disclosures-clerk.house.gov/x",
+    )
     assert isinstance(t, PoliticianTrade)
     assert t.ticker == "NVDA"
     assert t.transaction_type == "buy"
@@ -37,45 +35,21 @@ def test_normalize_house_record_buy():
     assert t.chamber == "house"
 
 
-def test_normalize_house_record_missing_ticker_returns_none():
-    assert _normalize_house_record({"ticker": "--", "type": "purchase"}) is None
+def test_build_trade_missing_ticker_returns_none():
+    assert _build_trade(
+        ticker="--", politician="x", chamber="house", raw_type="purchase",
+        owner="self", amount="", txn_date=None, filed_date=None, url=None,
+    ) is None
 
 
-def test_fetch_partial_failure_never_raises(monkeypatch):
-    def fake_fetch_json(url, *, timeout):
-        if "house" in url:
-            return [{
-                "ticker": "AAPL", "representative": "Rep A", "type": "purchase",
-                "owner": "self", "amount": "$1,001 - $15,000",
-                "transaction_date": "2026-06-01", "disclosure_date": "2026-06-20",
-                "ptr_link": "http://x",
-            }]
-        raise ValueError("senate feed down")
-
-    monkeypatch.setattr(mod, "_fetch_json", fake_fetch_json)
-    result = PoliticianDisclosureProvider(house_url="http://house", senate_url="http://senate").fetch()
-    assert len(result.trades) == 1
-    assert result.trades[0].ticker == "AAPL"
-    assert result.source == "house"
-    assert result.error is not None and "senate" in result.error
-
-
-def test_malformed_feed_never_raises(monkeypatch):
-    """Non-list payloads and non-dict / non-string-field rows must not crash fetch()."""
-    def fake_fetch_json(url, *, timeout):
-        if "house" in url:
-            return {"error": "AccessDenied"}          # dict, not list
-        return [
-            "garbage",                                  # non-dict row -> skipped
-            {"ticker": "AAPL", "representative": "Rep A", "type": "purchase",
-             "owner": "self", "amount": 12345,          # non-string amount
-             "transaction_date": 20260601,              # non-string date
-             "disclosure_date": "2026-06-20", "ptr_link": "http://x"},
-        ]
-    monkeypatch.setattr(mod, "_fetch_json", fake_fetch_json)
-    result = PoliticianDisclosureProvider(house_url="http://house", senate_url="http://senate").fetch()
-    assert result.error is not None and "house" in result.error  # dict payload surfaced as error
-    assert len(result.trades) == 1                                # senate good row survived
-    assert result.trades[0].ticker == "AAPL"
-    assert result.trades[0].amount_min == 12345                   # str-coerced amount parsed
-    assert result.trades[0].transaction_date is None              # numeric date -> None, no crash
+def test_build_trade_malformed_fields_no_crash():
+    """Non-string amount / unparseable date fields must not crash."""
+    t = _build_trade(
+        ticker="AAPL", politician="Rep A", chamber="senate",
+        raw_type="purchase", owner="self",
+        amount=12345, txn_date=20260601, filed_date="2026-06-20",
+        url="http://x",
+    )
+    assert t.ticker == "AAPL"
+    assert t.amount_min == 12345
+    assert t.transaction_date is None

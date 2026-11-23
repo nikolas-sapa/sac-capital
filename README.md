@@ -264,8 +264,6 @@ ANTHROPIC_STRONG_MODEL=claude-sonnet-4-6
 
 # Politician disclosure screen (off by default)
 POLITICIAN_SIGNAL_ENABLED=false
-# Feed URLs default to public House/Senate stock-watcher mirrors; override to
-# point at canonical sources. POLITICIAN_HOUSE_URL / POLITICIAN_SENATE_URL
 ```
 
 ---
