@@ -135,6 +135,10 @@ class TestDispatch:
     def test_research_passthrough_args(self, monkeypatch, tmp_path):
         import cli.main as m
         monkeypatch.setenv("SAC_HOME", str(tmp_path))
+        # Configured workdir, else dispatch takes the first-run setup path and prompts on stdin.
+        (tmp_path / ".env").write_text("A=1\n")
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("sys.argv", ["pytest"])  # dispatch rewrites sys.argv; restore after
         seen = {}
 
         def fake_research_main():
@@ -144,6 +148,7 @@ class TestDispatch:
         monkeypatch.setattr(m, "_research_main", lambda: fake_research_main())
         rc = m.main(["research", "--static-only"])
         assert rc == 0
+        assert seen["argv"] == ["--static-only"]
 
     def test_setup_dispatch(self, monkeypatch, tmp_path):
         import cli.main as m
